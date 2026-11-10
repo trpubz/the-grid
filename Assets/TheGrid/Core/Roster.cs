@@ -30,6 +30,16 @@ namespace TheGrid.Core
         public List<string> errors = new List<string>();
     }
 
+    public static class RosterFormat
+    {
+        // "4m", "1h 12m". Never negative.
+        public static string Elapsed(long sinceMs, long nowMs)
+        {
+            long minutes = Math.Max(0, nowMs - sinceMs) / 60000;
+            return minutes < 60 ? minutes + "m" : minutes / 60 + "h " + minutes % 60 + "m";
+        }
+    }
+
     // Turns the live session list into roster rows, remembering what it has seen between calls.
     public sealed class RosterBuilder
     {
