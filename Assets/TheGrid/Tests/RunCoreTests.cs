@@ -19,15 +19,20 @@ namespace TheGrid.Core.Tests
         {
             SessionState.SetBool(PendingKey, true);
             AssetDatabase.Refresh();
-            if (!EditorApplication.isCompiling) RunIfPending();
+            // If the refresh recompiled, a domain reload follows and discards this callback; RunPending then fires from the reload instead.
+            EditorApplication.update += RunPending;
         }
 
         [InitializeOnLoadMethod]
-        static void RunIfPending()
+        static void AfterReload() => EditorApplication.update += RunPending;
+
+        // On update, not delayCall: delayCall does not fire while the editor sits in the background.
+        static void RunPending()
         {
+            EditorApplication.update -= RunPending;
             if (!SessionState.GetBool(PendingKey, false)) return;
             SessionState.SetBool(PendingKey, false);
-            EditorApplication.delayCall += Run;
+            Run();
         }
 
         [MenuItem("The Grid/Run Core Tests")]
