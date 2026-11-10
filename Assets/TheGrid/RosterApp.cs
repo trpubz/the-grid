@@ -15,13 +15,15 @@ namespace TheGrid
         string settingsPath;
         Collector collector;
         Vector2 scroll;
-        RosterSnapshot logged;
+        RosterSnapshot logged, drawn = new RosterSnapshot();
         readonly Dictionary<string, string> lastState = new Dictionary<string, string>();
         GUIStyle chip, title, dim, detail, error, button;
 
         void Start()
         {
-            Application.targetFrameRate = 10; // a lens that sits open all day; nothing here needs more
+            // A lens that sits open all day: 10 frames a second is plenty. With vsync on, targetFrameRate is ignored and the app renders at the display rate.
+            QualitySettings.vSyncCount = 0;
+            Application.targetFrameRate = 10;
             Application.runInBackground = true;
             if (Camera.main != null)
             {
@@ -59,7 +61,9 @@ namespace TheGrid
             // Retina screens report pixels; draw in points so text keeps its size.
             float scale = Screen.dpi >= 160f ? 2f : 1f;
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
-            var snap = collector.Latest;
+            // IMGUI calls OnGUI once to lay out and again to paint; both passes must see the same rows.
+            if (Event.current.type == EventType.Layout) drawn = collector.Latest;
+            var snap = drawn;
             long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
             GUILayout.BeginArea(new Rect(8, 6, Screen.width / scale - 16, Screen.height / scale - 12));

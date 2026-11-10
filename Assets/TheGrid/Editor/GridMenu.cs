@@ -1,5 +1,6 @@
 using System;
 using UnityEditor;
+using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 
@@ -19,6 +20,27 @@ namespace TheGrid.EditorTools
             if (!EditorSceneManager.SaveScene(scene, RosterScene)) throw new InvalidOperationException("could not save " + RosterScene);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(RosterScene, true), new EditorBuildSettingsScene(DemoScene, true) };
             AssetDatabase.SaveAssets();
+        }
+
+        // Builds Builds/TheGrid.app: a resizable, narrow window that keeps running when it is not in front.
+        [MenuItem("The Grid/Build Mac App")]
+        public static void BuildMac()
+        {
+            PlayerSettings.productName = "The Grid";
+            PlayerSettings.resizableWindow = true;
+            PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
+            // Pixels. A retina screen halves these, giving a 400 by 750 point window.
+            PlayerSettings.defaultScreenWidth = 800;
+            PlayerSettings.defaultScreenHeight = 1500;
+            PlayerSettings.runInBackground = true;
+            var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            {
+                scenes = new[] { RosterScene, DemoScene },
+                locationPathName = "Builds/TheGrid.app",
+                target = BuildTarget.StandaloneOSX,
+                options = BuildOptions.None,
+            });
+            if (report.summary.result != BuildResult.Succeeded) throw new InvalidOperationException("build failed: " + report.summary.result);
         }
     }
 }

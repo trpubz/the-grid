@@ -14,12 +14,41 @@ This is an implementation starter. The included Unity component plays a fixed re
 4. Read [the agent brief](AGENT_HANDOFF.md), [the architecture](docs/architecture.md), [the transport contract](docs/protocol.md), and [the acceptance plan](docs/delivery.md).
 5. First implementation issue: prove a real supported send-and-reply path between two different agent apps. Record versions, exact capabilities, and failure behavior. Then connect observation and transport to Unity.
 
+## The roster
+
+The first working piece: a narrow window that lists your live Claude Code sessions on this Mac, with the one that needs you most on top. It reads what Claude Code already publishes about its own sessions, makes no network calls, and never writes to an agent app's files.
+
+- **Run it in the editor:** open the project in Unity 6000.4.3f1, open `Assets/TheGrid/Roster.unity`, press Play.
+- **Build the app:** menu **The Grid > Build Mac App**, then open `Builds/TheGrid.app`.
+- **Run the tests:** menu **The Grid > Run Core Tests**; results appear in Unity's Test Runner window and in `TestResults.xml` in the app's data folder. With the editor closed:
+
+  ```bash
+  /Applications/Unity/Hub/Editor/6000.4.3f1/Unity.app/Contents/MacOS/Unity -batchmode -nographics -projectPath "$PWD" -runTests -testPlatform EditMode -assemblyNames TheGrid.Core.Tests -testResults Logs/editmode.xml
+  ```
+
+Each row shows the state (question, permission, done, running and so on), the session name, its account, how long it has been in that state, the repo, the ticket read from the branch name, the pull request, and the workspace. Click the pull request to open it. Click the workspace to move the repo to the next one.
+
+Settings live in `~/Library/Application Support/DefaultCompany/The Grid/settings.json` and are created the first time you change a workspace:
+
+| Field | Meaning |
+|---|---|
+| `configDirs` | Claude config directories to read. Empty means `~/.claude` and every `~/.claude-*` that has a `projects` folder |
+| `claudePath` | Path to the `claude` program. Empty means look in `~/.local/bin`, `/opt/homebrew/bin` and `/usr/local/bin` |
+| `workspaces` | Workspace names, in the order a click cycles through them. Starts as `Personal` |
+| `repoWorkspaces` | Which repo belongs to which workspace. A repo not listed is `Personal` |
+
+The shape of the data the window draws is described in [docs/roster-snapshot.md](docs/roster-snapshot.md).
+
 ## Package map
 
 | Path | Purpose |
 |---|---|
 | Assets/TheGrid/GridReplay.cs | Small interactive 3D fixture viewer. No provider SDK dependency. |
 | Assets/TheGrid/Demo.unity | Scene with GridReplay attached. Open it and press Play. |
+| Assets/TheGrid/Core/ | Reads live sessions and builds the roster. No scene or editor code. |
+| Assets/TheGrid/RosterApp.cs, Roster.unity | The roster window and its scene. |
+| Assets/TheGrid/Tests/ | EditMode tests for Core. |
+| fixtures/ | Hand-written sample records and the pinned roster snapshot. |
 | Assets/TheGrid/Resources/grid-demo.json | Ordered offline projection for two synthetic users, sessions, and messages. |
 | tools/check_replay.py | Dependency-free contract check for the fixture. |
 | docs/protocol.md | Live envelope, identifiers, transactions, failure handling, and proposed routes. |
