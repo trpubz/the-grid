@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "roomId": "sector-demo",
+  "actors": [
+    {"id":"a1","owner":"Alex","harness":"codex","provider":"OpenAI"},
+    {"id":"b1","owner":"Sam","harness":"claude-code","provider":"Anthropic"}
+  ],
+  "events": [
+    {"seq":1,"id":"e01","type":"activity.changed","actor":"a1","value":"editing"},
+    {"seq":2,"id":"e02","type":"activity.changed","actor":"b1","value":"idle"},
+    {"seq":3,"id":"e03","type":"message.queued","actor":"a1","target":"b1","messageId":"m1","value":"Review the parser at commit 0123456789abcdef0123456789abcdef01234567."},
+    {"seq":4,"id":"e04","type":"message.delivered","actor":"b1","target":"a1","messageId":"m1"},
+    {"seq":5,"id":"e05","type":"activity.changed","actor":"b1","value":"testing"},
+    {"seq":6,"id":"e06","type":"activity.changed","actor":"b1","value":"waiting"},
+    {"seq":7,"id":"e07","type":"message.queued","actor":"b1","target":"a1","messageId":"m2","replyTo":"m1","value":"The parser tests pass on that commit."},
+    {"seq":8,"id":"e08","type":"message.delivered","actor":"a1","target":"b1","messageId":"m2"},
+    {"seq":9,"id":"e09","type":"activity.changed","actor":"a1","value":"reviewing"},
+    {"seq":10,"id":"e10","type":"presence.changed","actor":"b1","value":"offline"}
+  ]
+}
