@@ -1,0 +1,49 @@
+[
+  {
+    "pid": 1001,
+    "cwd": "/work/alpha",
+    "kind": "interactive",
+    "startedAt": 1794000000000,
+    "sessionId": "00000000-0000-4000-8000-000000000001",
+    "name": "alpha-01",
+    "status": "busy"
+  },
+  {
+    "pid": 1002,
+    "cwd": "/work/alpha",
+    "kind": "interactive",
+    "startedAt": 1794000100000,
+    "sessionId": "00000000-0000-4000-8000-000000000002",
+    "name": "alpha-02",
+    "status": "waiting",
+    "waitingFor": "input needed"
+  },
+  {
+    "pid": 1004,
+    "cwd": "/work/alpha",
+    "kind": "interactive",
+    "startedAt": 1794000150000,
+    "sessionId": "00000000-0000-4000-8000-000000000005",
+    "name": "alpha-03",
+    "status": "waiting",
+    "waitingFor": "permission prompt"
+  },
+  {
+    "pid": 1003,
+    "cwd": "/work/beta",
+    "kind": "interactive",
+    "startedAt": 1794000200000,
+    "sessionId": "00000000-0000-4000-8000-000000000003",
+    "name": "beta-01",
+    "status": "idle"
+  },
+  {
+    "id": "bg000001",
+    "cwd": "/work/beta",
+    "kind": "background",
+    "startedAt": 1794000300000,
+    "sessionId": "00000000-0000-4000-8000-000000000004",
+    "name": "beta-nightly",
+    "state": "blocked"
+  }
+]
