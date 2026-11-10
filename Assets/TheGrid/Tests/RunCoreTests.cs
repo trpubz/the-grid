@@ -8,30 +8,6 @@ namespace TheGrid.Core.Tests
     // <Application.persistentDataPath>/TestResults.xml; read that file for the result.
     public static class RunCoreTests
     {
-        const string PendingKey = "TheGrid.RunCoreTestsAfterReload";
-
-        // Picks up changed files, then runs the tests once the scripts have recompiled.
-        [MenuItem("The Grid/Refresh And Run Core Tests")]
-        public static void RefreshAndRun()
-        {
-            SessionState.SetBool(PendingKey, true);
-            AssetDatabase.Refresh();
-            // If the refresh recompiled, a domain reload follows and discards this callback; RunPending then fires from the reload instead.
-            EditorApplication.update += RunPending;
-        }
-
-        [InitializeOnLoadMethod]
-        static void AfterReload() => EditorApplication.update += RunPending;
-
-        // On update, not delayCall: delayCall does not fire while the editor sits in the background.
-        static void RunPending()
-        {
-            EditorApplication.update -= RunPending;
-            if (!SessionState.GetBool(PendingKey, false)) return;
-            SessionState.SetBool(PendingKey, false);
-            Run();
-        }
-
         [MenuItem("The Grid/Run Core Tests")]
         public static void Run()
         {
