@@ -114,10 +114,18 @@ namespace TheGrid
             while (Far && level < Iso.Zoom.Length - 1) level++;
         }
 
-        // Centres on a bot, at the level the view is at.
+        // Centres on a bot, close enough to make it out.
         public void LookAt(string botKey)
         {
-            if (stage != null && stage.TryGetBot(botKey, out var at)) centre = at;
+            if (stage == null || !stage.TryGetBot(botKey, out var at)) return;
+            while (Far && level < Iso.Zoom.Length - 1) level++;
+            centre = at;
+        }
+
+        // Selects a bot as a click on it does. A key no bot has selects nothing.
+        public void Select(string botKey)
+        {
+            if (stage != null && stage.TryGetBot(botKey, out _)) Selected = botKey;
         }
 
         public void ZoomBy(int steps) => level = Iso.ClampLevel(level + steps);
@@ -236,12 +244,13 @@ namespace TheGrid
         }
 
         // Mouse and keys, then the picture of the map and the names over it, drawn as text at the screen's own sharpness.
-        // Call inside OnGUI after Show.
-        public void Gui(GUIStyle label, GUIStyle loud)
+        // Call inside OnGUI after Show. covered: true for a point that something drawn over the map has taken; a press or a
+        // scroll there is not the map's.
+        public void Gui(GUIStyle label, GUIStyle loud, Func<Vector2, bool> covered = null)
         {
             if (holder == null) return;
             var e = Event.current;
-            Handle(e);
+            Handle(e, covered);
             if (e.type != EventType.Repaint) return;
 
             if (picture != null) GUI.DrawTexture(new Rect(view.x, view.y, pixelW / pointScale, pixelH / pointScale), picture, ScaleMode.StretchToFill, false);
@@ -305,9 +314,9 @@ namespace TheGrid
             GUI.Label(new Rect(rect.x + 5, rect.y, rect.width - 5, rect.height), content, style);
         }
 
-        void Handle(Event e)
+        void Handle(Event e, Func<Vector2, bool> covered)
         {
-            bool inside = view.Contains(e.mousePosition);
+            bool inside = view.Contains(e.mousePosition) && (covered == null || !covered(e.mousePosition));
             float k = Iso.Zoom[level] / pointScale;   // points per art pixel
             switch (e.type)
             {
