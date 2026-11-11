@@ -1,86 +1,39 @@
 """The Grid sprite factory.
 
-Builds every sprite from boxes, renders it as isometric pixel art and writes PNGs into Assets/TheGrid/Resources/Art.
-Run from the repo root:
+Renders every sprite as isometric pixel art and writes PNGs into Assets/TheGrid/Resources/Art, with sprites.json beside
+them saying what each one is. Run from the repo root:
 
     /Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python tools/art/make_sprites.py
 
-How it stays pixel art: the Workbench engine with flat lighting gives every face one flat colour, anti-aliasing is off,
-and every pixel is then snapped to PALETTE. The camera is orthographic, 30 degrees above the ground and turned 45 degrees,
-which draws a 1 by 1 ground square as a 64 by 32 diamond: one tile.
+The camera, the palette and the building blocks are in kit.py. This file is the entry point, and still holds the first
+sprite set, which draws from its own palette until the world stops using it.
 """
-import math
 import os
-import tempfile
+import sys
 
-import bpy
 import numpy as np
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-OUT = os.path.join(ROOT, "Assets", "TheGrid", "Resources", "Art")
-SHEET = os.path.join(ROOT, "docs", "art", "contact-sheet.png")
-TMP = os.path.join(tempfile.gettempdir(), "grid-sprite.png")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import kit
+from kit import hex_rgb, mat
 
-TILE_PX = 64                                   # one ground unit is 64 pixels wide on screen
-PX_PER_UNIT = TILE_PX / math.sqrt(2)           # across the screen
-PX_PER_Z = PX_PER_UNIT * math.cos(math.radians(30))   # one unit of height
+import bpy
 
-# One palette for everything. Navy shapes, neutral greys, and a few glow colours.
-PALETTE = [
-    "#070d1a", "#0a1222", "#0f1a2e", "#101b33", "#182746", "#22355c", "#2a416f", "#2c4470", "#3a5a94",   # navy, dark to light
-    "#05080f", "#121826", "#232c40", "#3a4660", "#8a97ad", "#ffffff",                                    # neutrals
-    "#35f2ff", "#1a8f9c", "#ffb23e", "#ff7a2e", "#ff4d4d", "#ff4fd8", "#5cf28a", "#4d8dff", "#a070ff",   # glows
-]
+# ---- the first sprite set ------------------------------------------------------------------------------------------
+
+PALETTE = kit.PALETTE_1
 N0, N1, N2, N3, N4, N5, N6, N7, N8 = PALETTE[0:9]
 K0, K1, K2, K3, K4, WHITE = PALETTE[9:15]
 CYAN, CYAN_DIM, AMBER, ORANGE, RED, PINK, GREEN, BLUE, VIOLET = PALETTE[15:24]
 BODY = (N5, N4, N3)        # top, left, right faces of an ordinary wall
 BODY_HI = (N6, N5, N4)
-BG = (0.035, 0.055, 0.085)  # the app's background, for the contact sheet
-
-
-def hex_rgb(h):
-    return tuple(int(h[i:i + 2], 16) / 255 for i in (1, 3, 5))
-
-
-PAL = np.array([hex_rgb(h) for h in PALETTE])
-
-
-def setup():
-    bpy.ops.wm.read_factory_settings(use_empty=True)
-    s = bpy.context.scene
-    s.render.engine = 'BLENDER_WORKBENCH'
-    sh = s.display.shading
-    sh.light, sh.color_type = 'FLAT', 'MATERIAL'
-    sh.show_shadows = sh.show_cavity = sh.show_object_outline = False
-    s.display.render_aa = 'OFF'
-    s.render.film_transparent = True
-    s.view_settings.view_transform = 'Standard'
-    s.render.image_settings.file_format, s.render.image_settings.color_mode = 'PNG', 'RGBA'
-    s.render.resolution_percentage = 100
-    cam = bpy.data.cameras.new("cam")
-    cam.type = 'ORTHO'
-    ob = bpy.data.objects.new("cam", cam)
-    s.collection.objects.link(ob)
-    s.camera = ob
-    ob.rotation_euler = (math.radians(60), 0, math.radians(45))
-    return s, ob
-
-
-SCENE, CAM = setup()
-MATS = {}
 TURN = 0    # quarter turns applied to everything built, so one model gives four facings
 SCALE = 1.0
 TALL = 1.0   # heights are stretched by this; buildings are drawn half again as tall as modelled, towers over the riders
 
 
-def mat(h):
-    if h not in MATS:
-        m = bpy.data.materials.new(h)
-        lin = lambda c: c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
-        m.diffuse_color = tuple(lin(c) for c in hex_rgb(h)) + (1,)
-        MATS[h] = m
-    return MATS[h]
+def render(name, w, h, ground_y):
+    kit.render(name, w, h, ground_y, palette=1)
 
 
 def box(cx, cy, z0, w, d, h, top, left=None, right=None):
@@ -104,54 +57,6 @@ def box(cx, cy, z0, w, d, h, top, left=None, right=None):
 
 def glow(cx, cy, z0, w, d, h, colour):
     box(cx, cy, z0, w, d, h, colour, colour, colour)
-
-
-def clear():
-    for o in [o for o in SCENE.objects if o.type == 'MESH']:
-        bpy.data.objects.remove(o, do_unlink=True)
-
-
-def snap(px):
-    """Every visible pixel becomes its nearest palette colour; alpha becomes fully on or fully off."""
-    h, w, _ = px.shape
-    out = np.zeros_like(px)
-    on = px[..., 3] > 0.5
-    rgb = px[..., :3][on]
-    if len(rgb):
-        nearest = np.argmin(((rgb[:, None, :] - PAL[None, :, :]) ** 2).sum(axis=2), axis=1)
-        out[..., :3][on] = PAL[nearest]
-        out[..., 3][on] = 1
-    return out
-
-
-def save(px, path):
-    h, w, _ = px.shape
-    img = bpy.data.images.new("out", w, h, alpha=True)
-    img.pixels = px.astype(np.float32).ravel()
-    img.filepath_raw, img.file_format = path, 'PNG'
-    img.save()
-    bpy.data.images.remove(img)
-
-
-SPRITES = []    # (name, pixels) in the order made, for the contact sheet
-
-
-def render(name, w, h, anchor_up_px):
-    """Renders what is in the scene to name.png, w by h. The ground point (0, 0, 0) lands at the horizontal centre,
-    anchor_up_px above the bottom edge."""
-    SCENE.render.resolution_x, SCENE.render.resolution_y = w, h
-    CAM.data.ortho_scale = max(w, h) / PX_PER_UNIT
-    tz = (h / 2 - anchor_up_px) / PX_PER_Z      # aim above the ground point so it sits low in the frame
-    d = 40
-    CAM.location = (0.612372 * d, -0.612372 * d, tz + 0.5 * d)
-    SCENE.render.filepath = TMP
-    bpy.ops.render.render(write_still=True)
-    img = bpy.data.images.load(TMP, check_existing=False)
-    px = snap(np.array(img.pixels[:]).reshape(h, w, 4))
-    bpy.data.images.remove(img)
-    save(px, os.path.join(OUT, name + ".png"))
-    SPRITES.append((name, px))
-    clear()
 
 
 # ---- tiles: 64 by 32, centred -------------------------------------------------------------------------------------
@@ -398,38 +303,10 @@ def draw_marker():
     return px
 
 
-def contact_sheet():
-    pad = 12
-    scale = lambda name: 4 if name.startswith("rider") or name == "marker" else 2     # small things shown larger
-    big = [(n, np.repeat(np.repeat(p, scale(n), axis=0), scale(n), axis=1)) for n, p in SPRITES]
-    rows = [[s for s in big if s[0].startswith("tile") or s[0].startswith("rider") or s[0] == "marker"],
-            [s for s in big if s[0].startswith("b-")][:5], [s for s in big if s[0].startswith("b-")][5:],
-            [s for s in big if s[0].startswith("o-")]]
-    k = 1
-    width = max(sum(p.shape[1] * k + pad for _, p in r) for r in rows) + pad
-    height = sum(max(p.shape[0] for _, p in r) * k + pad for r in rows) + pad
-    sheet = np.zeros((height, width, 4))
-    sheet[..., :3], sheet[..., 3] = BG, 1
-    y = height - pad
-    for r in rows:
-        x, rh = pad, max(p.shape[0] for _, p in r) * k
-        for _, big in r:
-            bh, bw, _ = big.shape
-            region = sheet[y - rh:y - rh + bh, x:x + bw]
-            a = big[..., 3:4]
-            region[..., :3] = big[..., :3] * a + region[..., :3] * (1 - a)
-            x += bw + pad
-        y -= rh + pad
-    os.makedirs(os.path.dirname(SHEET), exist_ok=True)
-    save(sheet, SHEET)
-
-
 def main():
-    os.makedirs(OUT, exist_ok=True)
+    os.makedirs(kit.OUT, exist_ok=True)
     global TURN, SCALE, TALL
-    pal = np.ones((1, len(PALETTE), 4))
-    pal[0, :, :3] = PAL
-    save(pal, os.path.join(OUT, "palette.png"))
+    kit.write_palettes()
 
     tile("tile-ground", N0)
     tile("tile-plot", N1)
@@ -460,12 +337,11 @@ def main():
     render("rider-small", 32, 32, 9)
     TURN, SCALE = 0, 1.0
 
-    m = snap(draw_marker())
-    save(m, os.path.join(OUT, "marker.png"))
-    SPRITES.append(("marker", m))
+    kit.record("marker", kit.snap(draw_marker(), 1), 0, palette=1)
 
-    contact_sheet()
-    print("SPRITES:", ", ".join(f"{n} {p.shape[1]}x{p.shape[0]}" for n, p in SPRITES))
+    kit.write_manifest()
+    kit.contact_sheet()
+    print("SPRITES:", ", ".join(f"{n} {p.shape[1]}x{p.shape[0]}" for n, p, _, _ in kit.SPRITES))
 
 
 main()

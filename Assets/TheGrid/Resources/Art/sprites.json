@@ -1,0 +1,220 @@
+{
+ "sprites": [
+  {
+   "name": "tile-ground",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16,
+   "palette": 1
+  },
+  {
+   "name": "tile-plot",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16,
+   "palette": 1
+  },
+  {
+   "name": "tile-kerb",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16,
+   "palette": 1
+  },
+  {
+   "name": "tile-alley",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16,
+   "palette": 1
+  },
+  {
+   "name": "tile-road",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16,
+   "palette": 1
+  },
+  {
+   "name": "tile-road-kerb",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16,
+   "palette": 1
+  },
+  {
+   "name": "tile-road-alley",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16,
+   "palette": 1
+  },
+  {
+   "name": "tile-water",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16,
+   "palette": 1
+  },
+  {
+   "name": "b-garage",
+   "width": 128,
+   "height": 192,
+   "groundX": 64,
+   "groundY": 32,
+   "palette": 1
+  },
+  {
+   "name": "b-library",
+   "width": 128,
+   "height": 192,
+   "groundX": 64,
+   "groundY": 32,
+   "palette": 1
+  },
+  {
+   "name": "b-lab",
+   "width": 128,
+   "height": 192,
+   "groundX": 64,
+   "groundY": 32,
+   "palette": 1
+  },
+  {
+   "name": "b-review",
+   "width": 128,
+   "height": 192,
+   "groundX": 64,
+   "groundY": 32,
+   "palette": 1
+  },
+  {
+   "name": "b-workshop",
+   "width": 128,
+   "height": 192,
+   "groundX": 64,
+   "groundY": 32,
+   "palette": 1
+  },
+  {
+   "name": "b-booth",
+   "width": 128,
+   "height": 192,
+   "groundX": 64,
+   "groundY": 32,
+   "palette": 1
+  },
+  {
+   "name": "b-gate",
+   "width": 128,
+   "height": 192,
+   "groundX": 64,
+   "groundY": 32,
+   "palette": 1
+  },
+  {
+   "name": "b-yard",
+   "width": 128,
+   "height": 192,
+   "groundX": 64,
+   "groundY": 32,
+   "palette": 1
+  },
+  {
+   "name": "b-lot",
+   "width": 128,
+   "height": 192,
+   "groundX": 64,
+   "groundY": 32,
+   "palette": 1
+  },
+  {
+   "name": "b-depot",
+   "width": 128,
+   "height": 192,
+   "groundX": 64,
+   "groundY": 32,
+   "palette": 1
+  },
+  {
+   "name": "o-stones",
+   "width": 128,
+   "height": 192,
+   "groundX": 64,
+   "groundY": 32,
+   "palette": 1
+  },
+  {
+   "name": "o-outcrop",
+   "width": 128,
+   "height": 192,
+   "groundX": 64,
+   "groundY": 32,
+   "palette": 1
+  },
+  {
+   "name": "o-spire",
+   "width": 128,
+   "height": 192,
+   "groundX": 64,
+   "groundY": 32,
+   "palette": 1
+  },
+  {
+   "name": "rider-se",
+   "width": 64,
+   "height": 64,
+   "groundX": 32,
+   "groundY": 18,
+   "palette": 1
+  },
+  {
+   "name": "rider-ne",
+   "width": 64,
+   "height": 64,
+   "groundX": 32,
+   "groundY": 18,
+   "palette": 1
+  },
+  {
+   "name": "rider-nw",
+   "width": 64,
+   "height": 64,
+   "groundX": 32,
+   "groundY": 18,
+   "palette": 1
+  },
+  {
+   "name": "rider-sw",
+   "width": 64,
+   "height": 64,
+   "groundX": 32,
+   "groundY": 18,
+   "palette": 1
+  },
+  {
+   "name": "rider-small",
+   "width": 32,
+   "height": 32,
+   "groundX": 16,
+   "groundY": 9,
+   "palette": 1
+  },
+  {
+   "name": "marker",
+   "width": 12,
+   "height": 16,
+   "groundX": 6,
+   "groundY": 0,
+   "palette": 1
+  }
+ ]
+}

@@ -34,7 +34,7 @@ This rewrites every PNG and `docs/art/contact-sheet.png`, a picture of the whole
 | `rider-small` | 32×32 | 9 pixels above the bottom edge |
 | `marker` | 12×16 | the bottom edge |
 
-Unity's import settings for these files are set by `Assets/TheGrid/Editor/ArtImport.cs`. Nobody sets them by hand.
+The script also writes `sprites.json` beside the pictures: every sprite's size and ground point. Unity's import settings for these files are set by `Assets/TheGrid/Editor/ArtImport.cs`, which takes each ground point from that file; the tests take what they expect from it too. Nobody sets any of it by hand. The camera, the palette and the building blocks are in `kit.py`.
 
 ## Add or change a building
 
