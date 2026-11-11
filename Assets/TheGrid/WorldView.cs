@@ -11,6 +11,7 @@ namespace TheGrid
     public sealed class WorldView : MonoBehaviour
     {
         const float RideSeconds = 1.2f, BounceSeconds = .4f;
+        const int OutlandRing = 3;   // plot-sized cells of scenery kept around the plots, enough to reach the edge of the overview
         const int MaxSmall = 3;   // subagents drawn beside a rider; the name label carries the full count
 
         static readonly string[] BuildingArt = { "b-garage", "b-library", "b-lab", "b-review", "b-workshop", "b-booth", "b-gate", "b-yard", "b-lot", "b-depot" };
@@ -32,7 +33,10 @@ namespace TheGrid
         Camera cam;
         Transform root;
         Tilemap ground;
-        Tile plotTile, kerbTile, alleyTile, roadTile, roadKerbTile;
+        Tile plotTile, kerbTile, alleyTile, roadTile, roadKerbTile, waterTile;
+        Sprite[] outlandSprites;  // stones, outcrop, spire
+        readonly Dictionary<Vector2Int, GameObject> outlands = new Dictionary<Vector2Int, GameObject>();
+        int outlandsFor = -1;     // how many plots the scenery was last laid out around
         Sprite[] buildingSprites, facing;   // facing: se, ne, nw, sw
         Sprite smallSprite, markerSprite;
         float[] roof;             // how far above its ground point each building's highest pixel is
@@ -45,7 +49,7 @@ namespace TheGrid
         float pointScale = 1f;
         int pixelW, pixelH, level = 2;
         bool fitted;              // the view opens on every plot, once there is a plot to open on
-        Vector2 centre, pressed;
+        Vector2 centre, pressed, last;
         bool dragging, moved;
         float fastUntil;
 
@@ -93,8 +97,11 @@ namespace TheGrid
 
         public void LookAtAll()
         {
-            level = Iso.FitLevel(pixelW, pixelH, bounds);
-            centre = bounds.center;
+            // The overview has to show more than the ground: the skyline stands above the back street, with its names over it.
+            var sight = bounds;
+            if (bounds.width > 0) sight.height += Mathf.Max(roof) + 24;
+            level = Iso.FitLevel(pixelW, pixelH, sight);
+            centre = sight.center;
         }
 
         // Two screen pixels to the art pixel, centred on the first city with a rider that needs the owner.
@@ -122,6 +129,7 @@ namespace TheGrid
                 if (painted.Add(city.plot)) Paint(city);   // a new plot is drawn once; the others are not touched
             }
             bounds = Iso.Bounds(cells);
+            LayOutlands(cells);
             if (!fitted)
             {
                 LookAtAll();
@@ -182,6 +190,8 @@ namespace TheGrid
             alleyTile = MakeTile("tile-alley");
             roadTile = MakeTile("tile-road");
             roadKerbTile = MakeTile("tile-road-kerb");
+            waterTile = MakeTile("tile-water");
+            outlandSprites = new[] { Art("o-stones"), Art("o-outcrop"), Art("o-spire") };
 
             buildingSprites = Array.ConvertAll(BuildingArt, Art);
             roof = Array.ConvertAll(buildingSprites, Top);
@@ -218,9 +228,80 @@ namespace TheGrid
             var o = Iso.PlotOrigin(city.cell);
             for (int col = 0; col < Iso.PlotTiles; col++)
                 for (int row = 0; row < Iso.PlotTiles; row++)
-                    ground.SetTile(new Vector3Int(-(o.y + row), -(o.x + col), 0), Ground(col, row));
+                    ground.SetTile(At(o.x + col, o.y + row), Ground(col, row));
             foreach (Building b in Enum.GetValues(typeof(Building)))
                 NewSprite(BuildingNames[(int)b], buildingSprites[(int)b], root).transform.localPosition = Iso.BuildingSpot(city.cell, b);
+        }
+
+        // Where a tile of the map is in Unity's isometric grid, whose axes run the other way.
+        static Vector3Int At(int col, int row) => new Vector3Int(-row, -col, 0);
+
+        // The outlands: the land does not stop at the last plot. Every empty cell near a plot gets stones, outcrops, now and then a
+        // spire or a lake, so the view runs on to its edges the way a tycoon map runs on into trees and shoreline. It is scenery:
+        // it says nothing about any agent, and it never moves.
+        void LayOutlands(List<Vector2Int> cells)
+        {
+            if (cells.Count == outlandsFor || cells.Count == 0) return;
+            outlandsFor = cells.Count;
+            var taken = new HashSet<Vector2Int>(cells);
+            int x0 = int.MaxValue, x1 = int.MinValue, y0 = int.MaxValue, y1 = int.MinValue;
+            foreach (var c in cells)
+            {
+                x0 = Mathf.Min(x0, c.x); x1 = Mathf.Max(x1, c.x); y0 = Mathf.Min(y0, c.y); y1 = Mathf.Max(y1, c.y);
+            }
+            for (int x = x0 - OutlandRing; x <= x1 + OutlandRing; x++)
+                for (int y = y0 - OutlandRing; y <= y1 + OutlandRing; y++)
+                {
+                    var cell = new Vector2Int(x, y);
+                    if (!taken.Contains(cell))
+                    {
+                        if (!outlands.ContainsKey(cell)) outlands[cell] = Scenery(cell);
+                    }
+                    else if (outlands.TryGetValue(cell, out var old))
+                    {
+                        // A new repo was given this cell: its plot has already been painted over the ground, so only the stones go.
+                        Kill(old);
+                        outlands.Remove(cell);
+                    }
+                }
+        }
+
+        GameObject Scenery(Vector2Int cell)
+        {
+            var holder = new GameObject("Outlands " + cell.x + " " + cell.y).transform;
+            holder.SetParent(root, false);
+            var o = Iso.PlotOrigin(cell);
+            var rng = new System.Random(cell.x * 73856093 ^ cell.y * 19349663);   // the same land every time the app opens
+
+            var water = new HashSet<Vector2Int>();
+            if (rng.Next(3) == 0)
+            {
+                int cx = rng.Next(2, 10), cy = rng.Next(2, 10);
+                float rx = rng.Next(2, 5), ry = rng.Next(2, 4);
+                for (int col = 0; col < Iso.PlotTiles; col++)
+                    for (int row = 0; row < Iso.PlotTiles; row++)
+                    {
+                        float dx = (col - cx) / rx, dy = (row - cy) / ry;
+                        if (dx * dx + dy * dy > 1f) continue;
+                        water.Add(new Vector2Int(col, row));
+                        ground.SetTile(At(o.x + col, o.y + row), waterTile);
+                    }
+            }
+
+            for (int i = 0; i < 6; i++)
+            {
+                int kind = rng.Next(10);
+                // A spire hides what stands behind it, so it keeps to the middle of its cell, clear of any plot next door.
+                int col = kind < 9 ? rng.Next(0, 11) : rng.Next(3, 8), row = kind < 9 ? rng.Next(0, 11) : rng.Next(3, 8);
+                bool wet = false;
+                for (int c = col; c <= col + 1; c++)
+                    for (int r = row; r <= row + 1; r++)
+                        wet |= water.Contains(new Vector2Int(c, r));
+                if (wet) continue;
+                var at = (Iso.TileCentre(o.x + col, o.y + row) + Iso.TileCentre(o.x + col + 1, o.y + row + 1)) / 2;
+                NewSprite("stone", outlandSprites[kind < 5 ? 0 : kind < 9 ? 1 : 2], holder).transform.localPosition = at;
+            }
+            return holder.gameObject;
         }
 
         // Light follows the buildings, not the tiles: a strip along each kerb of the two streets, which run past the buildings' fronts,
@@ -402,17 +483,27 @@ namespace TheGrid
                 case EventType.MouseDown when inside && e.button == 0:
                     dragging = true;
                     moved = false;
-                    pressed = e.mousePosition;
+                    pressed = last = e.mousePosition;
                     e.Use();
                     break;
                 case EventType.MouseDrag when dragging:
-                    if ((e.mousePosition - pressed).sqrMagnitude > 9) moved = true;
-                    centre += new Vector2(-e.delta.x, e.delta.y) / k;
-                    Moved(e);
-                    break;
                 case EventType.MouseUp when dragging:
-                    dragging = false;
-                    if (!moved) Selected = Pick(ToWorld(e.mousePosition - view.position));
+                    // The map follows where the pointer is, not the movement the event reports: a scripted or remote pointer leaves
+                    // that empty. A press that never strays three points is a click.
+                    if (moved || (e.mousePosition - pressed).sqrMagnitude > 9)
+                    {
+                        moved = true;
+                        var step = e.mousePosition - last;
+                        last = e.mousePosition;
+                        centre += new Vector2(-step.x, step.y) / k;
+                        PlaceCamera();
+                        fastUntil = Time.unscaledTime + .5f;
+                    }
+                    if (e.type == EventType.MouseUp)
+                    {
+                        dragging = false;
+                        if (!moved) Selected = Pick(ToWorld(e.mousePosition - view.position));
+                    }
                     e.Use();
                     break;
                 case EventType.ScrollWheel when inside:

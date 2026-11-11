@@ -72,6 +72,8 @@ The shape of the data the window draws is described in [docs/roster-snapshot.md]
 | Lot | done with its turn |
 | Depot | offline |
 
+Past the last plot the land carries on to the edge of the window: stones, outcrops, a spire or a lake here and there. That is scenery, laid out the same way every time; it says nothing about any agent.
+
 The Booth, the Gate and the Yard are where you are needed. The tall work buildings stand along the back street of a plot and the low ones along the front, so no tower hides a rider.
 
 - **Move:** drag, or scroll with two fingers.

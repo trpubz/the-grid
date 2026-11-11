@@ -206,7 +206,7 @@ namespace TheGrid
             var row = selected == "" ? null : drawn.agents.Find(a => a.account + "|" + a.sessionId == selected);
             // The row never takes more than half the view, however many subagents it lists or however short the window: there is
             // always a map to click, which is also how a selection is cleared. What does not fit scrolls.
-            float rowHeight = row == null ? 0 : Mathf.Min(52 + 16 * row.subagents.Count, area.height / 2);
+            float rowHeight = row == null ? 0 : Mathf.Min(60 + 16 * row.subagents.Count, area.height / 2);
             var map = new Rect(area.x, area.y, area.width, area.height - rowHeight);
             if (Event.current.type == EventType.Layout)
             {

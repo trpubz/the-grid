@@ -310,6 +310,52 @@ BUILDINGS = [("b-garage", b_garage), ("b-library", b_library), ("b-lab", b_lab),
              ("b-lot", b_lot), ("b-depot", b_depot)]
 
 
+# ---- outlands: what lies beyond the plots, out to the edge of the view. Dark and dim, so it never competes with a city. --
+
+ROCK = (N2, N1, N0)
+ROCK_HI = (N3, N2, N1)
+
+
+def column(cx, cy, w, h, faces=ROCK, seam=None):
+    """One square column of stone. A seam is a crack of light down its front."""
+    box(cx, cy, 0, w, w, h, *faces)
+    if seam:
+        glow(cx - w * .15, cy - w / 2 - .01, h * .2, .05, .02, h * .55, seam)
+
+
+def o_stones():      # a scatter of low stones
+    column(-.5, .2, .5, .25)
+    column(.1, -.3, .7, .4)
+    column(.55, .35, .4, .2)
+    column(-.15, .5, .35, .55, ROCK_HI)
+
+
+def o_outcrop():     # a stand of columns, one of them cracked
+    column(-.3, .3, .7, 1.1)
+    column(.6, .55, .4, 1.4, ROCK_HI)
+    column(.3, .1, .6, .7, seam=CYAN_DIM)
+    column(-.1, -.35, .5, .4)
+    column(-.7, -.1, .35, .3)
+
+
+def o_spire():       # a tower of stone with one lit seam, seen from far off
+    column(0, .2, .8, 1.2)
+    column(.1, .25, .55, 2.6, ROCK_HI, seam=CYAN_DIM)
+    column(-.35, -.2, .45, .6)
+    column(.5, -.1, .35, .9)
+
+
+OUTLANDS = [("o-stones", o_stones), ("o-outcrop", o_outcrop), ("o-spire", o_spire)]
+
+
+def water():
+    """A tile of still water: darker than the land, with two glints."""
+    box(0, 0, -.02, 1, 1, .02, K0)
+    glow(-.15, .2, 0, .4, .04, .001, CYAN_DIM)
+    glow(.2, -.2, 0, .25, .04, .001, N6)
+    render("tile-water", 64, 32, 16)
+
+
 # ---- riders: the glow is pure white so the game can tint it per account -------------------------------------------
 
 def rider():
@@ -357,7 +403,8 @@ def contact_sheet():
     scale = lambda name: 4 if name.startswith("rider") or name == "marker" else 2     # small things shown larger
     big = [(n, np.repeat(np.repeat(p, scale(n), axis=0), scale(n), axis=1)) for n, p in SPRITES]
     rows = [[s for s in big if s[0].startswith("tile") or s[0].startswith("rider") or s[0] == "marker"],
-            [s for s in big if s[0].startswith("b-")][:5], [s for s in big if s[0].startswith("b-")][5:]]
+            [s for s in big if s[0].startswith("b-")][:5], [s for s in big if s[0].startswith("b-")][5:],
+            [s for s in big if s[0].startswith("o-")]]
     k = 1
     width = max(sum(p.shape[1] * k + pad for _, p in r) for r in rows) + pad
     height = sum(max(p.shape[0] for _, p in r) * k + pad for r in rows) + pad
@@ -390,13 +437,19 @@ def main():
     tile("tile-alley", N1, alley=CYAN)
     tile("tile-road", N3)
     tile("tile-road-kerb", N3, kerb=CYAN)
+    water()
 
     TALL = 1.5
     for name, build in BUILDINGS:
         build()
         render(name, 128, 192, 32)       # footprint is 2 tiles: its centre sits 32 above the bottom edge, its near corner on it
 
-    TALL, SCALE = 1.0, 1.5
+    TALL = 1.0
+    for name, build in OUTLANDS:
+        build()
+        render(name, 128, 192, 32)
+
+    SCALE = 1.5
     for facing, turns in FACINGS:
         TURN = turns
         rider()

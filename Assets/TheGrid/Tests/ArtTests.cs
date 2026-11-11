@@ -8,7 +8,8 @@ namespace TheGrid.Core.Tests
     // The sprite set made by tools/art/make_sprites.py, as Unity imports it.
     public class ArtTests
     {
-        static readonly string[] Tiles = { "tile-ground", "tile-plot", "tile-kerb", "tile-alley", "tile-road", "tile-road-kerb" };
+        static readonly string[] Tiles = { "tile-ground", "tile-plot", "tile-kerb", "tile-alley", "tile-road", "tile-road-kerb", "tile-water" };
+        static readonly string[] Outlands = { "o-stones", "o-outcrop", "o-spire" };
         static readonly string[] Buildings = { "b-garage", "b-library", "b-lab", "b-review", "b-workshop", "b-booth", "b-gate", "b-yard", "b-lot", "b-depot" };
         static readonly string[] Riders = { "rider-se", "rider-ne", "rider-nw", "rider-sw" };
 
@@ -16,6 +17,7 @@ namespace TheGrid.Core.Tests
         {
             foreach (var n in Tiles) yield return new TestCaseData(n, 64, 32, 32f, 16f);
             foreach (var n in Buildings) yield return new TestCaseData(n, 128, 192, 64f, 32f);
+            foreach (var n in Outlands) yield return new TestCaseData(n, 128, 192, 64f, 32f);
             foreach (var n in Riders) yield return new TestCaseData(n, 64, 64, 32f, 18f);
             yield return new TestCaseData("rider-small", 32, 32, 16f, 9f);
             yield return new TestCaseData("marker", 12, 16, 6f, 0f);

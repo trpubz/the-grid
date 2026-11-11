@@ -20,6 +20,7 @@ This rewrites every PNG and `docs/art/contact-sheet.png`, a picture of the whole
 - **One palette.** `PALETTE` at the top of the script lists every colour. After rendering, each pixel is moved to its nearest palette colour. `palette.png` is that list as a picture, and a test checks every sprite against it.
 - **Glow** is just a thin box in a bright colour. On the ground it follows the buildings, not the tiles: `tile-kerb` and `tile-road-kerb` carry a strip along one edge for the two sides of a street, and `tile-alley` a strip along the other for the gap between two buildings. A strip on every tile makes a grid, and a grid reads as a car park.
 - **Buildings are stretched** to one and a half times their modelled height (`TALL`), so they tower over the riders. Write heights as if they were not.
+- **Outlands** (`o-*`, `tile-water`) are what lies beyond the plots. Keep them dark and dim: nothing out there may draw the eye from a city.
 - **Riders** are drawn in grey with a pure white glow line. The game tints them per account, so the white becomes that account's colour.
 
 ## What is where in a picture
@@ -28,6 +29,7 @@ This rewrites every PNG and `docs/art/contact-sheet.png`, a picture of the whole
 |---|---|---|
 | `tile-*` | 64×32 | the centre |
 | `b-*` (buildings) | 128×192 | the centre of the 2 by 2 tile footprint, 32 pixels above the bottom edge |
+| `o-*` (outlands: stones, outcrop, spire) | 128×192 | as a building |
 | `rider-se`, `-ne`, `-nw`, `-sw` | 64×64 | under the bike, 18 pixels above the bottom edge |
 | `rider-small` | 32×32 | 9 pixels above the bottom edge |
 | `marker` | 12×16 | the bottom edge |
