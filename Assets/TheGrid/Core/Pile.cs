@@ -161,8 +161,10 @@ namespace TheGrid.Core
             return m;
         }
 
+        const string DesktopAddress = "local_"; // how a desktop-app session is addressed
+
         // A socket path or a desktop-app session id, as opposed to a session name.
-        static bool IsAddress(string to) => to.StartsWith("uds:", StringComparison.Ordinal) || to.StartsWith("local_", StringComparison.Ordinal);
+        static bool IsAddress(string to) => to.StartsWith("uds:", StringComparison.Ordinal) || to.StartsWith(DesktopAddress, StringComparison.Ordinal);
 
         static string BodyKey(string account, string body)
         {
@@ -270,6 +272,8 @@ namespace TheGrid.Core
         }
 
         // Messages to a desktop-app session carry no shared id: pair a sent one with the oldest unpaired received one of the same text.
+        // Only a send addressed to a desktop session id qualifies. Any other send with no id is either waiting a moment for its
+        // result or was refused, and pairing it by text would swallow a different message that says the same thing.
         bool PairByText()
         {
             bool any = false;
@@ -283,7 +287,8 @@ namespace TheGrid.Core
             if (waiting.Count == 0) return false;
             foreach (var sent in state.messages.ToArray())
             {
-                if (sent.id != "" || sent.sendRef == "" || sent.recvRef != "" || !waiting.TryGetValue(sent.bodyKey, out var list) || list.Count == 0) continue;
+                if (sent.id != "" || sent.sendRef == "" || sent.recvRef != "" || !sent.to.StartsWith(DesktopAddress, StringComparison.Ordinal)) continue;
+                if (!waiting.TryGetValue(sent.bodyKey, out var list) || list.Count == 0) continue;
                 var received = list[0];
                 list.RemoveAt(0);
                 // Here `sent` is kept: it has been on screen longer. It was addressed by id, so the names come from the receipt.
@@ -317,6 +322,8 @@ namespace TheGrid.Core
                 lock (gate)
                 {
                     files.TryGetValue(path, out var known);
+                    // shortcut: a transcript rewritten in place to the same or a greater length is not noticed, because Claude Code only
+                    // appends to, moves or deletes these files; keep a checkpoint of the bytes before the offset if that ever changes.
                     if (known != null && known.length == length) continue; // nothing appended
                     from = known != null ? known.offset : 0;
                 }

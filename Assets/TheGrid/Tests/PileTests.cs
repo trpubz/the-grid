@@ -176,6 +176,31 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual("written-name", row.to);
         }
 
+        static string DesktopReceivedLine(string uuid, string body) =>
+            "{\"type\":\"user\",\"uuid\":\"" + uuid + "\",\"timestamp\":\"2026-01-02T08:00:00.000Z\",\"cwd\":\"/nowhere\",\"message\":{\"role\":\"user\",\"content\":\"Another session sent a message:\\n<cross-session-message from=\\\"local_0009\\\" name=\\\"Desk\\\">\\n"
+            + body + "\\n</cross-session-message>\"},\"origin\":{\"kind\":\"peer\",\"from\":\"local_0009\",\"hostInjected\":true}}\n";
+
+        // Pairing by text is for sends to a desktop-app session, which never get an id. A send to a named session gets one a moment
+        // later, and must not be swallowed by a desktop receipt that happens to say the same thing.
+        [Test]
+        public void OnlyASendToADesktopSessionIsPairedByText()
+        {
+            foreach (var f in new[] { senderPath, recipientPath, desktopPath }) File.Delete(f);
+            var sender = Path.Combine(cfg, "projects", "p1", "a.jsonl");
+            var desk = Path.Combine(cfg, "projects", "p3", "d.jsonl");
+            var peer = Path.Combine(cfg, "projects", "p2", "b.jsonl");
+            File.WriteAllText(desk, DesktopReceivedLine("h-u1", "Hello."));                       // a desktop receipt whose sender's record is gone
+            File.WriteAllText(sender, SentLine("toolu_n1", "written-name", "Hello."));            // another message, same words, result not written yet
+            Assert.AreEqual(2, pile.Poll(Now).rows.Count);
+
+            File.AppendAllText(sender, ResultLine("toolu_n1", "m-n1"));
+            File.WriteAllText(peer, ReceivedLine("n-u1", "m-n1", "sender-name"));
+            var rows = pile.Poll(Now + 2000).rows;
+            Assert.AreEqual(2, rows.Count);
+            Assert.AreEqual("written-name", rows.Single(r => r.from == "sender-name").to);
+            Assert.AreEqual("Desk", rows.Single(r => r.from != "sender-name").from);
+        }
+
         [Test]
         public void ATranscriptsOwnLabelStandsInWhenTheMessageNamesNobody()
         {
