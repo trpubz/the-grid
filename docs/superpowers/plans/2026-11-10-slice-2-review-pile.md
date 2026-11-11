@@ -51,12 +51,10 @@ The reviewer's to veto:
 6. **The flag needs both sides.** A message is flagged only when both its sent and received records were found and the two repos' workspaces differ. A message nobody has received yet is not flagged.
 7. **The pile runs on its own thread**, so the first long read never delays the roster.
 
-**Options waiting on the owner** (not built unless chosen; each is a small addition to the task named):
+8. **Side by side when there is room** (approved by the owner, 2026-11-10). At 720 points or wider the roster is on the left and the pile on the right, each with its own scroll; below 720, the two tabs of decision 2.
+9. **The whole message on demand** (approved by the owner, 2026-11-10; replaces decision 4). Clicking a row opens its full text under it, read from the transcript at that moment. `pile.json` gains only the transcript path and the byte offset of the record (`srcPath`, `srcOffset`); no body is stored. If the transcript is gone, the row says so.
 
-- **A, for decision 2: side by side when there is room.** The default window is now 1000 points wide. At 720 points or more, draw the roster on the left and the pile on the right, each with its own scroll; below 720, the two tabs. (Task 5)
-- **B, for decision 4: read the whole message on demand.** Clicking a row opens its full text under it, read from the transcript at that moment. `pile.json` gains only the transcript path and the byte offset of the record (`srcPath`, `srcOffset`); no body is stored. If the transcript is gone, the row says so. `ReadNewLines` passes each line's offset to `onLine`. (Tasks 1, 3 and 5)
-
-Not in this plan: delivering or sending messages, Codex and Grok, the isometric world, search, browsing or restoring archived rows, reading a full message body.
+Not in this plan: delivering or sending messages, Codex and Grok, the isometric world, search, browsing or restoring archived rows.
 
 ## Review Focus
 
@@ -99,7 +97,8 @@ Written "run the core tests" below. Pass means `Logs/editmode.xml` has `result="
 public static List<string> Transcripts(string configDir);   // <configDir>/projects/*/*.jsonl, top level only; empty when the folder is missing
 // Calls onLine for every complete line after `offset` that contains one of `markers`, and returns the offset just past the last complete line.
 // A last line with no newline is left for the next call. A file shorter than `offset` is read from 0. An unreadable file returns `offset`.
-public static long ReadNewLines(string path, long offset, string[] markers, Action<string> onLine, int bufferBytes = 1 << 20);
+public static long ReadNewLines(string path, long offset, string[] markers, Action<string, long> onLine, int bufferBytes = 1 << 20);   // onLine(line, byte offset of the line)
+public static string ReadLineAt(string path, long offset, int maxBytes = 4 << 20);   // the one line starting at `offset`, or null when it cannot be read
 ```
 
 Markers are matched on the raw bytes before a line is decoded, so the bulk of a transcript is never turned into strings. The buffer grows when one line is longer than it.
@@ -110,22 +109,23 @@ Markers are matched on the raw bytes before a line is decoded, so the bulk of a 
 var p = Path.Combine(cfg, "projects", "p1", "t.jsonl");
 File.WriteAllText(p, "{\"a\":1}\n{\"k\":\"hit\"}\n{\"k\":\"hit\",\"half");
 var seen = new List<string>();
-long at = SessionFiles.ReadNewLines(p, 0, new[] { "\"hit\"" }, seen.Add);
+long at = SessionFiles.ReadNewLines(p, 0, new[] { "\"hit\"" }, (l, o) => seen.Add(l));
 CollectionAssert.AreEqual(new[] { "{\"k\":\"hit\"}" }, seen);            // unmarked line skipped, half line left
 Assert.AreEqual(20, at);
 File.AppendAllText(p, "\"}\n");
 var markers = new[] { "\"hit\"" };
-long at2 = SessionFiles.ReadNewLines(p, at, markers, seen.Add);
+long at2 = SessionFiles.ReadNewLines(p, at, markers, (l, o) => seen.Add(l));
 Assert.AreEqual(new FileInfo(p).Length, at2);
 Assert.AreEqual(2, seen.Count);                                           // only the appended line, now complete
-Assert.AreEqual(at2, SessionFiles.ReadNewLines(p, at2, markers, seen.Add)); Assert.AreEqual(2, seen.Count);   // nothing new: nothing read
+Assert.AreEqual(at2, SessionFiles.ReadNewLines(p, at2, markers, (l, o) => seen.Add(l))); Assert.AreEqual(2, seen.Count);   // nothing new: nothing read
 
 // Review Focus 3
 File.WriteAllText(p, "{\"k\":\"hit\"}\n");                                // file replaced by a shorter one
-seen.Clear(); SessionFiles.ReadNewLines(p, at2, markers, seen.Add); Assert.AreEqual(1, seen.Count);
+seen.Clear(); SessionFiles.ReadNewLines(p, at2, markers, (l, o) => seen.Add(l)); Assert.AreEqual(1, seen.Count);
 File.WriteAllText(p, "{\"pad\":\"" + new string('x', 5000) + "\",\"k\":\"hit\"}\n");
-seen.Clear(); SessionFiles.ReadNewLines(p, 0, markers, seen.Add, bufferBytes: 64); Assert.AreEqual(1, seen.Count);   // line longer than the buffer
-Assert.AreEqual(7, SessionFiles.ReadNewLines("/no/such/file", 7, markers, seen.Add));
+seen.Clear(); SessionFiles.ReadNewLines(p, 0, markers, (l, o) => seen.Add(l), bufferBytes: 64); Assert.AreEqual(1, seen.Count);   // line longer than the buffer
+Assert.AreEqual(7, SessionFiles.ReadNewLines("/no/such/file", 7, markers, (l, o) => seen.Add(l)));
+Assert.AreEqual("{\"k\":\"hit\"}", SessionFiles.ReadLineAt(twoLines, 8)); Assert.IsNull(SessionFiles.ReadLineAt("/no/such/file", 0));   // twoLines: the first file above
 
 CollectionAssert.AreEqual(new[] { transcript, p }, SessionFiles.Transcripts(cfg));   // sorted; a .jsonl one folder deeper (a subagent's) is not listed
 Assert.AreEqual(0, SessionFiles.Transcripts(Path.Combine(cfg, "nowhere")).Count);
@@ -155,6 +155,7 @@ public sealed class MessageEvent {
     public long At;              // record timestamp, ms since 1970 UTC; 0 when unreadable
     public bool OwnSubagent;     // Sent with recipient_kind "agent", or SendResult with a pin
     public bool IsTitle;         // SessionName from ai-title: used only when no other name is known
+    public long Offset;          // byte offset of the record's line; set by the reader, not by Parse
 }
 public static class Messages {
     public static readonly string[] Markers = { "\"SendMessage\"", "\"peer\"", "\"msg_id\"", "\"pin\"", "\"agent-name\"", "\"custom-title\"", "\"ai-title\"" };
@@ -173,7 +174,7 @@ Fixtures (all synthetic; session ids `…0011`, `…0012`, `…0013`; folders `/
 ```csharp
 var s = Events("sender.jsonl");
 Assert.AreEqual(5, s.Count(e => e.Kind == MessageEventKind.Sent));
-Assert.AreEqual(5, s.Count(e => e.Kind == MessageEventKind.SendResult));
+Assert.AreEqual(4, s.Count(e => e.Kind == MessageEventKind.SendResult));         // a result with neither msg_id nor pin is not an event
 Assert.AreEqual(1, s.Count(e => e.Kind == MessageEventKind.Received));     // the handback is not an event
 var s1 = s.First(e => e.Kind == MessageEventKind.Sent);
 Assert.AreEqual("toolu_s1", s1.Ref); Assert.AreEqual("beta-01", s1.Peer); Assert.AreEqual("/work/alpha", s1.Cwd);
@@ -181,7 +182,6 @@ Assert.AreEqual("Synthetic handoff", s1.Summary); Assert.AreEqual(1767268805000L
 Assert.AreEqual("m-1001", s.First(e => e.Kind == MessageEventKind.SendResult).MsgId);
 Assert.IsTrue(s.Single(e => e.Kind == MessageEventKind.Sent && e.Ref == "toolu_s3").OwnSubagent);
 Assert.IsTrue(s.Single(e => e.Kind == MessageEventKind.SendResult && e.Ref == "toolu_s4").OwnSubagent);
-Assert.AreEqual("", s.Single(e => e.Kind == MessageEventKind.SendResult && e.Ref == "toolu_s5").MsgId);
 Assert.AreEqual("alpha-02", s.First(e => e.Kind == MessageEventKind.SessionName).Name);
 
 var r = Events("recipient.jsonl").Where(e => e.Kind == MessageEventKind.Received).ToList();
@@ -214,6 +214,7 @@ Assert.AreEqual(0, none.Count);
 [Serializable] public sealed class PileMessage {      // field names are the JSON keys of pile.json
     public string key = "", id = "", sendRef = "", recvRef = "", bodyKey = "", account = "";
     public string from = "", fromRepo = "", to = "", toRepo = "", summary = "", firstLine = "";
+    public string srcPath = ""; public long srcOffset;   // where the full text can be read: the sent record, else the received one
     public long sentAt, receivedAt;
     public bool ticked, archived;
 }
@@ -235,7 +236,10 @@ public sealed class Pile : IDisposable {
     public Pile(Settings settings, string home, string statePath);   // loads statePath if present
     public PileSnapshot Latest { get; }
     public void Apply(MessageEvent e, string transcriptPath, string configDir);   // used by Poll; public for tests
-    public void SetTicked(string key, bool ticked);                  // saves, republishes
+    public void Refresh();                                           // republishes, e.g. after a workspace changed
+    public void SetTicked(IEnumerable<string> keys, bool ticked);    // one save, republishes
+    public void SetTicked(string key, bool ticked);
+    public string ReadBody(string key);                              // the full text from the transcript, or null when it cannot be read
     public int Clear();                                              // archives ticked rows, saves, republishes; returns how many
     public PileSnapshot Poll(long nowMs);                            // Task 4
     public void Start(int intervalMs = 2000);                        // Task 4
@@ -371,11 +375,12 @@ public void Age(long since, long now, string expected) => Assert.AreEqual(expect
 
 Behaviour:
 - On start, after the collector: `pile = new Pile(settings, home, Path.Combine(Application.persistentDataPath, "pile.json")); pile.Start();`. `OnDestroy` disposes it.
-- A two-button toolbar above the list: `Agents (n)` and `Messages (n)`, where the second `n` counts unticked rows. The roster tab draws exactly what it draws today.
-- Messages tab, top line: `n to review · m archived` (plus `· reading history…` while `reading`), then the buttons `Tick shown` and `Clear ticked (k)`; `Clear ticked` is disabled when `k` is 0.
-- Each message is two lines. Line 1: a tick box, `from → to` in the title style, then the age (`PileFormat.Age`) at the right. Line 2, indented 24 points: when `crossWorkspace`, `fromWorkspace → toWorkspace` in the question red, then the summary if there is one, else the first line; clipped, never wrapped. An empty `from` or `to` is drawn as its repo name, or `unknown`.
+- At 720 points or wider: roster in the left half, pile in the right half. Narrower: a two-button toolbar above the list, `Agents (n)` and `Messages (n)`, where the second `n` counts unticked rows. The roster draws exactly what it draws today.
+- Pile, first line: `Messages: n to review · m archived` (plus `· reading history…` while `reading`). Second line: the buttons `Tick shown` and `Clear ticked (k)`; `Clear ticked` is disabled when `k` is 0.
+- Each message is two lines. Line 1: a tick box, `from → to` in the title style, then the age (`PileFormat.Age`) at the right. Line 2, indented 24 points: the summary if there is one, else the first line; clipped, never wrapped. When `crossWorkspace` the line is drawn in the question red and starts with `fromWorkspace → toWorkspace · `. Clicking line 1 opens the full text under the row (`Pile.ReadBody`, wrapped); clicking again closes it. One row is open at a time. An empty `from` or `to` is drawn as its repo name, or `unknown`.
 - The newest 200 rows are drawn; below them `… and n older` when there are more. `Tick shown` ticks only drawn rows.
 - The snapshot is taken on the `Layout` event, as the roster does, so both IMGUI passes see the same rows.
+- Cycling a workspace on the roster calls `pile.Refresh()` so the flags follow.
 - Log one line when the first full pass ends: `[pile] n messages, m archived`.
 
 - [ ] **Step 1:** Implement.
