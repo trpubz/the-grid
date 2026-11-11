@@ -38,6 +38,9 @@ namespace TheGrid.Core
             long minutes = Math.Max(0, nowMs - sinceMs) / 60000;
             return minutes < 60 ? minutes + "m" : minutes / 60 + "h " + minutes % 60 + "m";
         }
+
+        // A pull request link comes from a file on disk; only ever hand an https address to the system.
+        public static bool IsWebLink(string url) => !string.IsNullOrEmpty(url) && url.StartsWith("https://", StringComparison.Ordinal);
     }
 
     // Turns the live session list into roster rows, remembering what it has seen between calls.
@@ -111,7 +114,8 @@ namespace TheGrid.Core
         {
             var row = m.Row;
             var state = LiveSessions.Map(s);
-            bool changed = !m.Seen || state != m.State;
+            bool firstSight = !m.Seen;
+            bool changed = firstSight || state != m.State;
             m.Seen = true;
             m.State = state;
 
@@ -132,8 +136,10 @@ namespace TheGrid.Core
                 row.app = file.Entrypoint;
                 since = file.StatusUpdatedAt;
             }
+            // No session file (background sessions have none): a session already in this state when first seen has
+            // been so since some time after it started, which is closer to the truth than "since this app launched".
             if (since > 0) row.stateSince = since;
-            else if (changed) row.stateSince = nowMs;
+            else if (changed) row.stateSince = firstSight && s.StartedAt > 0 ? s.StartedAt : nowMs;
 
             if (m.TranscriptPath == null) m.TranscriptPath = SessionFiles.FindTranscript(s.ConfigDir, s.SessionId);
             if (m.TranscriptPath != null)

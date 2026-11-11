@@ -36,6 +36,16 @@ namespace TheGrid.Core
             return s;
         }
 
+        // Re-reads the file into this object, so a hand edit made while the app runs is not overwritten by the next Save.
+        public void Reload(string path)
+        {
+            var fresh = Load(path);
+            configDirs = fresh.configDirs;
+            claudePath = fresh.claudePath;
+            workspaces = fresh.workspaces;
+            repoWorkspaces = fresh.repoWorkspaces;
+        }
+
         public void Save(string path)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path));

@@ -52,19 +52,29 @@ namespace TheGrid.Core
     {
         readonly Settings settings;
         readonly string home;
+        // A quiet directory is still asked this often: background sessions leave no session file to watch.
+        public const long FullRefreshMs = 30000;
+
         readonly Func<string, string> agentsJsonForConfigDir;
+        readonly Func<string, string> changeStampForConfigDir;
         readonly RosterBuilder builder;
         readonly Dictionary<string, List<LiveSession>> lastGood = new Dictionary<string, List<LiveSession>>();
+        readonly Dictionary<string, string> lastStamp = new Dictionary<string, string>();
+        readonly Dictionary<string, long> lastRunAt = new Dictionary<string, long>();
+        readonly HashSet<string> failed = new HashSet<string>();
         readonly object gate = new object();
         readonly ManualResetEventSlim stop = new ManualResetEventSlim(false);
         volatile RosterSnapshot latest = new RosterSnapshot();
         Thread thread;
 
-        public Collector(Settings settings, string home, Func<string, string> agentsJsonForConfigDir)
+        // changeStampForConfigDir returns a value that moves whenever a directory's sessions may have changed.
+        // With one, the command only runs on a change, after a failure, or every FullRefreshMs. Without one it runs on every poll.
+        public Collector(Settings settings, string home, Func<string, string> agentsJsonForConfigDir, Func<string, string> changeStampForConfigDir = null)
         {
             this.settings = settings;
             this.home = home;
             this.agentsJsonForConfigDir = agentsJsonForConfigDir;
+            this.changeStampForConfigDir = changeStampForConfigDir;
             builder = new RosterBuilder(settings);
         }
 
@@ -76,17 +86,29 @@ namespace TheGrid.Core
             {
                 var live = new List<LiveSession>();
                 var errors = new List<string>();
+                bool anyRead = false;
                 foreach (var dir in settings.EffectiveConfigDirs(home))
                 {
-                    List<LiveSession> sessions = null;
-                    string error;
-                    try { if (!LiveSessions.TryParse(agentsJsonForConfigDir(dir), dir, out sessions, out error)) sessions = null; }
-                    catch (Exception e) { error = e.Message; }
-                    if (sessions != null) lastGood[dir] = sessions;
-                    else errors.Add(RosterBuilder.AccountLabel(dir) + ": " + error);
+                    string stamp = null;
+                    if (changeStampForConfigDir != null) try { stamp = changeStampForConfigDir(dir); } catch (Exception) { stamp = null; }
+                    bool due = stamp == null || failed.Contains(dir) || !lastRunAt.TryGetValue(dir, out var ranAt)
+                               || nowMs - ranAt >= FullRefreshMs || !lastStamp.TryGetValue(dir, out var before) || before != stamp;
+                    if (due)
+                    {
+                        anyRead = true;
+                        lastRunAt[dir] = nowMs;
+                        lastStamp[dir] = stamp;
+                        List<LiveSession> sessions = null;
+                        string error;
+                        try { if (!LiveSessions.TryParse(agentsJsonForConfigDir(dir), dir, out sessions, out error)) sessions = null; }
+                        catch (Exception e) { error = e.Message; }
+                        if (sessions != null) { lastGood[dir] = sessions; failed.Remove(dir); }
+                        else { failed.Add(dir); errors.Add(RosterBuilder.AccountLabel(dir) + ": " + error); }
+                    }
                     // A failed read reuses the last good one, so a hiccup never looks like every agent going offline.
                     if (lastGood.TryGetValue(dir, out var keep)) live.AddRange(keep);
                 }
+                if (!anyRead) return latest; // nothing changed anywhere: no command run, no files read
                 return latest = builder.Build(live, errors, nowMs);
             }
         }

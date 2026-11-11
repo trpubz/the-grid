@@ -120,5 +120,59 @@ namespace TheGrid.Core.Tests
             File.WriteAllText(usual, "");
             Assert.AreEqual(usual, ClaudeCli.ResolvePath("", places));
         }
+
+        [Test]
+        public void WhenNothingChangedTheCommandIsNotRunAndTheSnapshotIsKept()
+        {
+            int calls = 0;
+            using (var c = new Collector(settings, home, dir => { calls++; return agentsJson; }, dir => "same"))
+            {
+                var first = c.Poll(Now);
+                var second = c.Poll(Now + 2000);
+                Assert.AreEqual(1, calls);
+                Assert.AreSame(first, second);
+            }
+        }
+
+        [Test]
+        public void AChangeRunsTheCommandAgain()
+        {
+            int calls = 0, stamp = 0;
+            using (var c = new Collector(settings, home, dir => { calls++; return agentsJson; }, dir => "v" + stamp))
+            {
+                c.Poll(Now);
+                stamp = 1;
+                c.Poll(Now + 2000);
+                Assert.AreEqual(2, calls);
+            }
+        }
+
+        [Test]
+        public void AfterTheFullRefreshIntervalTheCommandRunsEvenWithNoChange()
+        {
+            int calls = 0;
+            using (var c = new Collector(settings, home, dir => { calls++; return agentsJson; }, dir => "same"))
+            {
+                c.Poll(Now);
+                c.Poll(Now + Collector.FullRefreshMs - 1);
+                Assert.AreEqual(1, calls);
+                c.Poll(Now + Collector.FullRefreshMs);
+                Assert.AreEqual(2, calls);
+            }
+        }
+
+        [Test]
+        public void AFailedReadIsTriedAgainOnTheNextPassEvenWithNoChange()
+        {
+            int calls = 0;
+            using (var c = new Collector(settings, home, dir => ++calls == 1 ? throw new InvalidOperationException("claude not found") : agentsJson, dir => "same"))
+            {
+                Assert.AreEqual(1, c.Poll(Now).errors.Count);
+                var second = c.Poll(Now + 2000);
+                Assert.AreEqual(2, calls);
+                Assert.AreEqual(5, second.agents.Count);
+                Assert.AreEqual(0, second.errors.Count);
+            }
+        }
     }
 }

@@ -38,7 +38,7 @@
             "rawStatus": "waiting / permission prompt",
             "workspace": "Personal",
             "prNumber": 0,
-            "stateSince": 1794000200000,
+            "stateSince": 1794000150000,
             "subagents": []
         },
         {
@@ -55,7 +55,7 @@
             "rawStatus": "blocked",
             "workspace": "Personal",
             "prNumber": 0,
-            "stateSince": 1794000200000,
+            "stateSince": 1794000300000,
             "subagents": []
         },
         {
@@ -89,7 +89,7 @@
             "rawStatus": "busy",
             "workspace": "Personal",
             "prNumber": 0,
-            "stateSince": 1794000200000,
+            "stateSince": 1794000000000,
             "subagents": []
         }
     ],

@@ -29,6 +29,27 @@ namespace TheGrid.Core
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is ArgumentException) { return false; }
         }
 
+        // Moves whenever a session file under <configDir>/sessions is rewritten, added or removed. Claude Code rewrites a
+        // session's file when its status changes and leaves it alone while idle, so this tells a poll whether anything happened.
+        public static string ChangeStamp(string configDir)
+        {
+            try
+            {
+                var dir = Path.Combine(configDir, "sessions");
+                if (!Directory.Exists(dir)) return "";
+                var files = Directory.GetFiles(dir, "*.json");
+                Array.Sort(files, StringComparer.Ordinal);
+                var sb = new StringBuilder();
+                foreach (var f in files)
+                {
+                    var fi = new FileInfo(f);
+                    sb.Append(fi.Name).Append(':').Append(fi.LastWriteTimeUtc.Ticks).Append(':').Append(fi.Length).Append(';');
+                }
+                return sb.ToString();
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException) { return ""; }
+        }
+
         // <configDir>/projects/*/<sessionId>.jsonl, or null.
         public static string FindTranscript(string configDir, string sessionId)
         {
@@ -68,15 +89,21 @@ namespace TheGrid.Core
             int end = text.LastIndexOf('\n');                      // a last line with no newline is still being written
             if ((startsMidFile && from == 0) || end < from) return meta;
 
-            foreach (var line in text.Substring(from, end - from).Split('\n'))
+            // Newest first, and stop parsing branch lines once one is found: nearly every line carries the branch.
+            var lines = text.Substring(from, end - from).Split('\n');
+            bool haveBranch = false, havePr = false;
+            for (int i = lines.Length - 1; i >= 0 && !(haveBranch && havePr); i--)
             {
-                if (line.IndexOf("\"gitBranch\"", StringComparison.Ordinal) < 0 && line.IndexOf("\"pr-link\"", StringComparison.Ordinal) < 0) continue;
+                var line = lines[i];
+                bool branchLine = !haveBranch && line.IndexOf("\"gitBranch\"", StringComparison.Ordinal) >= 0;
+                bool prLine = !havePr && line.IndexOf("\"pr-link\"", StringComparison.Ordinal) >= 0;
+                if (!branchLine && !prLine) continue;
                 Line r;
                 try { r = JsonUtility.FromJson<Line>(line); }
                 catch (ArgumentException) { continue; }
                 if (r == null) continue;
-                if (!string.IsNullOrEmpty(r.gitBranch)) meta.Branch = r.gitBranch;
-                if (r.type == "pr-link" && r.prNumber > 0) { meta.PrNumber = r.prNumber; meta.PrUrl = r.prUrl ?? ""; }
+                if (branchLine && !string.IsNullOrEmpty(r.gitBranch)) { meta.Branch = r.gitBranch; haveBranch = true; }
+                if (prLine && r.type == "pr-link" && r.prNumber > 0) { meta.PrNumber = r.prNumber; meta.PrUrl = r.prUrl ?? ""; havePr = true; }
             }
             return meta;
         }

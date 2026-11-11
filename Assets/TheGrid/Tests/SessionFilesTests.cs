@@ -92,5 +92,31 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual("", m.Branch);
             Assert.AreEqual(0, m.PrNumber);
         }
+
+        [Test]
+        public void AWindowThatStartsMidFileStillReadsTheCompleteLinesAfterIt()
+        {
+            long size = new FileInfo(transcript).Length;
+            Assert.Greater(size, 1300);
+            Assert.AreEqual("feature/demo-12-example-change", SessionFiles.ReadTranscriptTail(transcript, 1300).Branch);
+        }
+
+        [Test]
+        public void ChangeStampMovesWhenASessionFileIsRewrittenAddedOrRemoved()
+        {
+            var first = SessionFiles.ChangeStamp(cfg);
+            Assert.AreEqual(first, SessionFiles.ChangeStamp(cfg));
+            var file = Path.Combine(cfg, "sessions", "1002.json");
+            File.WriteAllText(file, "{\"pid\":1002,\"status\":\"idle\",\"statusUpdatedAt\":1794000999000}");
+            File.SetLastWriteTimeUtc(file, new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var rewritten = SessionFiles.ChangeStamp(cfg);
+            Assert.AreNotEqual(first, rewritten);
+            File.WriteAllText(Path.Combine(cfg, "sessions", "1003.json"), "{}");
+            var added = SessionFiles.ChangeStamp(cfg);
+            Assert.AreNotEqual(rewritten, added);
+            File.Delete(Path.Combine(cfg, "sessions", "1003.json"));
+            Assert.AreEqual(rewritten, SessionFiles.ChangeStamp(cfg));
+            Assert.AreEqual("", SessionFiles.ChangeStamp(Path.Combine(cfg, "nowhere")));
+        }
     }
 }

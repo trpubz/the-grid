@@ -10,5 +10,13 @@ namespace TheGrid.Core.Tests
         [TestCase(0L, 4320000L, "1h 12m")]
         [TestCase(5000L, 1000L, "0m")]
         public void Elapsed(long since, long now, string expected) => Assert.AreEqual(expected, RosterFormat.Elapsed(since, now));
+
+        [TestCase("https://example.invalid/demo/alpha/pull/7", true)]
+        [TestCase("http://example.invalid/x", false)]
+        [TestCase("file:///etc/passwd", false)]
+        [TestCase("javascript:alert(1)", false)]
+        [TestCase("", false)]
+        [TestCase(null, false)]
+        public void OnlyHttpsLinksAreOpened(string url, bool expected) => Assert.AreEqual(expected, RosterFormat.IsWebLink(url));
     }
 }

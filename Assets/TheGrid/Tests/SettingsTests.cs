@@ -91,5 +91,20 @@ namespace TheGrid.Core.Tests
             s.configDirs = new List<string> { "/only/this", "~/mine" };
             CollectionAssert.AreEqual(new[] { "/only/this", Path.Combine(home, "mine") }, s.EffectiveConfigDirs(home));
         }
+
+        [Test]
+        public void ReloadPicksUpAHandEditSoALaterSaveDoesNotLoseIt()
+        {
+            var s = Settings.Load(file);
+            s.Save(file);
+            File.WriteAllText(file, "{\"workspaces\":[\"Personal\",\"Work\"],\"claudePath\":\"/opt/claude\"}");
+            s.Reload(file);
+            Assert.AreEqual("Work", s.CycleWorkspace("/work/alpha"));
+            s.Save(file);
+            var again = Settings.Load(file);
+            CollectionAssert.AreEqual(new[] { "Personal", "Work" }, again.workspaces);
+            Assert.AreEqual("/opt/claude", again.claudePath);
+            Assert.AreEqual("Work", again.WorkspaceFor("/work/alpha"));
+        }
     }
 }

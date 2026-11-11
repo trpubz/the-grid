@@ -185,5 +185,16 @@ namespace TheGrid.Core.Tests
             if (actual != golden) File.WriteAllText(Path.Combine(Path.GetTempPath(), "grid-roster-snapshot.actual.json"), actual + "\n");
             Assert.AreEqual(golden, actual, "snapshot changed; the actual output is in the temp folder as grid-roster-snapshot.actual.json");
         }
+
+        [Test]
+        public void ARowWithNoSessionFileStartsItsClockWhenTheSessionStarted()
+        {
+            var old = Idle("s-1", "old-timer");
+            old.StartedAt = Now - 86400000;
+            var unknown = Idle("s-2", "no-start");
+            var snap = new RosterBuilder(settings).Build(new[] { old, unknown }, None, Now);
+            Assert.AreEqual(Now - 86400000, snap.agents.First(a => a.name == "old-timer").stateSince);
+            Assert.AreEqual(Now, snap.agents.First(a => a.name == "no-start").stateSince);
+        }
     }
 }

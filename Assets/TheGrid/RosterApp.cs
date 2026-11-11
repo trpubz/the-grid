@@ -18,6 +18,8 @@ namespace TheGrid
         RosterSnapshot logged, drawn = new RosterSnapshot();
         readonly Dictionary<string, string> lastState = new Dictionary<string, string>();
         GUIStyle chip, title, dim, detail, error, button;
+        float rowWidth, warnedWidth = -1f;
+        string lastErrors = "";
 
         void Start()
         {
@@ -33,8 +35,9 @@ namespace TheGrid
             var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             settingsPath = Path.Combine(Application.persistentDataPath, "settings.json");
             settings = Settings.Load(settingsPath);
+            if (!File.Exists(settingsPath)) TrySave(); // so there is a file to edit: workspaces are added by hand
             var claude = ClaudeCli.ResolvePath(settings.claudePath, ClaudeCli.UsualPlaces(home));
-            collector = new Collector(settings, home, dir => ClaudeCli.AgentsJson(claude, dir, home));
+            collector = new Collector(settings, home, dir => ClaudeCli.AgentsJson(claude, dir, home), SessionFiles.ChangeStamp);
             collector.Start();
         }
 
@@ -46,6 +49,9 @@ namespace TheGrid
             if (ReferenceEquals(snap, logged) || snap.generatedAt == 0) return;
             if (logged == null) Debug.Log("[roster] first snapshot: " + snap.agents.Count + " agents, " + snap.errors.Count + " errors");
             logged = snap;
+            var errors = string.Join(" | ", snap.errors);
+            if (errors != lastErrors) Debug.Log(errors == "" ? "[roster] errors cleared, " + snap.agents.Count + " agents" : "[roster] errors: " + errors);
+            lastErrors = errors;
             foreach (var a in snap.agents)
             {
                 var key = a.account + "|" + a.sessionId;
@@ -66,7 +72,8 @@ namespace TheGrid
             var snap = drawn;
             long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-            GUILayout.BeginArea(new Rect(8, 6, Screen.width / scale - 16, Screen.height / scale - 12));
+            rowWidth = Screen.width / scale - 16;
+            GUILayout.BeginArea(new Rect(8, 6, rowWidth, Screen.height / scale - 12));
             foreach (var e in snap.errors) GUILayout.Label(e, error);
             scroll = GUILayout.BeginScrollView(scroll);
             if (snap.agents.Count == 0 && snap.errors.Count == 0) GUILayout.Label(snap.generatedAt == 0 ? "Looking for agent sessions..." : "No live agent sessions.", dim);
@@ -87,6 +94,7 @@ namespace TheGrid
             GUILayout.FlexibleSpace();
             GUILayout.Label(RosterFormat.Elapsed(a.stateSince, now), dim);
             GUILayout.EndHorizontal();
+            CheckFits();
 
             GUILayout.BeginHorizontal();
             GUILayout.Space(88);
@@ -96,10 +104,11 @@ namespace TheGrid
             if (a.ticket != "") parts.Add(a.ticket);
             GUILayout.Label(string.Join("  ·  ", parts), detail);
             GUILayout.FlexibleSpace();
-            if (a.prNumber > 0 && GUILayout.Button("PR #" + a.prNumber, button)) Application.OpenURL(a.prUrl);
+            if (a.prNumber > 0 && GUILayout.Button("PR #" + a.prNumber, button) && RosterFormat.IsWebLink(a.prUrl)) Application.OpenURL(a.prUrl);
             if (a.repoRoot == "") GUILayout.Label(a.workspace, dim);
             else if (GUILayout.Button(a.workspace, button)) CycleWorkspace(a.repoRoot);
             GUILayout.EndHorizontal();
+            CheckFits();
 
             foreach (var s in a.subagents)
             {
@@ -111,10 +120,26 @@ namespace TheGrid
             GUILayout.Space(6);
         }
 
+        // Self-check: the row just drawn must fit the window. Logged once per window width.
+        void CheckFits()
+        {
+            if (Event.current.type != EventType.Repaint || Mathf.Approximately(warnedWidth, rowWidth)) return;
+            var r = GUILayoutUtility.GetLastRect();
+            if (r.xMax <= rowWidth + 1f) return;
+            warnedWidth = rowWidth;
+            Debug.LogWarning("[roster] layout overflow: a row needs " + Mathf.CeilToInt(r.xMax) + " points, the window gives " + Mathf.FloorToInt(rowWidth));
+        }
+
         // The collector reads these settings on its own thread; a read that overlaps this change shows up as one error line for one pass.
         void CycleWorkspace(string repoRoot)
         {
+            settings.Reload(settingsPath); // pick up workspaces added by hand since the app started
             settings.CycleWorkspace(repoRoot);
+            TrySave();
+        }
+
+        void TrySave()
+        {
             try { settings.Save(settingsPath); }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException) { Debug.LogWarning("[roster] could not save settings: " + e.Message); }
         }

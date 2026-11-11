@@ -16,7 +16,7 @@ This is an implementation starter. The included Unity component plays a fixed re
 
 ## The roster
 
-The first working piece: a narrow window that lists your live Claude Code sessions on this Mac, with the one that needs you most on top. It reads what Claude Code already publishes about its own sessions, makes no network calls, and never writes to an agent app's files.
+The first working piece: a narrow window that lists your live Claude Code sessions on this Mac, with the one that needs you most on top. It reads what Claude Code already publishes about its own sessions and never writes to an agent app's files. The Grid's own code makes no network calls; it does run the `claude` program to ask for the session list.
 
 - **Run it in the editor:** open the project in Unity 6000.4.3f1, open `Assets/TheGrid/Roster.unity`, press Play.
 - **Build the app:** menu **The Grid > Build Mac App**, then open `Builds/TheGrid.app`.
@@ -28,7 +28,7 @@ The first working piece: a narrow window that lists your live Claude Code sessio
 
 Each row shows the state (question, permission, done, running and so on), the session name, its account, how long it has been in that state, the repo, the ticket read from the branch name, the pull request, and the workspace. Click the pull request to open it. Click the workspace to move the repo to the next one.
 
-Settings live in `~/Library/Application Support/DefaultCompany/The Grid/settings.json` and are created the first time you change a workspace:
+Settings live in `~/Library/Application Support/DefaultCompany/The Grid/settings.json`, created on first launch. Edit the file to add workspaces; the app re-reads it the next time you click a workspace.
 
 | Field | Meaning |
 |---|---|
