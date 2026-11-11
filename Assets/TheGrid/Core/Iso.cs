@@ -37,8 +37,6 @@ namespace TheGrid.Core
 
         public static Vector2Int BuildingTile(Building b) => Tiles[(int)b];
 
-        public static bool IsRoad(int row) => row % 6 == 2 || row % 6 == 3;
-
         // The centre of a building's footprint.
         public static Vector2 BuildingSpot(Vector2Int cell, Building b)
         {

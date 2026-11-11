@@ -156,19 +156,24 @@ def render(name, w, h, anchor_up_px):
 
 # ---- tiles: 64 by 32, centred -------------------------------------------------------------------------------------
 
-def tile(name, fill, edge):
+def tile(name, fill, kerb=None, alley=None):
+    """Ground. Light is a strip along one edge, never a grid: a kerb strip runs the way a street runs, along the fronts of a
+    row of buildings; an alley strip runs between two buildings, along their sides."""
     box(0, 0, -.02, 1, 1, .02, fill)
-    box(0, .485, 0, 1, .03, .001, edge)      # two far edges only, so neighbouring tiles share one line
-    box(.485, 0, 0, .03, 1, .001, edge)
+    if kerb:
+        box(0, .455, 0, 1, .09, .001, kerb)
+    if alley:
+        box(.455, 0, 0, .09, 1, .001, alley)
     render(name, 64, 32, 16)
 
 
 # ---- buildings: 128 by 192, a 2 by 2 tile footprint whose near corner touches the bottom edge ----------------------
 
 def slab(fill=N3, edge=N4):
-    box(0, 0, 0, 2, 2, .04, fill, N1, N0)
-    box(0, -.97, .04, 2, .04, .01, edge)
-    box(.97, 0, .04, .04, 2, .01, edge)
+    """The pad a building stands on. A little smaller than the 2 by 2 footprint, so an alley shows between neighbours."""
+    box(0, 0, 0, 1.8, 1.8, .04, fill, N1, N0)
+    box(0, -.88, .04, 1.8, .04, .01, edge)
+    box(.88, 0, .04, .04, 1.8, .01, edge)
 
 
 def trim(cx, cy, z, w, d, colour):
@@ -379,10 +384,12 @@ def main():
     pal[0, :, :3] = PAL
     save(pal, os.path.join(OUT, "palette.png"))
 
-    # Every tile carries a strip of light along two edges; side by side they make the grid.
-    tile("tile-ground", N0, N2)
-    tile("tile-plot", N1, CYAN_DIM)
-    tile("tile-road", N3, CYAN)
+    tile("tile-ground", N0)
+    tile("tile-plot", N1)
+    tile("tile-kerb", N1, kerb=CYAN)
+    tile("tile-alley", N1, alley=CYAN)
+    tile("tile-road", N3)
+    tile("tile-road-kerb", N3, kerb=CYAN)
 
     TALL = 1.5
     for name, build in BUILDINGS:

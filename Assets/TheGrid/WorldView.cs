@@ -32,9 +32,10 @@ namespace TheGrid
         Camera cam;
         Transform root;
         Tilemap ground;
-        Tile plotTile, roadTile;
+        Tile plotTile, kerbTile, alleyTile, roadTile, roadKerbTile;
         Sprite[] buildingSprites, facing;   // facing: se, ne, nw, sw
         Sprite smallSprite, markerSprite;
+        float[] roof;             // how far above its ground point each building's highest pixel is
         readonly Dictionary<string, Rider> riders = new Dictionary<string, Rider>();
         readonly HashSet<int> painted = new HashSet<int>();
         readonly List<string> accounts = new List<string>();
@@ -177,9 +178,13 @@ namespace TheGrid
             ground.transform.SetParent(grid.transform, false);
             ground.gameObject.AddComponent<TilemapRenderer>().sortingOrder = -10;
             plotTile = MakeTile("tile-plot");
+            kerbTile = MakeTile("tile-kerb");
+            alleyTile = MakeTile("tile-alley");
             roadTile = MakeTile("tile-road");
+            roadKerbTile = MakeTile("tile-road-kerb");
 
             buildingSprites = Array.ConvertAll(BuildingArt, Art);
+            roof = Array.ConvertAll(buildingSprites, Top);
             facing = new[] { Art("rider-se"), Art("rider-ne"), Art("rider-nw"), Art("rider-sw") };
             smallSprite = Art("rider-small");
             markerSprite = Art("marker");
@@ -190,6 +195,15 @@ namespace TheGrid
             var s = Resources.Load<Sprite>("Art/" + name);
             if (s == null) Debug.LogError("[world] missing sprite Art/" + name + "; run tools/art/make_sprites.py");
             return s;
+        }
+
+        static float Top(Sprite s)
+        {
+            var px = s.texture.GetPixels32();
+            int w = s.texture.width;
+            for (int i = px.Length - 1; i >= 0; i--)
+                if (px[i].a > 0) return i / w + 1 - s.pivot.y;
+            return 0;
         }
 
         static Tile MakeTile(string name)
@@ -204,9 +218,24 @@ namespace TheGrid
             var o = Iso.PlotOrigin(city.cell);
             for (int col = 0; col < Iso.PlotTiles; col++)
                 for (int row = 0; row < Iso.PlotTiles; row++)
-                    ground.SetTile(new Vector3Int(-(o.y + row), -(o.x + col), 0), Iso.IsRoad(row) ? roadTile : plotTile);
+                    ground.SetTile(new Vector3Int(-(o.y + row), -(o.x + col), 0), Ground(col, row));
             foreach (Building b in Enum.GetValues(typeof(Building)))
                 NewSprite(BuildingNames[(int)b], buildingSprites[(int)b], root).transform.localPosition = Iso.BuildingSpot(city.cell, b);
+        }
+
+        // Light follows the buildings, not the tiles: a strip along each kerb of the two streets, which run past the buildings' fronts,
+        // and a strip down each alley between neighbouring buildings. Everything else is plain ground.
+        Tile Ground(int col, int row)
+        {
+            switch (row % 6)
+            {
+                case 0:
+                case 1: return col % 2 == 0 ? alleyTile : plotTile;   // a building row: footprints start on odd columns
+                case 2: return roadKerbTile;                           // the kerb at the buildings' feet
+                case 3: return roadTile;
+                case 4: return kerbTile;                               // the kerb on the far side of the street
+                default: return plotTile;
+            }
         }
 
         static SpriteRenderer NewSprite(string name, Sprite sprite, Transform parent)
@@ -333,14 +362,19 @@ namespace TheGrid
                     GUI.DrawTextureWithTexCoords(m, markerSprite.texture, new Rect(0, 0, 1, 1));
                     continue;
                 }
-                var name = ToView(Iso.TileCentre(Iso.PlotOrigin(city.cell).x, Iso.PlotOrigin(city.cell).y)) - new Vector2(0, 14);
-                Text(name, city.name, loud);
+                // The city's name goes at the open end of the back street, on the strip no building or rider uses. A building's name floats over its
+                // roof: riders park in front of buildings, so that is the one place it never covers one.
+                var o = Iso.PlotOrigin(city.cell);
+                Text(ToView((Iso.TileCentre(o.x, o.y + 2) + Iso.TileCentre(o.x, o.y + 3)) / 2) - new Vector2(0, 9), city.name, loud);
                 foreach (Building b in Enum.GetValues(typeof(Building)))
-                    Text(ToView(Iso.BuildingSpot(city.cell, b) - new Vector2(0, 26)), BuildingNames[(int)b], label);
-                foreach (var r in city.riders)
-                    if (riders.TryGetValue(r.key, out var rider))
-                        Text(ToView((Vector2)rider.at.localPosition - new Vector2(0, 10)), r.subagents > 0 ? r.name + " +" + r.subagents : r.name, r.key == Selected ? loud : label);
+                    Text(ToView(Iso.BuildingSpot(city.cell, b) + new Vector2(0, roof[(int)b] + 3)) - new Vector2(0, 18), BuildingNames[(int)b], label);
             }
+            // Riders are named last, over everything: where two plots meet, a rider's name matters more than a roof's.
+            if (!Far)
+                foreach (var city in model.cities)
+                    foreach (var r in city.riders)
+                        if (riders.TryGetValue(r.key, out var rider))
+                            Text(ToView((Vector2)rider.at.localPosition - new Vector2(0, 10)), r.subagents > 0 ? r.name + " +" + r.subagents : r.name, r.key == Selected ? loud : label);
             GUI.EndGroup();
         }
 
@@ -349,13 +383,14 @@ namespace TheGrid
         {
             if (at.x < -80 || at.y < -20 || at.x > view.width + 80 || at.y > view.height + 20) return;
             var content = new GUIContent(text);
-            var size = style.CalcSize(content);
+            // Text is drawn at the screen's scale, where it comes out a little wider than it measures; without slack the end is cut off.
+            var size = style.CalcSize(content) + new Vector2(10, 0);
             var rect = new Rect(Mathf.Round(at.x - size.x / 2), Mathf.Round(at.y), size.x, size.y);
             var old = GUI.color;
             GUI.color = new Color(.02f, .03f, .06f, .8f);
-            GUI.DrawTexture(new Rect(rect.x - 3, rect.y, rect.width + 6, rect.height), Texture2D.whiteTexture);
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
             GUI.color = old;
-            GUI.Label(rect, content, style);
+            GUI.Label(new Rect(rect.x + 5, rect.y, rect.width - 5, rect.height), content, style);
         }
 
         void Handle(Event e)
