@@ -335,6 +335,54 @@
    "groundX": 64,
    "groundY": 32,
    "palette": 2
+  },
+  {
+   "name": "b-server-tower",
+   "width": 256,
+   "height": 352,
+   "groundX": 128,
+   "groundY": 80,
+   "palette": 2
+  },
+  {
+   "name": "b-review-hall",
+   "width": 256,
+   "height": 288,
+   "groundX": 128,
+   "groundY": 80,
+   "palette": 2
+  },
+  {
+   "name": "b-works",
+   "width": 256,
+   "height": 224,
+   "groundX": 128,
+   "groundY": 80,
+   "palette": 2
+  },
+  {
+   "name": "b-relay",
+   "width": 192,
+   "height": 256,
+   "groundX": 96,
+   "groundY": 64,
+   "palette": 2
+  },
+  {
+   "name": "b-assembly-bay",
+   "width": 288,
+   "height": 224,
+   "groundX": 144,
+   "groundY": 88,
+   "palette": 2
+  },
+  {
+   "name": "b-test-workshop",
+   "width": 288,
+   "height": 224,
+   "groundX": 144,
+   "groundY": 88,
+   "palette": 2
   }
  ]
 }
