@@ -59,6 +59,30 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual("{ broken", File.ReadAllText(file + ".bad"));
         }
 
+        [Test]
+        public void AFailedSaveIsTriedAgainAndAnUnchangedLayoutIsNotRewritten()
+        {
+            var plots = new Plots();
+            plots.IndexFor("/work/alpha", out _);
+            var blocker = Path.Combine(tmp, "a-file");
+            File.WriteAllText(blocker, "");
+            Assert.Catch<IOException>(() => plots.SaveIfGrown(Path.Combine(blocker, "world.json"))); // no folder can be made under a file
+
+            var file = Path.Combine(tmp, "world.json");
+            plots.SaveIfGrown(file); // the write that failed is still owed
+            CollectionAssert.AreEqual(new[] { "/work/alpha" }, Plots.Load(file).repos);
+
+            var loaded = Plots.Load(file);
+            File.Delete(file);
+            plots.SaveIfGrown(file);
+            loaded.SaveIfGrown(file);
+            Assert.IsFalse(File.Exists(file), "nothing was added, so nothing is written");
+
+            loaded.IndexFor("/work/beta", out _);
+            loaded.SaveIfGrown(file);
+            CollectionAssert.AreEqual(new[] { "/work/alpha", "/work/beta" }, Plots.Load(file).repos);
+        }
+
         [TestCase("Running", "editing", Building.Garage)]
         [TestCase("Running", "reading", Building.Library)]
         [TestCase("Running", "testing", Building.Lab)]

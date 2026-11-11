@@ -12,6 +12,8 @@ namespace TheGrid.Core
         // A repo's index in this list is its plot number, for good. "" is the plot for sessions with no repo.
         public List<string> repos = new List<string>();
 
+        int saved;   // how many of them the file on disk holds; not part of the file
+
         public static Plots Load(string path)
         {
             Plots p = null;
@@ -24,6 +26,7 @@ namespace TheGrid.Core
             }
             p = p ?? new Plots();
             p.repos = p.repos ?? new List<string>();
+            p.saved = p.repos.Count;
             return p;
         }
 
@@ -33,6 +36,13 @@ namespace TheGrid.Core
             var tmp = path + ".tmp";
             File.WriteAllText(tmp, JsonUtility.ToJson(this, true));
             if (File.Exists(path)) File.Replace(tmp, path, null); else File.Move(tmp, path);
+            saved = repos.Count;
+        }
+
+        // Writes the file when plots were added since it was last written. A write that throws leaves them owed, so the next call tries again.
+        public void SaveIfGrown(string path)
+        {
+            if (repos.Count != saved) Save(path);
         }
 
         public int IndexFor(string repoRoot, out bool added)

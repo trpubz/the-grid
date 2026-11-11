@@ -33,7 +33,7 @@ namespace TheGrid
         WorldModel worldDrawn = new WorldModel();
         Plots plots;
         string plotsPath, selected = "", shotsDir;
-        int plotsSaved;
+        int plotsWarned = -1;
         RosterSnapshot fixedSnap;   // picture mode: the one snapshot there is
         string openKey = "", nextOpenKey = "", openBody = "";
         bool pileLogged;
@@ -78,7 +78,6 @@ namespace TheGrid
             // The world's own file: which repo has which plot.
             plotsPath = Path.Combine(Application.persistentDataPath, "world.json");
             plots = Plots.Load(plotsPath);
-            plotsSaved = plots.repos.Count;
         }
 
         static string Arg(string name)
@@ -210,11 +209,15 @@ namespace TheGrid
             if (Event.current.type == EventType.Layout)
             {
                 worldDrawn = World.Build(drawn, plots);
-                if (fixedSnap == null && plots.repos.Count != plotsSaved)
+                if (fixedSnap == null)
                 {
-                    plotsSaved = plots.repos.Count;
-                    try { plots.Save(plotsPath); }
-                    catch (Exception e) when (e is IOException || e is UnauthorizedAccessException) { Debug.LogWarning("[world] could not save plots: " + e.Message); }
+                    // A failed write is tried again on the next pass, so new plots are not lost when the disk recovers; it is logged once, not ten times a second.
+                    try { plots.SaveIfGrown(plotsPath); }
+                    catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+                    {
+                        if (plotsWarned != plots.repos.Count) Debug.LogWarning("[world] could not save plots, will keep trying: " + e.Message);
+                        plotsWarned = plots.repos.Count;
+                    }
                 }
                 world.Show(worldDrawn, map, scale);
             }
