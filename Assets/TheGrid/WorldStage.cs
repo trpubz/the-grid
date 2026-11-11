@@ -8,10 +8,9 @@ namespace TheGrid
 {
     // The scene's objects, built from the WorldModel: ground, lit lines, structures, bots, and the land beyond. It has no
     // camera, no input and no text; WorldView has those. What the art should look like is in docs/art-direction.md.
-    // A bot moves only when its agent's place changes; the only other motion is the bounce of a badge that needs the owner.
+    // A bot moves only when its agent's place changes. Badges are not here: the window draws them over the names.
     public sealed class WorldStage
     {
-        public const float BounceSeconds = .4f;
         const float WalkPixelsPerSecond = 4f * 36f;   // four tiles a second
         const float StepSeconds = .2f;
         const int OutlandRing = 3;   // plot-sized cells of city kept beyond the sectors, enough to reach the edge of the overview
@@ -20,7 +19,6 @@ namespace TheGrid
         // In the order of Structure.
         static readonly string[] StructureArt = { "b-server-tower", "b-review-hall", "b-relay", "b-works", "b-assembly-bay", "fountain", "b-test-workshop" };
         public static readonly string[] StructureNames = { "Server tower", "Review hall", "Relay", "Works", "Assembly bay", "", "Test workshop" };
-        static readonly string[] BadgeArt = { "", "badge-question", "badge-approve", "badge-fault", "badge-done" };   // in the order of Badge
         static readonly string[] StanceArt = { "stand", "type", "inspect", "off" };                                    // in the order of Stance
         // A bot's light is drawn in three marker colours: the light, its highlight, its dim partner. They become one of
         // these colourways, one an account: blue, white, orange. All from the art palette, and none of them amber: amber
@@ -39,7 +37,7 @@ namespace TheGrid
         sealed class Bot
         {
             public Transform at;
-            public SpriteRenderer body, badge;
+            public SpriteRenderer body;
             public readonly List<SpriteRenderer> small = new List<SpriteRenderer>();
             public Vector2 from, to;
             public float started = -100f, seconds = 1f;
@@ -56,8 +54,7 @@ namespace TheGrid
         readonly Dictionary<Vector2Int, GameObject> outlands = new Dictionary<Vector2Int, GameObject>();
         readonly List<string> accounts = new List<string>();
         readonly float[] tops = new float[StructureArt.Length];
-        int outlandsFor = -1, bouncing;
-        bool lastUp;
+        int outlandsFor = -1;
 
         // True while any bot is walking: the window draws faster while it lasts.
         public bool Walking { get; private set; }
@@ -135,9 +132,8 @@ namespace TheGrid
             return 0;
         }
 
-        // Lays out whatever changed in the model. far: the view is too far out for badges to be made out, so they are left
-        // off and the window draws one for each sector instead. Returns true: the picture has to be drawn again.
-        public bool Sync(WorldModel model, bool far)
+        // Lays out whatever changed in the model. Returns true: the picture has to be drawn again.
+        public bool Sync(WorldModel model)
         {
             var cells = new List<Vector2Int>();
             foreach (var sector in model.sectors)
@@ -158,7 +154,7 @@ namespace TheGrid
                 foreach (var b in sector.bots)
                 {
                     seen.Add(b.key);
-                    PutBot(b, Iso.BotSpot(sector.cell, b.place, b.slot), far);
+                    PutBot(b, Iso.BotSpot(sector.cell, b.place, b.slot));
                 }
             var gone = new List<string>();
             foreach (var kv in bots) if (!seen.Contains(kv.Key)) gone.Add(kv.Key);
@@ -167,23 +163,14 @@ namespace TheGrid
                 Kill(bots[key].at.gameObject);
                 bots.Remove(key);
             }
-            bouncing = 0;
-            foreach (var b in bots.Values)
-                if (b.badge.enabled && b.data.needsOwner) bouncing++;
             return true;
         }
 
-        // Walks and the badge bounce. Returns true when the picture has to be drawn again.
+        // Walks. Returns true when the picture has to be drawn again.
         public bool Tick(float now)
         {
             bool stale = false;
             Walking = false;
-            bool up = (int)(now / BounceSeconds) % 2 == 0;
-            if (up != lastUp)
-            {
-                lastUp = up;
-                if (bouncing > 0) stale = true;   // a badge on screen has just jumped
-            }
             foreach (var b in bots.Values)
             {
                 float t = Mathf.Clamp01((now - b.started) / b.seconds);
@@ -214,7 +201,6 @@ namespace TheGrid
                     b.shown = shown;
                     stale = true;
                 }
-                b.badge.transform.localPosition = new Vector3(0, b.data.needsOwner && up ? 39 : 37, 0);   // just over the helmet
             }
             return stale;
         }
@@ -346,7 +332,7 @@ namespace TheGrid
             return sr;
         }
 
-        void PutBot(WorldBot data, Vector2 spot, bool far)
+        void PutBot(WorldBot data, Vector2 spot)
         {
             if (!bots.TryGetValue(data.key, out var b))
             {
@@ -354,9 +340,6 @@ namespace TheGrid
                 b.body = NewSprite(data.name, null, root);
                 b.at = b.body.transform;
                 b.at.localPosition = new Vector3(spot.x, spot.y, -1);   // first sight: it is simply there
-                b.badge = NewSprite("badge", null, b.at);
-                b.badge.sortingOrder = 10;   // what a bot needs from the owner is never hidden behind a building
-                b.badge.transform.localPosition = new Vector3(0, 37, 0);
             }
             else if (spot != b.to)
             {
@@ -366,8 +349,6 @@ namespace TheGrid
                 b.seconds = Mathf.Max(.3f, (b.to - b.from).magnitude / WalkPixelsPerSecond);
             }
             b.data = data;
-            b.badge.sprite = data.badge == Badge.None ? null : Art(BadgeArt[(int)data.badge]);
-            b.badge.enabled = data.badge != Badge.None && !far;
 
             int want = Mathf.Min(data.subagents, MaxSmall);
             while (b.small.Count > want)

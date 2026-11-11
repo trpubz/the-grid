@@ -13,16 +13,17 @@ namespace TheGrid
     public sealed class WorldView : MonoBehaviour
     {
         static readonly Color Ground = new Color32(0x0b, 0x0e, 0x22, 255);   // the palette's ground colour
+        const float BounceSeconds = .4f;
+        const int BadgeHeight = 37;   // art pixels from where a bot stands to the foot of its badge: just over the helmet
 
         Camera cam;
         Transform holder;
         WorldStage stage;
-        Sprite farBadge;
+        readonly Sprite[] badges = new Sprite[5];   // in the order of Badge; none for Badge.None
 
         WorldModel model = new WorldModel();
         RenderTexture picture;    // the last drawing of the map
         bool stale = true;        // the map has changed since it was drawn
-        bool syncedFar;
         Rect view, bounds;        // view: where the map is, in points
         float pointScale = 1f;
         int pixelW, pixelH, level = 2;
@@ -95,6 +96,14 @@ namespace TheGrid
             if (model.sectors.Count == 0) return;
             var sector = model.sectors.Find(s => s.needOwner > 0) ?? model.sectors[0];
             LookAtSector(sector.cell);
+            // In a window too small for the whole sector, the first bot that needs the owner must still be in view: the
+            // view moves off the sector's middle only as far as that takes.
+            var waiting = sector.bots.Find(b => b.needsOwner);
+            if (waiting == null) return;
+            var at = Iso.BotSpot(sector.cell, waiting.place, waiting.slot) + new Vector2(0, 16);
+            float zoom = Iso.Zoom[level], reachX = Mathf.Max(0, pixelW / (2 * zoom) - 48), reachY = Mathf.Max(0, pixelH / (2 * zoom) - 48);
+            centre.x = Mathf.Clamp(centre.x, at.x - reachX, at.x + reachX);
+            centre.y = Mathf.Clamp(centre.y, at.y - reachY, at.y + reachY);
         }
 
         // One sector and its lane, at the closest level that fits: near enough to follow a bot from a doorway to a workstation.
@@ -135,9 +144,9 @@ namespace TheGrid
             }
             pixelW = Mathf.Max(2, width & ~1);    // even, so the centre of the view falls between two pixels and art stays crisp
             pixelH = Mathf.Max(2, height & ~1);
-            // The model is a new object only when the roster changed, and far or near changes only on a zoom. The rest of the
-            // time there is nothing to lay out, only the camera to keep where it should be.
-            if (!ReferenceEquals(world, model) || Far != syncedFar)
+            // The model is a new object only when the roster changed. The rest of the time there is nothing to lay out, only
+            // the camera to keep where it should be.
+            if (!ReferenceEquals(world, model))
             {
                 model = world;
                 var cells = new List<Vector2Int>();
@@ -148,8 +157,7 @@ namespace TheGrid
                     LookAtOpening();
                     opened = true;
                 }
-                stale |= stage.Sync(model, Far);
-                syncedFar = Far;
+                stale |= stage.Sync(model);
                 if (Selected != "" && !stage.TryGetBot(Selected, out _)) Selected = "";
             }
             PlaceCamera();
@@ -174,7 +182,8 @@ namespace TheGrid
             cam.transparencySortAxis = new Vector3(0, 1, .001f);
 
             stage = new WorldStage(holder);
-            farBadge = Resources.Load<Sprite>("Art/badge-question");
+            string[] art = { "", "badge-question", "badge-approve", "badge-fault", "badge-done" };
+            for (int i = 1; i < art.Length; i++) badges[i] = Resources.Load<Sprite>("Art/" + art[i]);
         }
 
         void Update()
@@ -238,7 +247,7 @@ namespace TheGrid
             if (picture != null) GUI.DrawTexture(new Rect(view.x, view.y, pixelW / pointScale, pixelH / pointScale), picture, ScaleMode.StretchToFill, false);
             GUI.BeginGroup(view);
             if (model.sectors.Count == 0) GUI.Label(new Rect(8, 8, view.width - 16, 20), "No live agent sessions.", label);
-            bool up = (int)(Time.unscaledTime / WorldStage.BounceSeconds) % 2 == 0;
+            bool up = (int)(Time.unscaledTime / BounceSeconds) % 2 == 0;
             foreach (var sector in model.sectors)
             {
                 var o = Iso.PlotOrigin(sector.cell);
@@ -250,8 +259,8 @@ namespace TheGrid
                     Text(at, sector.name, label);
                     var summary = World.Summary(sector);
                     if (summary != "") Text(at + new Vector2(0, 16), summary, sector.needOwner > 0 ? loud : label);
-                    if (sector.needOwner > 0 && farBadge != null)
-                        GUI.DrawTexture(new Rect(at.x - 8, at.y - 26 - (up ? 2 : 0), 16, 20), farBadge.texture);
+                    if (sector.needOwner > 0 && badges[(int)Badge.Question] != null)
+                        GUI.DrawTexture(new Rect(at.x - 8, at.y - 26 - (up ? 2 : 0), 16, 20), badges[(int)Badge.Question].texture);
                     continue;
                 }
                 // The sector's name lies on the lane along its front. A building's name floats over its roof: bots stand in
@@ -267,6 +276,17 @@ namespace TheGrid
                     foreach (var b in sector.bots)
                         if (stage.TryGetBot(b.key, out var at))
                             Text(ToView(at - new Vector2(0, 8)), b.subagents > 0 ? b.name + " +" + b.subagents : b.name, b.key == Selected ? loud : label);
+            // Badges go on last of all, over buildings and over names: what a bot needs from the owner is never covered.
+            // The three that need the owner bounce; done does not.
+            float k = Iso.Zoom[level] / pointScale;
+            if (!Far)
+                foreach (var sector in model.sectors)
+                    foreach (var b in sector.bots)
+                        if (b.badge != Badge.None && badges[(int)b.badge] != null && stage.TryGetBot(b.key, out var at))
+                        {
+                            var foot = ToView(at + new Vector2(0, BadgeHeight + (b.needsOwner && up ? 2 : 0)));
+                            GUI.DrawTexture(new Rect(Mathf.Round(foot.x - 8 * k), Mathf.Round(foot.y - 18 * k), 16 * k, 20 * k), badges[(int)b.badge].texture);
+                        }
             GUI.EndGroup();
         }
 
