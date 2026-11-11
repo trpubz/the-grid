@@ -38,7 +38,8 @@ namespace TheGrid.Core
                 if (!p.WaitForExit(timeoutMs))
                 {
                     try { p.Kill(); } catch (InvalidOperationException) { }
-                    throw new TimeoutException("claude agents did not answer within " + timeoutMs + " ms");
+                    // Seen when the child blocks opening a file: macOS holds it until the owner answers a folder-access prompt for this app.
+                    throw new TimeoutException("claude agents did not answer within " + timeoutMs + " ms. If macOS is asking whether this app may access your folders, answer that prompt.");
                 }
                 p.WaitForExit(); // let the output readers finish
                 if (p.ExitCode != 0) throw new InvalidOperationException("claude agents exited with " + p.ExitCode + ": " + stderr.Result.Trim().Split('\n')[0]);

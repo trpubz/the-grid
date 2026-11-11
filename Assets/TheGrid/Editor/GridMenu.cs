@@ -22,16 +22,16 @@ namespace TheGrid.EditorTools
             AssetDatabase.SaveAssets();
         }
 
-        // Builds Builds/TheGrid.app: a resizable, narrow window that keeps running when it is not in front.
+        // Builds Builds/TheGrid.app: a resizable window that keeps running when it is not in front.
         [MenuItem("The Grid/Build Mac App")]
         public static void BuildMac()
         {
             PlayerSettings.productName = "The Grid";
             PlayerSettings.resizableWindow = true;
             PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
-            // Pixels. A retina screen halves these, giving a 400 by 750 point window.
-            PlayerSettings.defaultScreenWidth = 800;
-            PlayerSettings.defaultScreenHeight = 1500;
+            // Pixels. A retina screen halves these, giving a 1000 by 625 point window: an ordinary landscape desktop window.
+            PlayerSettings.defaultScreenWidth = 2000;
+            PlayerSettings.defaultScreenHeight = 1250;
             PlayerSettings.runInBackground = true;
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
