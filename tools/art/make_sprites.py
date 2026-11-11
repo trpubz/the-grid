@@ -437,6 +437,7 @@ def main():
     tile("tile-alley", N1, alley=CYAN)
     tile("tile-road", N3)
     tile("tile-road-kerb", N3, kerb=CYAN)
+    tile("tile-road-alley", N3, alley=CYAN)     # for a thoroughfare that runs the other way
     water()
 
     TALL = 1.5

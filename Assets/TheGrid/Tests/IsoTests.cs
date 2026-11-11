@@ -57,6 +57,60 @@ namespace TheGrid.Core.Tests
             Assert.AreNotEqual(Iso.RiderSpot(new Vector2Int(0, 0), Building.Garage, 0), Iso.RiderSpot(cell, Building.Garage, 0));
         }
 
+        static readonly Vector2Int LowerLeft = new Vector2Int(0, 1), LowerRight = new Vector2Int(1, 0), UpperLeft = new Vector2Int(-1, 0), UpperRight = new Vector2Int(0, -1);
+
+        [Test]
+        public void ThreeCitiesInAnLShareOneNotch()
+        {
+            // The owner's example: alpha, beta beside it, and a third below beta. The first and the third each touch only beta,
+            // and the empty cell between them is where both get their road.
+            Vector2Int alpha = new Vector2Int(0, 0), beta = new Vector2Int(1, 0), third = new Vector2Int(1, 1), notch = new Vector2Int(0, 1);
+            var roads = Iso.Thoroughfares(new[] { alpha, beta, third });
+            Assert.AreEqual(2, roads.Count);
+            CollectionAssert.Contains(roads, (notch, alpha - notch));   // along alpha's lower-left side
+            CollectionAssert.Contains(roads, (notch, third - notch));   // along the third city's upper-left side: its left
+            Assert.AreEqual(UpperLeft, notch - third);
+        }
+
+        [Test]
+        public void ACityOnItsOwnGetsRoadsOnItsTwoFrontSides()
+        {
+            var city = new Vector2Int(3, -2);
+            var roads = Iso.Thoroughfares(new[] { city });
+            Assert.AreEqual(2, roads.Count);
+            CollectionAssert.Contains(roads, (city + LowerLeft, -LowerLeft));
+            CollectionAssert.Contains(roads, (city + LowerRight, -LowerRight));
+        }
+
+        [Test]
+        public void CitiesWithTwoNeighboursNeedNoRoads()
+        {
+            Assert.AreEqual(0, Iso.Thoroughfares(new[] { new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(1, 1), new Vector2Int(0, 1) }).Count);
+            Assert.AreEqual(0, Iso.Thoroughfares(new Vector2Int[0]).Count);
+        }
+
+        [Test]
+        public void HoweverManyCitiesEachHasCompanyOnTwoSidesAndNoRoadRunsThroughACity()
+        {
+            for (int n = 1; n <= 40; n++)
+            {
+                var cities = Enumerable.Range(0, n).Select(Plots.Cell).ToList();
+                var roads = Iso.Thoroughfares(cities);
+                CollectionAssert.AreEqual(roads, Iso.Thoroughfares(cities), "the same cities give the same roads");
+                foreach (var r in roads)
+                {
+                    CollectionAssert.DoesNotContain(cities, r.cell, n + " cities: a road runs through a city");
+                    CollectionAssert.Contains(cities, r.cell + r.toCity, n + " cities: a road serves no city");
+                }
+                foreach (var city in cities)
+                {
+                    int company = Iso.Sides.Count(side => cities.Contains(city + side) || roads.Contains((city + side, -side)));
+                    Assert.GreaterOrEqual(company, 2, n + " cities: " + city + " is stranded");
+                    Assert.AreEqual(Math.Max(0, 2 - Iso.Sides.Count(side => cities.Contains(city + side))), roads.Count(r => r.cell + r.toCity == city), n + " cities: " + city + " has roads it does not need");
+                }
+            }
+        }
+
         [Test]
         public void BoundsCoverThePlots()
         {

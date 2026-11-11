@@ -8,7 +8,7 @@ namespace TheGrid.Core.Tests
     // The sprite set made by tools/art/make_sprites.py, as Unity imports it.
     public class ArtTests
     {
-        static readonly string[] Tiles = { "tile-ground", "tile-plot", "tile-kerb", "tile-alley", "tile-road", "tile-road-kerb", "tile-water" };
+        static readonly string[] Tiles = { "tile-ground", "tile-plot", "tile-kerb", "tile-alley", "tile-road", "tile-road-kerb", "tile-road-alley", "tile-water" };
         static readonly string[] Outlands = { "o-stones", "o-outcrop", "o-spire" };
         static readonly string[] Buildings = { "b-garage", "b-library", "b-lab", "b-review", "b-workshop", "b-booth", "b-gate", "b-yard", "b-lot", "b-depot" };
         static readonly string[] Riders = { "rider-se", "rider-ne", "rider-nw", "rider-sw" };

@@ -54,6 +54,42 @@ namespace TheGrid.Core
             return Point(o.x + slot % RidersPerRow + t.y / 6 * .25f, o.y + 1.75f + slot / RidersPerRow * .5f);
         }
 
+        // The four sides of a plot, each as the step to the cell beyond it. On screen: lower left, lower right, upper left, upper right.
+        public static readonly Vector2Int[] Sides = { new Vector2Int(0, 1), new Vector2Int(1, 0), new Vector2Int(-1, 0), new Vector2Int(0, -1) };
+
+        // A city always has company on two sides: another city, or a thoroughfare. These are the roads that takes, each as the
+        // empty cell it runs through and the step from that cell to the city whose side it runs along.
+        // A road goes first where the empty cell already lies between cities, so one stretch of land serves both; after that
+        // on a front side, where no tower hides it. It follows only from where the cities are.
+        public static List<(Vector2Int cell, Vector2Int toCity)> Thoroughfares(IEnumerable<Vector2Int> cities)
+        {
+            var all = new HashSet<Vector2Int>(cities);
+            var roads = new List<(Vector2Int, Vector2Int)>();
+            foreach (var city in all)
+            {
+                var open = new List<Vector2Int>();
+                foreach (var side in Sides)
+                    if (!all.Contains(city + side)) open.Add(side);
+                for (int need = 2 - (Sides.Length - open.Count); need > 0; need--)
+                {
+                    int best = 0;
+                    for (int i = 1; i < open.Count; i++)
+                        if (CitiesAround(all, city + open[i]) > CitiesAround(all, city + open[best])) best = i;
+                    roads.Add((city + open[best], -open[best]));
+                    open.RemoveAt(best);
+                }
+            }
+            return roads;
+        }
+
+        static int CitiesAround(HashSet<Vector2Int> all, Vector2Int cell)
+        {
+            int n = 0;
+            foreach (var side in Sides)
+                if (all.Contains(cell + side)) n++;
+            return n;
+        }
+
         // The pixel rectangle that covers these plots' ground.
         public static Rect Bounds(IEnumerable<Vector2Int> cells)
         {
