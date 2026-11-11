@@ -139,18 +139,20 @@ namespace TheGrid
         void DrawPile(Rect area, PileSnapshot snap, long now)
         {
             rowWidth = area.width;
-            int shown = Math.Min(snap.rows.Count, MaxMessages), ticked = 0;
+            int shown = Math.Min(snap.rows.Count, MaxMessages), ticked = 0, shownTicked = 0;
             foreach (var r in snap.rows) if (r.ticked) ticked++;
+            for (int i = 0; i < shown; i++) if (snap.rows[i].ticked) shownTicked++;
+            bool allShownTicked = shown > 0 && shownTicked == shown; // then the button unticks, so a tick-all can be taken back
             GUILayout.BeginArea(area);
             foreach (var e in snap.errors) GUILayout.Label(e, error);
             GUILayout.Label("Messages: " + (snap.rows.Count - ticked) + " to review  ·  " + snap.archived + " archived" + (snap.reading ? "  ·  reading history…" : ""), dim);
             GUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Tick shown", button))
+            if (GUILayout.Button(allShownTicked ? "Untick shown" : "Tick shown", button))
             {
                 var keys = new List<string>();
                 for (int i = 0; i < shown; i++) keys.Add(snap.rows[i].key);
-                pile.SetTicked(keys, true);
+                pile.SetTicked(keys, !allShownTicked);
             }
             GUI.enabled = ticked > 0;
             if (GUILayout.Button("Clear ticked (" + ticked + ")", button)) pile.Clear();

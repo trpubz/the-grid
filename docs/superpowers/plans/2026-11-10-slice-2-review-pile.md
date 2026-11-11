@@ -45,7 +45,7 @@ The reviewer's to veto:
 
 1. **`pile.json` holds an index, not just ticks.** It stores each message's sender, recipient, repos, time, summary and first line (no full body), plus a read position per transcript. Without it every launch would re-read 3.4 GB. Archived rows stay in the file with `archived: true`.
 2. **Tabs, not side by side.** The window must work at 360 points, so the roster and the pile are two tabs: `Agents (n)` and `Messages (n unticked)`.
-3. **First launch lists the whole history** (about 600 messages here), newest first, read once in the background. To make that backlog clearable there is a `Tick shown` button beside `Clear ticked`. The list draws the newest 200 rows and says how many more there are.
+3. **First launch lists the whole history** (about 600 messages here), newest first, read once in the background. To make that backlog clearable there is a `Tick shown` button beside `Clear ticked`; it is a toggle, reading `Untick shown` once every drawn row is ticked (asked for by the owner, 2026-11-10). The list draws the newest 200 rows and says how many more there are.
 4. **Only the first line and the sender's summary are shown.** Reading a whole message stays in the terminal for now.
 5. **Desktop-app messages pair by exact text** within one account, because their records carry no shared id. Two identical texts pair in the order seen.
 6. **The flag needs both sides.** A message is flagged only when both its sent and received records were found and the two repos' workspaces differ. A message nobody has received yet is not flagged.
