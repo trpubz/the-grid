@@ -74,10 +74,23 @@ Two Claude accounts on this Mac are kept apart by config directory (`CLAUDE_CONF
 
 ## Messages between sessions
 
-- **Sent:** an assistant record with a `SendMessage` tool call; input has `to`, `message` and `summary`.
-- **Received:** a user record with `origin.kind: peer` and `turnOrigin: peer`. The origin holds `from`, `name`, `msg_id` and `body`, and sometimes `hopChain`.
-- **Subagent reports** use the same record with `origin.handback: true`. Filter on that flag to keep them out of a review list.
+Checked again on 2026-11-10 against every transcript on this Mac (599 sends), while building the review pile:
+
+| Side | Record | Fields |
+|---|---|---|
+| Sent | `type: assistant`, a `message.content[]` block with `type: tool_use` and `name: SendMessage` | block `id`; `input.to`, `input.message`, `input.summary`, `input.recipient_kind` (`name`, `session` or `agent`) |
+| Send result | `type: user`, a `message.content[]` block with `type: tool_result` and that `tool_use_id` | `toolUseResult.msg_id` |
+| Received between turns | `type: user` with `origin.kind: peer` and `turnOrigin: peer` | `origin.from`, `name`, `msg_id`, `body`, sometimes `hopChain` |
+| Received mid-turn | `type: attachment` with `attachment.type: queued_command` | the same object, at `attachment.origin` |
+| Received from a desktop-app session | `type: user` with `origin.kind: peer`, `origin.hostInjected: true`, and only `origin.from` | `message.content` is text: `<cross-session-message from="…" name="…">`, the body, a closing tag, then advice to the reader |
+
+- **The two sides share an id.** The sender's `toolUseResult.msg_id` is the recipient's `origin.msg_id`. Every received id found (560) matched a sent one.
+- **Mid-turn deliveries are attachments, not user records.** About four in ten messages arrive this way; a reader that only looks at user records never sees them received.
+- **Desktop-app sessions get no id.** A send to a `local_…` address returns no `msg_id`, and the received record has none either, so the two sides can only be matched on the text.
+- **Subagent traffic** is told apart on both sides: a send to the sender's own subagent has `recipient_kind: agent` or returns `toolUseResult.pin` instead of an id, and a subagent's report is a received record with `origin.handback: true`. Filter on these to keep them out of a review list.
+- **A forked or resumed session copies its parent's records**, so the same send can sit in two transcripts with the same tool call id.
 - **Other machine-made turns** are marked `origin.kind: task-notification`, so human prompts can be told apart from all of them (`origin.kind: human`).
+- **Session names** come from `agent-name` (`agentName`), `custom-title` (`customTitle`) and `ai-title` (`aiTitle`) records.
 - Messaging works only between sessions of one account.
 
 **Typed-in messages.** Another agent can reach a session by typing into its terminal pane. On this Mac that is done with Zellij: `action list-panes` to find the pane, `action dump-screen -p <pane>` twice to check nobody is typing, `action write-chars -p <pane>` for the text, and `action write -p <pane> 13` for Enter. Tested: a prompt typed into the scratch session this way was recorded exactly like one a person typed (`origin.kind: human`, `promptSource: typed`). The records cannot tell the two apart. Labelling such a message needs a marker in the text or a send path that The Grid owns.

@@ -16,7 +16,7 @@ This is an implementation starter. The included Unity component plays a fixed re
 
 ## The roster
 
-The first working piece: a narrow window that lists your live Claude Code sessions on this Mac, with the one that needs you most on top. It reads what Claude Code already publishes about its own sessions and never writes to an agent app's files. The Grid's own code makes no network calls; it does run the `claude` program to ask for the session list.
+The first working piece: a window that lists your live Claude Code sessions on this Mac, with the one that needs you most on top. It reads what Claude Code already publishes about its own sessions and never writes to an agent app's files. The Grid's own code makes no network calls; it does run the `claude` program to ask for the session list.
 
 - **Run it in the editor:** open the project in Unity 6000.4.3f1, open `Assets/TheGrid/Roster.unity`, press Play.
 - **Build the app:** menu **The Grid > Build Mac App**, then open `Builds/TheGrid.app`.
@@ -38,6 +38,18 @@ Settings live in `~/Library/Application Support/DefaultCompany/The Grid/settings
 | `claudePath` | Path to the `claude` program. Empty means look in `~/.local/bin`, `/opt/homebrew/bin` and `/usr/local/bin` |
 | `workspaces` | Workspace names, in the order a click cycles through them. Starts as `Personal` |
 | `repoWorkspaces` | Which repo belongs to which workspace. A repo not listed is `Personal` |
+
+## The review pile
+
+Beside the roster, the window lists every message your Claude Code sessions sent each other on this Mac, newest first, once each. The Grid only observes these messages. It never sends, changes or deletes one.
+
+- At 720 points or wider the roster is on the left and the pile on the right. Narrower, they are two tabs: **Agents** and **Messages**.
+- Each row shows who sent it, who received it, how long ago, and the sender's summary or the first line. Click the names to read the whole message; it is read from the session's transcript at that moment.
+- Tick a message once you have reviewed it. **Clear ticked** archives the ticked rows: they leave the list and stay archived. **Tick shown** ticks every row on screen, which helps with the backlog on first launch; once they are all ticked the same button reads **Untick shown** and takes the ticks back.
+- A row drawn in red, starting with two workspace names such as `Work → Personal`, is a message whose sender and recipient repos belong to different workspaces. A message is only flagged once both its sent and its received record have been found.
+- A session's exchanges with its own subagents are not listed.
+
+Clearing changes The Grid's own list and nothing else. The pile lives in `pile.json` beside `settings.json`. It holds, for each message, the two session names and repos, the time, the summary, the first line and where the full text can be read, plus how far each transcript has been read, so a transcript is not read twice. It holds no full message text. Nothing is written under a Claude config directory. Deleting `pile.json` rebuilds the list from the transcripts with every message unticked; on this Mac that first read took 9 seconds for 3.4 GB of transcripts.
 
 The shape of the data the window draws is described in [docs/roster-snapshot.md](docs/roster-snapshot.md).
 
