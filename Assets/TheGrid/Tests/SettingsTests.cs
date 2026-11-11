@@ -1,0 +1,110 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using NUnit.Framework;
+
+namespace TheGrid.Core.Tests
+{
+    public class SettingsTests
+    {
+        string tmp, file, home;
+
+        [SetUp]
+        public void SetUp()
+        {
+            tmp = Path.Combine(Path.GetTempPath(), "grid-tests-" + Guid.NewGuid().ToString("N"));
+            home = Path.Combine(tmp, "home");
+            Directory.CreateDirectory(Path.Combine(home, ".claude", "projects"));
+            Directory.CreateDirectory(Path.Combine(home, ".claude-two", "projects"));
+            Directory.CreateDirectory(Path.Combine(home, ".claude-router"));
+            Directory.CreateDirectory(Path.Combine(home, ".clauded", "projects"));
+            file = Path.Combine(tmp, "settings.json");
+        }
+
+        [TearDown]
+        public void TearDown() => Directory.Delete(tmp, true);
+
+        [Test]
+        public void MissingFileGivesDefaults()
+        {
+            var s = Settings.Load(Path.Combine(tmp, "missing.json"));
+            CollectionAssert.AreEqual(new[] { "Personal" }, s.workspaces);
+            Assert.AreEqual("Personal", s.WorkspaceFor("/work/alpha"));
+            Assert.AreEqual("Personal", s.WorkspaceFor(""));
+            Assert.AreEqual("", s.claudePath);
+        }
+
+        [Test]
+        public void CyclingAssignsTheNextWorkspaceAndSurvivesSaveAndLoad()
+        {
+            var s = Settings.Load(file);
+            s.workspaces = new List<string> { "Personal", "Work" };
+            Assert.AreEqual("Work", s.CycleWorkspace("/work/alpha"));
+            Assert.AreEqual("Personal", s.CycleWorkspace("/work/alpha"));
+            Assert.AreEqual("Work", s.CycleWorkspace("/work/alpha"));
+            Assert.AreEqual("Personal", s.WorkspaceFor("/work/beta"));
+            s.Save(file);
+            var again = Settings.Load(file);
+            Assert.AreEqual("Work", again.WorkspaceFor("/work/alpha"));
+            CollectionAssert.AreEqual(new[] { "Personal", "Work" }, again.workspaces);
+        }
+
+        [Test]
+        public void ASessionWithNoRepoCannotBeAssigned()
+        {
+            var s = Settings.Load(file);
+            s.workspaces = new List<string> { "Personal", "Work" };
+            Assert.AreEqual("Personal", s.CycleWorkspace(""));
+            Assert.AreEqual(0, s.repoWorkspaces.Count);
+        }
+
+        [Test]
+        public void CorruptFileGivesDefaultsAndIsKeptAsBad()
+        {
+            File.WriteAllText(file, "{ broken");
+            var d = Settings.Load(file);
+            Assert.AreEqual(1, d.workspaces.Count);
+            Assert.AreEqual("{ broken", File.ReadAllText(file + ".bad"));
+            d.Save(file);
+            Assert.AreEqual("Personal", Settings.Load(file).WorkspaceFor("/x"));
+        }
+
+        [Test]
+        public void FileWithAnEmptyWorkspaceListStillHasTheDefault()
+        {
+            File.WriteAllText(file, "{\"workspaces\":[]}");
+            CollectionAssert.AreEqual(new[] { "Personal" }, Settings.Load(file).workspaces);
+        }
+
+        [Test]
+        public void DiscoversConfigDirectoriesThatHoldProjects()
+        {
+            CollectionAssert.AreEqual(new[] { Path.Combine(home, ".claude"), Path.Combine(home, ".claude-two") }, Settings.DiscoverConfigDirs(home));
+            Assert.AreEqual(0, Settings.DiscoverConfigDirs(Path.Combine(tmp, "nobody")).Count);
+        }
+
+        [Test]
+        public void ConfiguredDirectoriesReplaceDiscovery()
+        {
+            var s = Settings.Load(file);
+            CollectionAssert.AreEqual(Settings.DiscoverConfigDirs(home), s.EffectiveConfigDirs(home));
+            s.configDirs = new List<string> { "/only/this", "~/mine" };
+            CollectionAssert.AreEqual(new[] { "/only/this", Path.Combine(home, "mine") }, s.EffectiveConfigDirs(home));
+        }
+
+        [Test]
+        public void ReloadPicksUpAHandEditSoALaterSaveDoesNotLoseIt()
+        {
+            var s = Settings.Load(file);
+            s.Save(file);
+            File.WriteAllText(file, "{\"workspaces\":[\"Personal\",\"Work\"],\"claudePath\":\"/opt/claude\"}");
+            s.Reload(file);
+            Assert.AreEqual("Work", s.CycleWorkspace("/work/alpha"));
+            s.Save(file);
+            var again = Settings.Load(file);
+            CollectionAssert.AreEqual(new[] { "Personal", "Work" }, again.workspaces);
+            Assert.AreEqual("/opt/claude", again.claudePath);
+            Assert.AreEqual("Work", again.WorkspaceFor("/work/alpha"));
+        }
+    }
+}

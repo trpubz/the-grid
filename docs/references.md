@@ -1,0 +1,10 @@
+# Reference implementations
+
+These repositories were inspected as design references. The starter is an original, standalone fixture and implementation brief. Verify actual harness behavior against installed versions during G01.
+
+- [Bot Crossing adapter contract](https://github.com/Station-Sciences/bot-crossing/blob/9f7dc6536aacbce2203bb705e3f0cf1772ea3fb7/server/harnesses/README.md) defines normalized identity, activity, preview, size and subagents. Its browser payload includes private details that should stay local in a shared room.
+- [Bot Crossing Codex adapter](https://github.com/Station-Sciences/bot-crossing/blob/9f7dc6536aacbce2203bb705e3f0cf1772ea3fb7/server/harnesses/codex.mjs) illustrates joining local thread records with rollout facts. Its resume/open capabilities require a separate delivery integration for peer messages.
+- [Bot Crossing Claude adapter](https://github.com/Station-Sciences/bot-crossing/blob/9f7dc6536aacbce2203bb705e3f0cf1772ea3fb7/server/harnesses/claude-code.mjs) illustrates merging desktop and CLI records and handling active children.
+- [DevTools session parser](https://github.com/matt1398/claude-devtools/blob/1486f2042c87bb547a4e34808ab54ab34a33f132/src/main/services/parsing/SessionParser.ts) and [tool execution matching](https://github.com/matt1398/claude-devtools/blob/1486f2042c87bb547a4e34808ab54ab34a33f132/src/main/services/analysis/ToolExecutionBuilder.ts) show how Claude logs become structured events.
+- [DevTools subagent resolver](https://github.com/matt1398/claude-devtools/blob/1486f2042c87bb547a4e34808ab54ab34a33f132/src/main/services/discovery/SubagentResolver.ts) links child records with parent calls; use recorded relationships as evidence.
+- [Bot Crossing license](https://github.com/Station-Sciences/bot-crossing/blob/9f7dc6536aacbce2203bb705e3f0cf1772ea3fb7/LICENSE) and [DevTools license](https://github.com/matt1398/claude-devtools/blob/1486f2042c87bb547a4e34808ab54ab34a33f132/LICENSE) apply to their respective code. Review notices and separate asset terms before importing anything.

@@ -1,0 +1,50 @@
+# Roster snapshot
+
+The roster snapshot is the one description of the data that the viewer draws. `TheGrid.Core.RosterBuilder` produces it; anything that later feeds or consumes the roster (a relay, another client) follows the same shape.
+
+The exact JSON is pinned by a test against [`fixtures/roster/snapshot.json`](../fixtures/roster/snapshot.json). If that test fails, the shape changed.
+
+## Snapshot
+
+| Field | Meaning |
+|---|---|
+| `generatedAt` | When the snapshot was built, in milliseconds since 1970 UTC |
+| `agents` | Agent rows, most urgent first |
+| `errors` | Problems reading a source, one line each. Rows from a failing source are kept from the last good read |
+
+## Agent row
+
+| Field | Meaning | Source |
+|---|---|---|
+| `sessionId` | The agent app's id for the session | Live session list |
+| `name` | Session name | Live session list |
+| `account` | Which account the session runs under | Name of the config directory it was read from |
+| `app` | `cli`, `claude-desktop`, or empty when unknown | Per-process session file |
+| `repoRoot` | Folder of the repo the session works in; empty when none | The session's working folder, walked up to `.git`. Worktrees resolve to the main repo |
+| `repoName` | Folder name of `repoRoot`, or `No project` | Same |
+| `branch` | Current git branch | Last branch recorded in the session's transcript |
+| `ticket` | Ticket id, such as `DEMO-12`; empty when none | First `letters-digits` token in `branch` |
+| `prNumber`, `prUrl` | Pull request; `0` and empty when none | Pull request record in the transcript. Once seen it is kept |
+| `state` | One of the states below | Mapped from the live session list |
+| `rawStatus` | The agent app's own words, such as `waiting / input needed` | Live session list |
+| `workspace` | Workspace the repo is assigned to; `Personal` when unassigned | Settings |
+| `stateSince` | When the agent entered `state`, in milliseconds since 1970 UTC | Per-process session file, else the first time the roster saw that state |
+| `subagents` | Helpers the agent started that are still working | Files beside the transcript |
+
+A subagent has `agentId`, `description` (what it was asked to do) and `agentType`.
+
+## States, in order of urgency
+
+| `state` | Meaning |
+|---|---|
+| `BlockedOnQuestion` | The agent asked a person something and cannot continue |
+| `WaitingForPermission` | The agent needs an approval |
+| `WaitingOther` | Waiting on something else, such as an open dialog |
+| `BackgroundBlocked` | A background session that is blocked |
+| `Errored` | A background session that failed |
+| `Finished` | The turn ended; the agent has nothing to do |
+| `Unknown` | The status was not recognised; `rawStatus` says what it was |
+| `Running` | Working |
+| `Offline` | The session was live and is gone. Kept for 12 hours |
+
+Within one state, the agent that has been in it longest comes first.

@@ -1,0 +1,97 @@
+{
+    "generatedAt": 1794000200000,
+    "agents": [
+        {
+            "sessionId": "00000000-0000-4000-8000-000000000002",
+            "name": "alpha-02",
+            "account": "demo",
+            "app": "cli",
+            "repoRoot": "",
+            "repoName": "No project",
+            "branch": "feature/demo-12-example-change",
+            "ticket": "DEMO-12",
+            "prUrl": "https://example.invalid/demo/alpha/pull/7",
+            "state": "BlockedOnQuestion",
+            "rawStatus": "waiting / input needed",
+            "workspace": "Personal",
+            "prNumber": 7,
+            "stateSince": 1794000123000,
+            "subagents": [
+                {
+                    "agentId": "a1",
+                    "description": "Synthetic task",
+                    "agentType": "general-purpose"
+                }
+            ]
+        },
+        {
+            "sessionId": "00000000-0000-4000-8000-000000000005",
+            "name": "alpha-03",
+            "account": "demo",
+            "app": "",
+            "repoRoot": "",
+            "repoName": "No project",
+            "branch": "",
+            "ticket": "",
+            "prUrl": "",
+            "state": "WaitingForPermission",
+            "rawStatus": "waiting / permission prompt",
+            "workspace": "Personal",
+            "prNumber": 0,
+            "stateSince": 1794000150000,
+            "subagents": []
+        },
+        {
+            "sessionId": "00000000-0000-4000-8000-000000000004",
+            "name": "beta-nightly",
+            "account": "demo",
+            "app": "",
+            "repoRoot": "",
+            "repoName": "No project",
+            "branch": "",
+            "ticket": "",
+            "prUrl": "",
+            "state": "BackgroundBlocked",
+            "rawStatus": "blocked",
+            "workspace": "Personal",
+            "prNumber": 0,
+            "stateSince": 1794000300000,
+            "subagents": []
+        },
+        {
+            "sessionId": "00000000-0000-4000-8000-000000000003",
+            "name": "beta-01",
+            "account": "demo",
+            "app": "",
+            "repoRoot": "",
+            "repoName": "No project",
+            "branch": "",
+            "ticket": "",
+            "prUrl": "",
+            "state": "Finished",
+            "rawStatus": "idle",
+            "workspace": "Personal",
+            "prNumber": 0,
+            "stateSince": 1794000200000,
+            "subagents": []
+        },
+        {
+            "sessionId": "00000000-0000-4000-8000-000000000001",
+            "name": "alpha-01",
+            "account": "demo",
+            "app": "",
+            "repoRoot": "",
+            "repoName": "No project",
+            "branch": "",
+            "ticket": "",
+            "prUrl": "",
+            "state": "Running",
+            "rawStatus": "busy",
+            "workspace": "Personal",
+            "prNumber": 0,
+            "stateSince": 1794000000000,
+            "subagents": []
+        }
+    ],
+    "errors": []
+}
