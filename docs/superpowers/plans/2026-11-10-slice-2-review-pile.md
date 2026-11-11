@@ -51,6 +51,11 @@ The reviewer's to veto:
 6. **The flag needs both sides.** A message is flagged only when both its sent and received records were found and the two repos' workspaces differ. A message nobody has received yet is not flagged.
 7. **The pile runs on its own thread**, so the first long read never delays the roster.
 
+**Options waiting on the owner** (not built unless chosen; each is a small addition to the task named):
+
+- **A, for decision 2: side by side when there is room.** The default window is now 1000 points wide. At 720 points or more, draw the roster on the left and the pile on the right, each with its own scroll; below 720, the two tabs. (Task 5)
+- **B, for decision 4: read the whole message on demand.** Clicking a row opens its full text under it, read from the transcript at that moment. `pile.json` gains only the transcript path and the byte offset of the record (`srcPath`, `srcOffset`); no body is stored. If the transcript is gone, the row says so. `ReadNewLines` passes each line's offset to `onLine`. (Tasks 1, 3 and 5)
+
 Not in this plan: delivering or sending messages, Codex and Grok, the isometric world, search, browsing or restoring archived rows, reading a full message body.
 
 ## Review Focus
