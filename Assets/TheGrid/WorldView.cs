@@ -414,6 +414,9 @@ namespace TheGrid
 
         static void Kill(GameObject go)
         {
+            // Destroy only takes effect at the end of the frame, and the map may be drawn into its picture before then. Switched
+            // off, the object is out of that drawing at once; otherwise it would stay in the picture until something else changed.
+            go.SetActive(false);
             if (Application.isPlaying) Destroy(go); else DestroyImmediate(go);
         }
 
