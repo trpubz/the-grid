@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
 
@@ -117,6 +118,64 @@ namespace TheGrid.Core.Tests
             File.Delete(Path.Combine(cfg, "sessions", "1003.json"));
             Assert.AreEqual(rewritten, SessionFiles.ChangeStamp(cfg));
             Assert.AreEqual("", SessionFiles.ChangeStamp(Path.Combine(cfg, "nowhere")));
+        }
+
+        [Test]
+        public void ReadNewLinesGivesOnlyMarkedCompleteLinesPastTheOffset()
+        {
+            var p = Path.Combine(cfg, "projects", "p1", "t.jsonl");
+            File.WriteAllText(p, "{\"a\":1}\n{\"k\":\"hit\"}\n{\"k\":\"hit\",\"half");
+            var markers = new[] { "\"hit\"", "\"other\"" };
+            var seen = new List<string>();
+            var offsets = new List<long>();
+            long at = SessionFiles.ReadNewLines(p, 0, markers, (l, o) => { seen.Add(l); offsets.Add(o); });
+            CollectionAssert.AreEqual(new[] { "{\"k\":\"hit\"}" }, seen); // the unmarked line is skipped, the half line is left
+            CollectionAssert.AreEqual(new[] { 8L }, offsets);
+            Assert.AreEqual(20, at);
+            Assert.AreEqual("{\"k\":\"hit\"}", SessionFiles.ReadLineAt(p, 8));
+            Assert.IsNull(SessionFiles.ReadLineAt(p, 20)); // a line with no newline yet
+            Assert.IsNull(SessionFiles.ReadLineAt("/no/such/file", 0));
+
+            File.AppendAllText(p, "\"}\n");
+            long at2 = SessionFiles.ReadNewLines(p, at, markers, (l, o) => { seen.Add(l); offsets.Add(o); });
+            Assert.AreEqual(new FileInfo(p).Length, at2);
+            Assert.AreEqual(2, seen.Count); // only the appended line, now complete
+            Assert.AreEqual(20L, offsets[1]);
+            Assert.AreEqual(at2, SessionFiles.ReadNewLines(p, at2, markers, (l, o) => seen.Add(l)));
+            Assert.AreEqual(2, seen.Count); // nothing new, nothing read
+        }
+
+        [Test]
+        public void ReadNewLinesSurvivesReplacedFilesAndLongLines() // Review Focus 3
+        {
+            var p = Path.Combine(cfg, "projects", "p1", "t.jsonl");
+            var markers = new[] { "\"hit\"" };
+            var seen = new List<string>();
+            File.WriteAllText(p, "{\"k\":\"hit\"}\n");
+            Assert.AreEqual(12, SessionFiles.ReadNewLines(p, 500, markers, (l, o) => seen.Add(l))); // shorter than the offset: read from the start
+            Assert.AreEqual(1, seen.Count);
+
+            var longLine = "{\"pad\":\"" + new string('x', 5000) + "\",\"k\":\"hit\"}";
+            File.WriteAllText(p, "{\"a\":1}\n" + longLine + "\n{\"k\":\"hit\"}\n{\"é\":\"hit\"}\n");
+            seen.Clear();
+            var offsets = new List<long>();
+            long end = SessionFiles.ReadNewLines(p, 0, markers, (l, o) => { seen.Add(l); offsets.Add(o); }, bufferBytes: 64); // a line longer than the buffer
+            CollectionAssert.AreEqual(new[] { longLine, "{\"k\":\"hit\"}", "{\"é\":\"hit\"}" }, seen);
+            Assert.AreEqual(new FileInfo(p).Length, end);
+            foreach (var i in new[] { 0, 1, 2 }) Assert.AreEqual(seen[i], SessionFiles.ReadLineAt(p, offsets[i]));
+            Assert.AreEqual(7, SessionFiles.ReadNewLines("/no/such/file", 7, markers, (l, o) => seen.Add(l)));
+        }
+
+        [Test]
+        public void TranscriptsListsTopLevelFilesOnly()
+        {
+            var p = Path.Combine(cfg, "projects", "p1", "t.jsonl");
+            File.WriteAllText(p, "");
+            var sub = Path.Combine(cfg, "projects", "p1", S2, "subagents");
+            Directory.CreateDirectory(sub);
+            File.WriteAllText(Path.Combine(sub, "agent-a1.jsonl"), ""); // a subagent's transcript is not a session's
+            CollectionAssert.AreEqual(new[] { transcript, p }, SessionFiles.Transcripts(cfg));
+            Assert.AreEqual(0, SessionFiles.Transcripts(Path.Combine(cfg, "nowhere")).Count);
         }
     }
 }

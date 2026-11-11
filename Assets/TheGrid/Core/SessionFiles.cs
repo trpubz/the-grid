@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEngine;
@@ -106,6 +107,82 @@ namespace TheGrid.Core
                 if (prLine && r.type == "pr-link" && r.prNumber > 0) { meta.PrNumber = r.prNumber; meta.PrUrl = r.prUrl ?? ""; havePr = true; }
             }
             return meta;
+        }
+
+        // Every session transcript: <configDir>/projects/*/*.jsonl. Subagent transcripts sit deeper and are not listed.
+        public static List<string> Transcripts(string configDir)
+        {
+            var found = new List<string>();
+            try
+            {
+                var projects = Path.Combine(configDir, "projects");
+                if (!Directory.Exists(projects)) return found;
+                foreach (var dir in Directory.GetDirectories(projects)) found.AddRange(Directory.GetFiles(dir, "*.jsonl"));
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException) { }
+            found.Sort(StringComparer.Ordinal);
+            return found;
+        }
+
+        // Calls onLine(line, byte offset of the line) for every complete line after `offset` that contains one of `markers`,
+        // and returns the offset just past the last complete line. A last line with no newline is left for the next call.
+        // A file shorter than `offset` was replaced and is read from the start. Transcripts reach a gigabyte, so markers are
+        // matched on the raw bytes and only matching lines are decoded.
+        public static long ReadNewLines(string path, long offset, string[] markers, Action<string, long> onLine, int bufferBytes = 1 << 20)
+        {
+            var needles = Array.ConvertAll(markers, m => Encoding.UTF8.GetBytes(m));
+            try
+            {
+                // Claude Code is appending to this file while we read it.
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                {
+                    if (offset > fs.Length) offset = 0;
+                    fs.Seek(offset, SeekOrigin.Begin);
+                    var buf = new byte[bufferBytes];
+                    int have = 0, n; // buf[0..have) is the file from `offset` on, starting at a line start
+                    while ((n = fs.Read(buf, have, buf.Length - have)) > 0)
+                    {
+                        have += n;
+                        int start = 0, nl;
+                        while ((nl = Array.IndexOf(buf, (byte)'\n', start, have - start)) >= 0)
+                        {
+                            var line = new ReadOnlySpan<byte>(buf, start, nl - start);
+                            foreach (var needle in needles)
+                                if (line.IndexOf(new ReadOnlySpan<byte>(needle)) >= 0)
+                                {
+                                    onLine(Encoding.UTF8.GetString(buf, start, nl - start), offset + start);
+                                    break;
+                                }
+                            start = nl + 1;
+                        }
+                        offset += start;
+                        have -= start;
+                        if (have > 0 && start > 0) Buffer.BlockCopy(buf, start, buf, 0, have);
+                        if (have == buf.Length) Array.Resize(ref buf, buf.Length * 2); // one line is longer than the buffer
+                    }
+                }
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException) { }
+            return offset;
+        }
+
+        // The one complete line that starts at `offset`, or null when it cannot be read.
+        public static string ReadLineAt(string path, long offset, int maxBytes = 4 << 20)
+        {
+            try
+            {
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                {
+                    if (offset < 0 || offset >= fs.Length) return null;
+                    fs.Seek(offset, SeekOrigin.Begin);
+                    var buf = new byte[Math.Min(maxBytes, fs.Length - offset)];
+                    int have = 0, n;
+                    while (have < buf.Length && (n = fs.Read(buf, have, buf.Length - have)) > 0) have += n;
+                    int nl = Array.IndexOf(buf, (byte)'\n', 0, have);
+                    return nl < 0 ? null : Encoding.UTF8.GetString(buf, 0, nl);
+                }
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException) { return null; }
         }
     }
 }
