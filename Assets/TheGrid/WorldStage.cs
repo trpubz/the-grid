@@ -214,7 +214,7 @@ namespace TheGrid
                     b.shown = shown;
                     stale = true;
                 }
-                b.badge.transform.localPosition = new Vector3(0, b.data.needsOwner && up ? 46 : 44, 0);
+                b.badge.transform.localPosition = new Vector3(0, b.data.needsOwner && up ? 39 : 37, 0);   // just over the helmet
             }
             return stale;
         }
@@ -356,7 +356,7 @@ namespace TheGrid
                 b.at.localPosition = new Vector3(spot.x, spot.y, -1);   // first sight: it is simply there
                 b.badge = NewSprite("badge", null, b.at);
                 b.badge.sortingOrder = 10;   // what a bot needs from the owner is never hidden behind a building
-                b.badge.transform.localPosition = new Vector3(0, 44, 0);
+                b.badge.transform.localPosition = new Vector3(0, 37, 0);
             }
             else if (spot != b.to)
             {

@@ -48,18 +48,25 @@ namespace TheGrid.Core
         };
 
         // Where the bots of each place stand: the first spot, how many to a row, the step along the row and the step to the next
-        // row. The numbers are chosen so that fifty bots at every place are four hundred different points.
+        // row. The numbers are chosen so that fifty bots at every place are four hundred different points, and so that the
+        // first six of a place are never behind the server tower of the sector in front: that tower hides the strip from the
+        // fountain to this sector's near corner.
         static readonly (float col, float row, int perRow, float along, float away)[] Spots =
         {
             (0.25f, 3.25f, 3, 1f, .5f),     // ServerTower: in front of its door
             (4.25f, 3.25f, 3, 1f, .5f),     // ReviewHall
-            (9.25f, 3.25f, 3, 1f, .5f),     // Works
+            (9.25f, 2.95f, 3, 1f, .5f),     // Works: close to its door, clear of the workshop's back wall
             (0.4f, 8.25f, 4, 1f, .5f),      // AssemblyBay
-            (8.7f, 8.25f, 4, 1f, .5f),      // Workshop, from its third bot
-            (4.4f, 7.4f, 4, 1f, .5f),       // Plaza: done, in front of the fountain
-            (3.5f, 9.75f, 6, 1f, .75f),     // Forecourt: every bot that needs the owner, in the open at the front
-            (9.6f, 9.75f, 3, .8f, .75f),    // Dock: offline
+            (8.7f, 8.25f, 4, 1f, .5f),      // Workshop, from its fifth bot
+            (4.3f, 7.0f, 3, .6f, .45f),     // Plaza: done, at the fountain's near left
+            (2.0f, 10.25f, 6, 1f, .6f),     // Forecourt: every bot that needs the owner, in the open at the front left, far enough
+                                            // forward that its badge is not on the head of a bot at the assembly bay
+            (6.9f, 2.3f, 3, .6f, .5f),      // Dock: offline, parked in front of the relay
         };
+
+        // The workshop's walls are cut away so its first four bots can be seen inside: at the terminal, at the bench, and
+        // two on the open floor.
+        static readonly Vector2[] InTheWorkshop = { new Vector2(9.5f, 6.0f), new Vector2(10.5f, 6.6f), new Vector2(10.0f, 7.0f), new Vector2(10.8f, 7.3f) };
 
         public static RectInt Footprint(Structure s) => Footprints[(int)s];
 
@@ -76,10 +83,10 @@ namespace TheGrid.Core
             var o = PlotOrigin(cell);
             if (place == Place.Workshop)
             {
-                // The workshop's walls are cut away so its first two bots can be seen inside: one at the terminal, one at the bench.
-                if (slot == 0) return Point(o.x + 9.5f, o.y + 6.0f);
-                if (slot == 1) return Point(o.x + 10.5f, o.y + 6.6f);
-                slot -= 2;
+                if (slot < InTheWorkshop.Length) return Point(o.x + InTheWorkshop[slot].x, o.y + InTheWorkshop[slot].y);
+                // shortcut: a fifth bot waits outside in front, where the next sector's tower can hide it. Give the workshop
+                // a bigger floor if five sessions testing at once in one repo turns out to be common.
+                slot -= InTheWorkshop.Length;
             }
             var s = Spots[(int)place];
             return Point(o.x + s.col + slot % s.perRow * s.along, o.y + s.row + slot / s.perRow * s.away);

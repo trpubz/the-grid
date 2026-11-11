@@ -126,7 +126,7 @@ namespace TheGrid.Core.Tests
             foreach (var place in Places)
                 for (int i = 0; i < 6; i++)
                 {
-                    int slot = place == Place.Workshop ? i + 2 : i;     // the workshop's first two stand inside it, on purpose
+                    int slot = place == Place.Workshop ? i + 4 : i;     // the workshop's first four stand inside it, on purpose
                     var at = Iso.BotSpot(cell, place, slot);
                     // back from pixels to the tile under the spot
                     float col = (at.x / (Iso.TileW / 2) - at.y / (Iso.TileH / 2)) / 2, row = (-at.y / (Iso.TileH / 2) - at.x / (Iso.TileW / 2)) / 2;
@@ -136,13 +136,31 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
-        public void TheWorkshopsFirstTwoStandInsideIt()
+        public void TheWorkshopsFirstFourStandInsideIt()
         {
             var cell = new Vector2Int(-1, 3);
             var o = Iso.PlotOrigin(cell);
             Assert.AreEqual(Iso.Point(o.x + 9.5f, o.y + 6.0f), Iso.BotSpot(cell, Place.Workshop, 0));    // at the terminal
             Assert.AreEqual(Iso.Point(o.x + 10.5f, o.y + 6.6f), Iso.BotSpot(cell, Place.Workshop, 1));   // at the bench
-            Assert.AreEqual(Iso.Point(o.x + 8.7f, o.y + 8.25f), Iso.BotSpot(cell, Place.Workshop, 2));   // the rest wait outside
+            Assert.AreEqual(Iso.Point(o.x + 10.0f, o.y + 7.0f), Iso.BotSpot(cell, Place.Workshop, 2));   // two more on the open floor
+            Assert.AreEqual(Iso.Point(o.x + 10.8f, o.y + 7.3f), Iso.BotSpot(cell, Place.Workshop, 3));
+            Assert.AreEqual(Iso.Point(o.x + 8.7f, o.y + 8.25f), Iso.BotSpot(cell, Place.Workshop, 4));   // the rest wait outside
+        }
+
+        [Test]
+        public void NoBotStandsBehindTheTowerOfTheSectorInFront()
+        {
+            // The sector straight down the screen from this one has its server tower at the corner nearest us. The tower's
+            // shaft is 84 pixels to each side of its ground point and 272 high; a bot is 10 to each side of where it stands.
+            var here = new Vector2Int(0, 0);
+            var tower = Iso.StructureSpot(new Vector2Int(1, 1), Structure.ServerTower);
+            foreach (var place in Places)
+                for (int slot = 0; slot < (place == Place.Workshop ? 4 : 6); slot++)   // shortcut in Iso.BotSpot: a fifth bot at the workshop may be hidden
+                {
+                    var at = Iso.BotSpot(here, place, slot);
+                    bool clear = Mathf.Abs(at.x - tower.x) >= 94 || at.y >= tower.y + 272;
+                    Assert.IsTrue(clear, place + " slot " + slot + " stands behind the next sector's tower");
+                }
         }
 
         [Test]
@@ -152,9 +170,9 @@ namespace TheGrid.Core.Tests
             var shift = Iso.Point(Iso.PlotOrigin(b).x, Iso.PlotOrigin(b).y) - Iso.Point(0, 0);
             foreach (var place in Places)
                 Assert.Less((Iso.BotSpot(a, place, 3) + shift - Iso.BotSpot(b, place, 3)).magnitude, .001f, place.ToString());   // to within float rounding
-            Assert.AreEqual(Iso.Point(3.5f, 9.75f), Iso.BotSpot(a, Place.Forecourt, 0));
-            Assert.AreEqual(Iso.Point(4.5f, 9.75f), Iso.BotSpot(a, Place.Forecourt, 1));
-            Assert.AreEqual(Iso.Point(3.5f, 10.5f), Iso.BotSpot(a, Place.Forecourt, 6));
+            Assert.AreEqual(Iso.Point(2.0f, 10.25f), Iso.BotSpot(a, Place.Forecourt, 0));
+            Assert.AreEqual(Iso.Point(3.0f, 10.25f), Iso.BotSpot(a, Place.Forecourt, 1));
+            Assert.AreEqual(Iso.Point(2.0f, 10.85f), Iso.BotSpot(a, Place.Forecourt, 6));
         }
 
         [Test]

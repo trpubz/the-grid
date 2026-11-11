@@ -170,7 +170,7 @@ def assembly_bay():
 def test_workshop():
     """Running tests. Told by: the two near walls cut to a kerb, and inside a terminal with a wall screen, and a bench.
     A bot stands at the middle of the floor, facing the screen; a second by the bench."""
-    w, d, h, lit = 3.4, 2.4, 1.4, "cyanw"
+    w, d, h, lit = 3.4, 2.4, 1.0, "cyanw"      # low walls: bots stand at the works right behind it, and must be seen whole
     glow(0, 0, w + .16, d + .16, "cyan")
     box(0, 0, 0, w + .16, d + .16, .1, "g3", "g1", "g0")
     light(0, -d / 2 - .08, .1, w + .16, .03, .07, "cyanw"); light(w / 2 + .08, 0, .1, .03, d + .16, .07, "cyanw")
@@ -183,9 +183,9 @@ def test_workshop():
     light(0, d / 2 - .15, .25 + h, w, .03, .05, "cyanw"); light(-w / 2 + .15, 0, .25 + h, .03, d, .05, "cyanw")
     box(0, -d / 2 + .06, .25, w, .12, .22, *TRIM); box(w / 2 - .06, 0, .25, .12, d, .22, *TRIM)  # the near ones are cut to a kerb
     light(0, -d / 2 + .06, .47, w, .12, .01, "c0"); light(w / 2 - .06, 0, .47, .12, d, .01, "c0")
-    box(0, d / 2 - .18, .85, 1.5, .05, .62, "k1"); light(0, d / 2 - .21, .9, 1.38, .02, .52, "teal")   # the wall screen
-    light(.42, d / 2 - .225, .98, .34, .012, .3, "cyanw"); light(-.3, d / 2 - .225, 1.18, .7, .012, .05, "cyan")
-    light(-.3, d / 2 - .225, 1.06, .5, .012, .05, "cyan")
+    box(0, d / 2 - .18, .6, 1.5, .05, .56, "k1"); light(0, d / 2 - .21, .65, 1.38, .02, .46, "teal")   # the wall screen
+    light(.42, d / 2 - .225, .72, .34, .012, .3, "cyanw"); light(-.3, d / 2 - .225, .95, .7, .012, .05, "cyan")
+    light(-.3, d / 2 - .225, .83, .5, .012, .05, "cyan")
     box(0, d / 2 - .5, .25, .9, .3, .4, "g5", "g3", "g2"); light(0, d / 2 - .52, .65, .7, .2, .02, "cyan")   # the terminal
     box(1.15, .45, .25, .7, .5, .4, "g5", "g3", "g2"); light(1.15, .43, .65, .5, .3, .02, "teal")            # the bench
     box(-1.2, .5, .25, .4, .4, .55, "g4", "g3", "g2"); box(-1.2, -.5, .25, .35, .35, .3, "g5", "g3", "g2")   # crates
