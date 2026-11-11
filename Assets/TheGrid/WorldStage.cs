@@ -22,8 +22,19 @@ namespace TheGrid
         public static readonly string[] StructureNames = { "Server tower", "Review hall", "Relay", "Works", "Assembly bay", "", "Test workshop" };
         static readonly string[] BadgeArt = { "", "badge-question", "badge-approve", "badge-fault", "badge-done" };   // in the order of Badge
         static readonly string[] StanceArt = { "stand", "type", "inspect", "off" };                                    // in the order of Stance
-        // What a bot's white becomes, one colour an account. All from the art palette, and none of them amber: amber is for badges.
-        static readonly Color32[] Tints = { new Color32(0x35, 0xf2, 0xff, 255), new Color32(0xa0, 0x70, 0xff, 255), new Color32(0xc9, 0xfb, 0xff, 255), new Color32(0x62, 0xb4, 0xd6, 255), new Color32(0xd9, 0xc8, 0xff, 255) };
+        // A bot's light is drawn in three marker colours: the light, its highlight, its dim partner. They become one of
+        // these colourways, one an account: blue, white, orange. All from the art palette, and none of them amber: amber
+        // is for badges.
+        // shortcut: three colourways, so a fourth account looks like the first. Add colourways if people run that many.
+        static readonly Color32[] Markers = { Hex(0xffffff), Hex(0xc9fbff), Hex(0x1a8f9c) };
+        static readonly Color32[][] Colourways =
+        {
+            new[] { Hex(0x35f2ff), Hex(0xc9fbff), Hex(0x1a8f9c) },
+            new[] { Hex(0xe4ecff), Hex(0xffffff), Hex(0x8791c4) },
+            new[] { Hex(0xff7a1e), Hex(0xffc27a), Hex(0xa8501a) },
+        };
+
+        static Color32 Hex(int rgb) => new Color32((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb, 255);
 
         sealed class Bot
         {
@@ -95,7 +106,7 @@ namespace TheGrid
             return tiles[name] = t;
         }
 
-        // A bot's picture with its white turned to the account's colour. The suit stays as drawn: only the light is the account's.
+        // A bot's picture with its light turned to the account's colourway. The suit stays as drawn: only the light is the account's.
         Sprite Lit(string name, int account)
         {
             string key = name + "#" + account;
@@ -103,9 +114,10 @@ namespace TheGrid
             var plain = Art(name);
             if (plain == null) return sprites[key] = null;
             var px = plain.texture.GetPixels32();
-            Color32 tint = Tints[account % Tints.Length];
+            var way = Colourways[account % Colourways.Length];
             for (int i = 0; i < px.Length; i++)
-                if (px[i].a == 255 && px[i].r == 255 && px[i].g == 255 && px[i].b == 255) px[i] = tint;
+                for (int k = 0; k < Markers.Length; k++)
+                    if (px[i].Equals(Markers[k])) { px[i] = way[k]; break; }
             var copy = new Texture2D(plain.texture.width, plain.texture.height, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
             copy.SetPixels32(px);
             copy.Apply(false, true);
