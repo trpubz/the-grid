@@ -289,38 +289,44 @@ namespace TheGrid.Core
         }
 
         // Reads what was appended to every transcript since the last pass. Returns Latest, which is replaced only when something changed.
+        // Call it from one thread only. The lock is not held while a file is read, so a tick never waits on a gigabyte of transcript.
         public PileSnapshot Poll(long nowMs)
         {
-            lock (gate)
-            {
-                var found = new List<KeyValuePair<string, FileInfo>>(); // config directory, transcript
-                foreach (var dir in settings.EffectiveConfigDirs(home))
-                    foreach (var path in SessionFiles.Transcripts(dir))
-                        found.Add(new KeyValuePair<string, FileInfo>(dir, new FileInfo(path)));
-                // Most recently written first, so on the first pass the newest messages show up first.
-                found.Sort((a, b) => SafeTicks(b.Value).CompareTo(SafeTicks(a.Value)));
+            var found = new List<KeyValuePair<string, FileInfo>>(); // config directory, transcript
+            foreach (var dir in settings.EffectiveConfigDirs(home))
+                foreach (var path in SessionFiles.Transcripts(dir))
+                    found.Add(new KeyValuePair<string, FileInfo>(dir, new FileInfo(path)));
+            // Most recently written first, so on the first pass the newest messages show up first.
+            found.Sort((a, b) => SafeTicks(b.Value).CompareTo(SafeTicks(a.Value)));
 
-                bool changed = false, moved = false;
-                var events = new List<MessageEvent>();
-                foreach (var kv in found)
+            bool changed = false, moved = false;
+            var events = new List<MessageEvent>();
+            foreach (var kv in found)
+            {
+                string path = kv.Value.FullName;
+                long length, from;
+                try { length = kv.Value.Length; }
+                catch (Exception e) when (e is IOException || e is UnauthorizedAccessException) { continue; }
+                lock (gate)
                 {
-                    long length;
-                    try { length = kv.Value.Length; }
-                    catch (Exception e) when (e is IOException || e is UnauthorizedAccessException) { continue; }
-                    files.TryGetValue(kv.Value.FullName, out var file);
-                    if (file != null && file.length == length) continue; // nothing appended
-                    events.Clear();
-                    long offset = SessionFiles.ReadNewLines(kv.Value.FullName, file != null ? file.offset : 0, Messages.Markers, (line, at) =>
-                    {
-                        int first = events.Count;
-                        Messages.Parse(line, events);
-                        for (int i = first; i < events.Count; i++) events[i].Offset = at;
-                    });
+                    files.TryGetValue(path, out var known);
+                    if (known != null && known.length == length) continue; // nothing appended
+                    from = known != null ? known.offset : 0;
+                }
+                events.Clear();
+                long offset = SessionFiles.ReadNewLines(path, from, Messages.Markers, (line, at) =>
+                {
+                    int first = events.Count;
+                    Messages.Parse(line, events);
+                    for (int i = first; i < events.Count; i++) events[i].Offset = at;
+                });
+                lock (gate)
+                {
                     bool fileChanged = false;
-                    foreach (var e in events) fileChanged |= Apply(e, kv.Value.FullName, kv.Key);
-                    if (!files.TryGetValue(kv.Value.FullName, out file))
+                    foreach (var e in events) fileChanged |= Apply(e, path, kv.Key);
+                    if (!files.TryGetValue(path, out var file))
                     {
-                        files[kv.Value.FullName] = file = new FileState { path = kv.Value.FullName };
+                        files[path] = file = new FileState { path = path };
                         state.files.Add(file);
                     }
                     file.offset = offset;
@@ -329,6 +335,9 @@ namespace TheGrid.Core
                     changed |= fileChanged;
                     if (fileChanged && !state.complete) Publish(nowMs, null); // the first pass is long: show what has been found so far
                 }
+            }
+            lock (gate)
+            {
                 changed |= PairByText();
                 if (!state.complete) { state.complete = true; changed = true; }
                 if (changed) Publish(nowMs, null);

@@ -6,18 +6,29 @@ using UnityEngine;
 
 namespace TheGrid
 {
-    // The roster window: starts the collector and draws its latest snapshot. Reads nothing but RosterSnapshot.
+    // The window: the roster of agents and the review pile of their messages. Draws nothing but RosterSnapshot and PileSnapshot.
     public sealed class RosterApp : MonoBehaviour
     {
         static readonly Color Background = new Color(.035f, .055f, .085f);
 
         Settings settings;
         string settingsPath;
+        // At this width or wider the roster and the pile sit side by side; narrower, they are two tabs.
+        const float SideBySideWidth = 720f;
+        // IMGUI lays out every row on every frame, so only the newest messages are drawn.
+        const int MaxMessages = 200;
+
         Collector collector;
-        Vector2 scroll;
+        Pile pile;
+        Vector2 scroll, pileScroll;
         RosterSnapshot logged, drawn = new RosterSnapshot();
+        PileSnapshot pileDrawn = new PileSnapshot();
+        // A click changes the "next" value; it takes effect on the following Layout event, so both IMGUI passes draw the same controls.
+        int tab, nextTab;
+        string openKey = "", nextOpenKey = "", openBody = "";
+        bool pileLogged;
         readonly Dictionary<string, string> lastState = new Dictionary<string, string>();
-        GUIStyle chip, title, dim, detail, error, button;
+        GUIStyle chip, title, dim, detail, error, button, body;
         float rowWidth, warnedWidth = -1f;
         string lastErrors = "";
 
@@ -39,12 +50,24 @@ namespace TheGrid
             var claude = ClaudeCli.ResolvePath(settings.claudePath, ClaudeCli.UsualPlaces(home));
             collector = new Collector(settings, home, dir => ClaudeCli.AgentsJson(claude, dir, home), SessionFiles.ChangeStamp);
             collector.Start();
+            // The pile's file sits beside settings.json, never under an agent app's folder.
+            pile = new Pile(settings, home, Path.Combine(Application.persistentDataPath, "pile.json"));
+            pile.Start();
         }
 
-        void OnDestroy() => collector?.Dispose();
+        void OnDestroy()
+        {
+            collector?.Dispose();
+            pile?.Dispose();
+        }
 
         void Update()
         {
+            if (!pileLogged && !pile.Latest.reading)
+            {
+                pileLogged = true;
+                Debug.Log("[pile] " + pile.Latest.rows.Count + " messages, " + pile.Latest.archived + " archived");
+            }
             var snap = collector.Latest;
             if (ReferenceEquals(snap, logged) || snap.generatedAt == 0) return;
             if (logged == null) Debug.Log("[roster] first snapshot: " + snap.agents.Count + " agents, " + snap.errors.Count + " errors");
@@ -68,12 +91,42 @@ namespace TheGrid
             float scale = Screen.dpi >= 160f ? 2f : 1f;
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
             // IMGUI calls OnGUI once to lay out and again to paint; both passes must see the same rows.
-            if (Event.current.type == EventType.Layout) drawn = collector.Latest;
-            var snap = drawn;
+            if (Event.current.type == EventType.Layout)
+            {
+                drawn = collector.Latest;
+                pileDrawn = pile.Latest;
+                tab = nextTab;
+                if (openKey != nextOpenKey)
+                {
+                    openKey = nextOpenKey;
+                    openBody = openKey == "" ? "" : pile.ReadBody(openKey) ?? "The transcript this message was read from is no longer there.";
+                }
+            }
             long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-            rowWidth = Screen.width / scale - 16;
-            GUILayout.BeginArea(new Rect(8, 6, rowWidth, Screen.height / scale - 12));
+            float width = Screen.width / scale - 16, height = Screen.height / scale - 12;
+            if (Screen.width / scale >= SideBySideWidth)
+            {
+                float half = (width - 12) / 2;
+                DrawRoster(new Rect(8, 6, half, height), drawn, now);
+                DrawPile(new Rect(8 + half + 12, 6, half, height), pileDrawn, now);
+            }
+            else
+            {
+                int unticked = 0;
+                foreach (var r in pileDrawn.rows) if (!r.ticked) unticked++;
+                GUILayout.BeginArea(new Rect(8, 6, width, 24));
+                nextTab = GUILayout.Toolbar(tab, new[] { "Agents (" + drawn.agents.Count + ")", "Messages (" + unticked + ")" }, button);
+                GUILayout.EndArea();
+                var area = new Rect(8, 32, width, height - 26);
+                if (tab == 0) DrawRoster(area, drawn, now); else DrawPile(area, pileDrawn, now);
+            }
+        }
+
+        void DrawRoster(Rect area, RosterSnapshot snap, long now)
+        {
+            rowWidth = area.width;
+            GUILayout.BeginArea(area);
             foreach (var e in snap.errors) GUILayout.Label(e, error);
             scroll = GUILayout.BeginScrollView(scroll);
             if (snap.agents.Count == 0 && snap.errors.Count == 0) GUILayout.Label(snap.generatedAt == 0 ? "Looking for agent sessions..." : "No live agent sessions.", dim);
@@ -81,6 +134,75 @@ namespace TheGrid
             GUILayout.EndScrollView();
             GUILayout.EndArea();
         }
+
+        // The review pile: every message between sessions, newest first. A tick marks one as reviewed; Clear archives the ticked ones.
+        void DrawPile(Rect area, PileSnapshot snap, long now)
+        {
+            rowWidth = area.width;
+            int shown = Math.Min(snap.rows.Count, MaxMessages), ticked = 0;
+            foreach (var r in snap.rows) if (r.ticked) ticked++;
+            GUILayout.BeginArea(area);
+            foreach (var e in snap.errors) GUILayout.Label(e, error);
+            GUILayout.Label("Messages: " + (snap.rows.Count - ticked) + " to review  ·  " + snap.archived + " archived" + (snap.reading ? "  ·  reading history…" : ""), dim);
+            GUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Tick shown", button))
+            {
+                var keys = new List<string>();
+                for (int i = 0; i < shown; i++) keys.Add(snap.rows[i].key);
+                pile.SetTicked(keys, true);
+            }
+            GUI.enabled = ticked > 0;
+            if (GUILayout.Button("Clear ticked (" + ticked + ")", button)) pile.Clear();
+            GUI.enabled = true;
+            GUILayout.EndHorizontal();
+            pileScroll = GUILayout.BeginScrollView(pileScroll);
+            if (snap.rows.Count == 0) GUILayout.Label(snap.reading ? "Reading message history..." : "No messages to review.", dim);
+            for (int i = 0; i < shown; i++) DrawMessage(snap.rows[i], now);
+            if (snap.rows.Count > shown) GUILayout.Label("… and " + (snap.rows.Count - shown) + " older", dim);
+            GUILayout.EndScrollView();
+            GUILayout.EndArea();
+        }
+
+        void DrawMessage(PileRow m, long now)
+        {
+            GUILayout.BeginHorizontal();
+            bool ticked = GUILayout.Toggle(m.ticked, GUIContent.none, GUILayout.Width(18));
+            if (ticked != m.ticked) pile.SetTicked(m.key, ticked);
+            // Clicking the names opens the whole message under the row; clicking again closes it.
+            if (GUILayout.Button(Who(m.from, m.fromRepoName) + "  →  " + Who(m.to, m.toRepoName), title, GUILayout.Width(rowWidth - 96)))
+                nextOpenKey = openKey == m.key ? "" : m.key;
+            GUILayout.FlexibleSpace();
+            GUILayout.Label(PileFormat.Age(m.at, now), dim);
+            GUILayout.EndHorizontal();
+            CheckFits();
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Space(24);
+            var old = GUI.contentColor;
+            var text = m.summary != "" ? m.summary : m.firstLine;
+            if (m.crossWorkspace) // a message that crossed from one workspace into another is the one to look at
+            {
+                GUI.contentColor = ColorFor("BlockedOnQuestion");
+                text = m.fromWorkspace + " → " + m.toWorkspace + "  ·  " + text;
+            }
+            GUILayout.Label(text, detail, GUILayout.Width(rowWidth - 48));
+            GUI.contentColor = old;
+            GUILayout.EndHorizontal();
+            CheckFits();
+
+            if (openKey == m.key)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Space(24);
+                GUILayout.Label(openBody, body, GUILayout.Width(rowWidth - 48));
+                GUILayout.EndHorizontal();
+            }
+            GUILayout.Space(6);
+        }
+
+        // A session with no name of its own is shown by its repo.
+        static string Who(string name, string repoName) => name != "" ? name : repoName != "" ? repoName : "unknown";
 
         void DrawAgent(AgentRow a, long now)
         {
@@ -136,6 +258,7 @@ namespace TheGrid
             settings.Reload(settingsPath); // pick up workspaces added by hand since the app started
             settings.CycleWorkspace(repoRoot);
             TrySave();
+            pile.Refresh(); // the cross-workspace flags follow the new assignment
         }
 
         void TrySave()
@@ -191,6 +314,8 @@ namespace TheGrid
             error = new GUIStyle(GUI.skin.label) { fontSize = 11, wordWrap = true };
             error.normal.textColor = new Color(1f, .5f, .4f);
             button = new GUIStyle(GUI.skin.button) { fontSize = 11 };
+            body = new GUIStyle(GUI.skin.label) { fontSize = 12, wordWrap = true };
+            body.normal.textColor = text;
         }
     }
 }
