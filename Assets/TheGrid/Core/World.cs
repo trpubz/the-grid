@@ -69,6 +69,15 @@ namespace TheGrid.Core
             return b == Building.Booth || b == Building.Gate || b == Building.Yard;
         }
 
+        // What a city says about itself when it is too far off to make out riders: "2 need you · 1 done". Empty when neither applies.
+        public static string Summary(WorldCity city)
+        {
+            var parts = new List<string>();
+            if (city.needOwner > 0) parts.Add(city.needOwner + (city.needOwner == 1 ? " needs you" : " need you"));
+            if (city.done > 0) parts.Add(city.done + " done");
+            return string.Join(" · ", parts);
+        }
+
         // One city per plot, in plot order; a repo not seen before takes the next plot. A plot whose riders have all gone stays, empty.
         public static WorldModel Build(RosterSnapshot snap, Plots plots)
         {

@@ -434,11 +434,13 @@ namespace TheGrid
             {
                 if (Far)
                 {
-                    // Too far to read riders: the city's name and how many of its riders need the owner.
+                    // Too far to read riders: the city's name, how many of its riders need the owner and how many are done.
+                    // Only a city that needs the owner is loud and gets the marker.
                     var at = ToView(Iso.Bounds(new[] { city.cell }).center);
                     Text(at, city.name, label);
+                    var summary = World.Summary(city);
+                    if (summary != "") Text(at + new Vector2(0, 16), summary, city.needOwner > 0 ? loud : label);
                     if (city.needOwner == 0) continue;
-                    Text(at + new Vector2(0, 16), city.needOwner + (city.needOwner == 1 ? " needs you" : " need you"), loud);
                     var m = new Rect(at.x - 6, at.y - 28 - (up ? 2 : 0), 12, 16);
                     GUI.DrawTextureWithTexCoords(m, markerSprite.texture, new Rect(0, 0, 1, 1));
                     continue;

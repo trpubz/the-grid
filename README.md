@@ -78,7 +78,7 @@ The Booth, the Gate and the Yard are where you are needed. The tall work buildin
 
 - **Move:** drag, or scroll with two fingers.
 - **Zoom:** the **−** and **+** buttons, the `-` and `+` keys, or scroll while holding Command. There are five levels, each double the last. The view opens at the closest one that shows every plot.
-- **Far out,** each city shows its name and how many riders need you. **Closer in,** buildings and riders are named. A rider's glow colour is its account. Small bikes beside a rider are its subagents.
+- **Far out,** each city shows its name, how many riders need you and how many are done. **Closer in,** buildings and riders are named. A rider's glow colour is its account. Small bikes beside a rider are its subagents.
 - **Click a rider** to see that agent's roster row under the map.
 
 Which repo has which plot is kept in `world.json` beside `settings.json`. A repo keeps its plot for good, also after its sessions are gone; delete the file to start the map again. If its contents are damaged it is kept as `world.json.bad` and the map starts empty.

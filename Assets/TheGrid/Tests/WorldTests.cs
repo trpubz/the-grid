@@ -102,6 +102,14 @@ namespace TheGrid.Core.Tests
         [TestCase("Offline", "", Building.Depot)]
         public void WorkOrStateDecidesTheBuilding(string state, string activity, Building expected) => Assert.AreEqual(expected, World.BuildingFor(state, activity));
 
+        [TestCase(2, 1, "2 need you · 1 done")]
+        [TestCase(1, 0, "1 needs you")]
+        [TestCase(1, 4, "1 needs you · 4 done")]
+        [TestCase(0, 3, "3 done")]
+        [TestCase(0, 0, "")]
+        public void ACitySeenFromFarSaysHowManyNeedTheOwnerAndHowManyAreDone(int need, int done, string expected) =>
+            Assert.AreEqual(expected, World.Summary(new WorldCity { needOwner = need, done = done }));
+
         [TestCase("BlockedOnQuestion", true)]
         [TestCase("WaitingForPermission", true)]
         [TestCase("WaitingOther", true)]
