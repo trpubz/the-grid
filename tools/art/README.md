@@ -12,13 +12,13 @@ From the repo root (Blender 5.1 or later):
 /Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python tools/art/make_sprites.py
 ```
 
-This rewrites every PNG, `sprites.json` beside them, and `docs/art/contact-sheet.png`, a picture of the whole set. Look at the contact sheet after every change. Rendering the same script twice gives the same files, byte for byte.
+This rewrites every PNG, `sprites.json` beside them, and `docs/art/contact-sheet.png`, a picture of the whole set. Look at the contact sheet after every change. Rendering the same script twice on one machine gives the same files, byte for byte. The shadow pass uses Blender's EEVEE engine, which needs a graphics card; on another machine a shadow's edge may fall a pixel differently.
 
 ## The files
 
 | File | What is in it |
 |---|---|
-| `kit.py` | The camera, the palette, and the building blocks: `box`, `light`, `disc`, `ball`, `limb`, `glow`, and `render` |
+| `kit.py` | The camera, the palette, the building blocks (`box`, `light`, `disc`, `ball`, `limb`, `glow`), and `render`, which also gives what stands its depth |
 | `ground.py` | Paving, the lane, the void, lines of light, the fountain, city blocks |
 | `buildings.py` | The six buildings |
 | `bots.py` | Bots in every pose and facing, the courier's bike, badges, the pulse |
@@ -31,7 +31,18 @@ This rewrites every PNG, `sprites.json` beside them, and `docs/art/contact-sheet
 - **Three shades per block.** Nothing is shaded for you, so `box(...)` takes a colour for the top, the left face and the right face. Light on top, darker to the left, darkest to the right.
 - **One palette.** `PALETTE` in `kit.py` names every colour, and sprites use the names. After rendering, each pixel is moved to its nearest palette colour. `palette.png` is that list as a picture.
 - **Light** is a thin solid in a bright colour: `light(...)`. Where it lies on the ground it is flat bands, `glow(...)`, never a fade.
-- **White is for tinting.** A bot's visor and suit lines, and the line along a bike, are pure white. The game multiplies each bot by its account's colour, so the white becomes that colour.
+- **A bot's light is three marker colours.** White is the light itself, cyan-white (`cyanw`) its highlight, teal its dim partner. The game swaps the three for the bot's colourway: blue, white or orange. A bot that is off shows none of them.
+
+## How it gets depth
+
+Ground tiles and the lines of light laid on them are flat, edge to edge. Everything that stands (buildings, the fountain, blocks, bots, bikes) gets four more things, all inside the palette:
+
+- **Soft shadows.** `render` takes the picture three times. The flat render says what each pixel is. The same wide sun, rendered with and without shadows, says how much light each pixel lost. In half shadow a pixel moves one tone down its own ramp (`RAMP` for graphite and concrete, `PAVING` for floors); in full shadow, two. A face the sun never reaches gets no cast shadow.
+- **Lights cast no shadow and take none.** A colour listed in `LIGHTS` keeps its colour everywhere. The walls of a room we look into cast none either: set `kit.SHADOWLESS = True` while you build them, as `test_workshop` does.
+- **Panels.** `box` puts a seam, one tone down, between panels and at every storey of any large face, the roof included.
+- **Edges.** A light line where a face sits over a clearly darker one, and the darkest colour round the silhouette.
+
+To build something flat, set `kit.DEPTH = False` first and back to `True` after, as `ground.make` does for tiles.
 
 ## The manifest
 
@@ -55,7 +66,7 @@ Unity's import settings are set by `Assets/TheGrid/Editor/ArtImport.cs`, which t
    ```
 
 2. Call it from `make()`.
-3. Render and look at the contact sheet. A building carries one light: pick `"cyanw"`, `"cyan"` or `"violet"` and use nothing else on it.
+3. Render and look at the contact sheet. A building's lines of light are one colour: pick `"cyanw"`, `"cyan"` or `"violet"`. A low building may also have warm (`"amber"`) windows.
 
 Keep the building, and the glow round it, inside its picture. The tests fail if a pixel touches the edge.
 

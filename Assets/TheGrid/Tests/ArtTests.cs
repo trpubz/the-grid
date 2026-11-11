@@ -19,7 +19,12 @@ namespace TheGrid.Core.Tests
             "#0b0e22", "#05070f", "#0c1024", "#141732", "#1b1f41", "#242950", "#2e3463", "#3a4178", "#474e8c", "#525a9b", "#5f67aa", "#6e76b7",
             "#2c3360", "#353d70", "#3f4780", "#101a34", "#35f2ff", "#c9fbff", "#1a8f9c", "#3f5a96", "#4a7fb4", "#62b4d6",
             "#a070ff", "#d9c8ff", "#4b4696", "#6657b8", "#ffb23e", "#b8741f", "#6e4a1c", "#ff4d4d", "#ffffff",
+            "#8791c4", "#e4ecff", "#ff7a1e", "#ffc27a", "#a8501a",   // what a white and an orange bot's light becomes
         };
+
+        // A bot's light is drawn in three marker colours, which the game swaps for its colourway.
+        static readonly Color32 Light = new Color32(255, 255, 255, 255), Highlight = new Color32(0xc9, 0xfb, 0xff, 255), Dim = new Color32(0x1a, 0x8f, 0x9c, 255);
+        static readonly Color32 Outline = new Color32(0x05, 0x07, 0x0f, 255);
 
         static Manifest Read()
         {
@@ -102,7 +107,7 @@ namespace TheGrid.Core.Tests
         public void ThePaletteIsTheOneTheArtDirectionPlanLists()
         {
             var t = Load("palette").texture;
-            Assert.AreEqual(31, t.width);
+            Assert.AreEqual(36, t.width);
             Assert.AreEqual(1, t.height);
             var got = t.GetPixels32().Select(c => "#" + c.r.ToString("x2") + c.g.ToString("x2") + c.b.ToString("x2")).ToArray();
             CollectionAssert.AreEqual(Palette2, got);
@@ -138,33 +143,108 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
-        public void ABotIsReadFromItsGaps()
+        public void ABotIsStockyUnderALargeHelmet()
         {
-            // A person, not a peg: daylight between the legs, and between an arm and the body.
             var t = Load("bot-stand-se").texture;
             // measured from where it stands, not from the bottom of its shadow
             int bottom = Find("bot-stand-se").groundY, top = Enumerable.Range(0, t.height).Last(y => Runs(t, y) > 0);
             int tall = top - bottom + 1;
             Assert.That(tall, Is.InRange(28, 38), "a bot is about 32 pixels tall");
-            int legRows = Enumerable.Range(bottom + 3, tall / 4).Count(y => Runs(t, y) >= 2);
-            Assert.GreaterOrEqual(legRows, 4, "no gap between the legs");
-            int armRows = Enumerable.Range(bottom + tall * 35 / 100, tall / 4).Count(y => Runs(t, y) >= 2);
-            Assert.GreaterOrEqual(armRows, 2, "no gap between an arm and the body");
+            int Wide(int y) => Enumerable.Range(0, t.width).Count(x => t.GetPixel(x, y).a > 0);
+            int helmet = Enumerable.Range(bottom + tall * 6 / 10, tall * 4 / 10).Max(Wide);
+            Assert.GreaterOrEqual(helmet, 16, "the helmet is oversized: half as wide as the bot is tall");
         }
 
+        static int Count(Texture2D t, Color32 c) => t.GetPixels32().Count(p => p.Equals(c));
+
         [Test]
-        public void OnlyTheVisorAndSuitLinesAreWhite()
+        public void ABotsLightIsThreeMarkersAndABotThatIsOffShowsNone()
         {
-            // White is what the game tints per account. A lit bot shows it from every side; a bot that is off shows none.
-            var white = new Color32(255, 255, 255, 255);
             var bots = Read().sprites.Select(s => s.name).Where(n => n.StartsWith("bot-")).ToList();
             Assert.AreEqual(7 * 4 + 1, bots.Count, "seven poses in four facings, and the small one");
             foreach (var name in bots)
             {
-                int n = Load(name).texture.GetPixels32().Count(c => c.Equals(white));
-                if (name.StartsWith("bot-off-")) Assert.AreEqual(0, n, name);
-                else Assert.GreaterOrEqual(n, name == "bot-small" ? 4 : 12, name);
+                var t = Load(name).texture;
+                if (name.StartsWith("bot-off-")) Assert.AreEqual(0, Count(t, Light) + Count(t, Highlight) + Count(t, Dim), name);
+                else Assert.GreaterOrEqual(Count(t, Light), name == "bot-small" ? 4 : 12, name);
             }
+            // seen from the front, the visor has its highlight
+            Assert.GreaterOrEqual(Count(Load("bot-stand-se").texture, Highlight), 4);
+            Assert.GreaterOrEqual(Count(Load("bot-stand-sw").texture, Highlight), 4);
+        }
+
+        // Rows of the body, between the boots and the helmet, in which light surrounds something that is not light: a ring.
+        static int RingRows(string name)
+        {
+            var t = Load(name).texture;
+            int g = Find(name).groundY, rows = 0;
+            for (int y = g + 6; y <= g + 19; y++)
+            {
+                int state = 0;   // 0 nothing yet, 1 in light, 2 in the hole after light, 3 light again
+                for (int x = 0; x < t.width && state < 3; x++)
+                {
+                    bool lit = ((Color32)t.GetPixel(x, y)).Equals(Light), solid = t.GetPixel(x, y).a > 0;
+                    if (lit) state = state == 2 ? 3 : 1;
+                    else if (state == 1 && solid) state = 2;
+                    else if (!solid) state = 0;
+                }
+                if (state == 3) rows++;
+            }
+            return rows;
+        }
+
+        [Test]
+        public void ABotCarriesARingOfLightOnItsBackAndHoldsItToInspect()
+        {
+            Assert.GreaterOrEqual(RingRows("bot-stand-ne"), 2, "seen from behind, the ring is on its back");
+            Assert.GreaterOrEqual(RingRows("bot-stand-nw"), 2, "seen from behind, the ring is on its back");
+            Assert.AreEqual(0, RingRows("bot-stand-se"), "seen from the front there is no ring");
+            Assert.GreaterOrEqual(RingRows("bot-inspect-se"), 1, "the bot that inspects holds its disc in front of it");
+        }
+
+        // The pixels of a picture that touch nothing: its outline.
+        static IEnumerable<Color32> Silhouette(Texture2D t)
+        {
+            for (int y = 0; y < t.height; y++)
+                for (int x = 0; x < t.width; x++)
+                {
+                    if (t.GetPixel(x, y).a == 0) continue;
+                    bool open = x == 0 || y == 0 || x == t.width - 1 || y == t.height - 1
+                        || t.GetPixel(x - 1, y).a == 0 || t.GetPixel(x + 1, y).a == 0 || t.GetPixel(x, y - 1).a == 0 || t.GetPixel(x, y + 1).a == 0;
+                    if (open) yield return t.GetPixel(x, y);
+                }
+        }
+
+        [Test]
+        public void WhatStandsIsOutlinedAndTheGroundIsNot()
+        {
+            foreach (var name in Read().sprites.Select(s => s.name))
+            {
+                var edge = Silhouette(Load(name).texture).ToList();
+                int dark = edge.Count(c => c.Equals(Outline));
+                if (IsTile(name)) Assert.AreEqual(0, dark, name + ": ground is flat, edge to edge");
+                else if (name.StartsWith("b-")) Assert.GreaterOrEqual(dark, 80, name);
+                else if (name.StartsWith("bot-") && name != "bot-small") Assert.GreaterOrEqual(dark * 2, edge.Count, name + ": at least half its edge");
+            }
+        }
+
+        [Test]
+        public void LargeFacesArePanelledRoofsIncluded()
+        {
+            // Across the middle of the assembly bay's roof, seams cross the row again and again.
+            var t = Load("b-assembly-bay").texture;
+            int y = Find("b-assembly-bay").groundY + 60, changes = 0;
+            for (int x = 100; x < 188; x++)
+                if (!((Color32)t.GetPixel(x, y)).Equals((Color32)t.GetPixel(x + 1, y))) changes++;
+            Assert.GreaterOrEqual(changes, 8);
+        }
+
+        [Test]
+        public void WhatStandsInTheWorkshopCastsAShadowOnItsFloor()
+        {
+            // The floor is the lightest paving; where a crate or the terminal shades it, it is one tone down.
+            var shade = new Color32(0x35, 0x3d, 0x70, 255);
+            Assert.GreaterOrEqual(Count(Load("b-test-workshop").texture, shade), 20);
         }
 
         [Test]

@@ -2,7 +2,7 @@
 
 How The Grid should look. This is the target every sprite and every screen is judged against. It was set by the project's owner on 2026-11-11 and replaces the look of the first sprite set (navy boxes, riders on bikes, stones and lakes).
 
-Three studies made with the project's own sprite kit show the direction. They are studies, not the shipped art; the shipped set is on `docs/art/contact-sheet.png`.
+Three studies made with the project's own sprite kit show the direction. They are studies, not the shipped art, and they are older than rules 6 to 8 below: the shipped set, with its depth and its stockier bots, is on `docs/art/contact-sheet.png`.
 
 ![A server tower and bots at the game's pixel density](art/direction-tower.png)
 ![Bots, close up](art/direction-bots.png)
@@ -25,10 +25,13 @@ The Grid is a virtual city where each repository occupies a sector and each codi
 ## Rules added while studying it
 
 1. **Pixel density is fixed.** A ground tile is 64 pixels wide and 32 high, the size classic tycoon games use. Detail comes from what is built at that grain, never from more pixels per tile. The world is looked at two or three screen pixels to the art pixel.
-2. **Bots are people, not robots.** A bot is a person in a dark suit traced with light, under its helmet. At about 32 pixels tall a person is read from the gaps: between the legs, between arm and body, between helmet and shoulders.
+2. **Bots are people, not robots.** A bot is a person in a dark suit under its helmet, stocky, about 32 pixels tall. At that size it is read from a few large shapes, not from fine lines: a large faceted helmet, a thick visor that wraps the face, a dark compact body, slab arms, chunky boots.
 3. **On buildings, light runs in long lines** up the corners and sides, unbroken from foot to roof and on round the roof edge. Windows are secondary to those lines.
 4. **The ground is lit the same way:** dark paving in large squares, with long lines of light along kerbs, lane edges and the outlines of platforms, and their glow lying on the paving beside them. Glow is flat bands in palette colours, never a gradient.
 5. **State is shown on the bot, not by a building.** Buildings stand only for kinds of work, plus the relay. Waiting, faulted, done and offline are a badge and a pose on the bot, wherever it stands.
+6. **Nothing that stands is flat.** Every large surface is panelled, roofs and floors as well as walls. Things cast shadows, and the shadows are soft: one tone down at their edge, two at most. A light casts no shadow and is never shaded. The walls of a room we look into cast none; what stands inside does. Each thing has a dark outline, and a light line where a face sits over a darker one. Walls are concrete, lighter than the graphite they stand on, and a low building may have warm windows. The ground itself stays flat.
+7. **A bot carries a ring of light on its back.** The bot that inspects holds that disc in its hand, and its back is bare.
+8. **A bot's light comes in blue, white and orange.** In the picture it is three marker colours (the light, its highlight, its dim partner), and the game swaps them. Orange is redder than the amber of a badge, so a badge is still the only amber thing on a bot.
 
 ## What stays from before
 

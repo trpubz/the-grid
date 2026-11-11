@@ -8,12 +8,13 @@ import math
 
 import bpy
 
+import kit
 from kit import PALETTE, box, disc, glow, light, mat, render
 
 # One light a building: the bright line for corners and strips, its dimmer partner for sides, and its glow on the ground.
 LIGHTS = {"cyanw": ("cyanw", "cyan", "cyan"), "cyan": ("cyan", "teal", "cyan"), "violet": ("violetw", "violet", "violet")}
-WALL = ("g4", "g2", "g1")       # graphite: top, left face, right face
-TRIM = ("g5", "g3", "g2")
+WALL = ("c0", "g4", "g1")       # concrete over graphite: top, left face, right face
+TRIM = ("c1", "g5", "g2")
 
 
 def footing(w, d, lit):
@@ -126,7 +127,7 @@ def works():
     light(-.6, .6, top + .89, .1, .1, .04, "cyan")
     entrance(.5, -w / 2, lit)
     for i in range(3):
-        light(w / 2 + .012, -.5 + i * .5, .7, .02, .28, .22, "glass")
+        light(w / 2 + .012, -.5 + i * .5, .7, .02, .28, .22, "amber")                 # someone is in: warm windows
     render("b-works", 256, 224, 80)
 
 
@@ -157,7 +158,7 @@ def assembly_bay():
         light(-.3, f - .016, z + .12 + i * .15, 1.9, .012, .03, "teal")
     box(-.3, f - .05, z + .82, 2.1, .1, .08, *TRIM)
     for i in range(4):
-        light(w / 2 + .012, -.75 + i * .5, .7, .02, .3, .24, "glass")
+        light(w / 2 + .012, -.75 + i * .5, .7, .02, .3, .24, "amber")
     top = roof(0, 0, w, d, h, lit)
     for x in (-1.5, 1.5):                                                             # the gantry
         box(x, 0, top, .12, .12, .55, "g5", "g4", "g3")
@@ -175,7 +176,9 @@ def test_workshop():
     light(0, -d / 2 - .08, .1, w + .16, .03, .07, "cyanw"); light(w / 2 + .08, 0, .1, .03, d + .16, .07, "cyanw")
     box(0, 0, .17, w + .2, d + .2, .08, *TRIM)
     light(0, 0, .25, w - .1, d - .1, .003, "pv2")                                     # the floor inside, lit
+    kit.SHADOWLESS = True       # we look into this room: its walls cast no shadow, only what stands inside does
     box(0, d / 2 - .07, .25, w, .14, h, *WALL); box(-w / 2 + .07, 0, .25, .14, d, h, *WALL)     # the two far walls stand
+    kit.SHADOWLESS = False
     light(-w / 2 + .15, -d / 2 + .1, .25, .03, .04, h, "cyanw"); light(w / 2 - .035, d / 2 - .15, .25, .07, .04, h, "cyanw")
     light(0, d / 2 - .15, .25 + h, w, .03, .05, "cyanw"); light(-w / 2 + .15, 0, .25 + h, .03, d, .05, "cyanw")
     box(0, -d / 2 + .06, .25, w, .12, .22, *TRIM); box(w / 2 - .06, 0, .25, .12, d, .22, *TRIM)  # the near ones are cut to a kerb

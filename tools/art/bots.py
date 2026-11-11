@@ -1,65 +1,83 @@
 """Bots, the courier's bike, badges and the pulse. See docs/art-direction.md.
 
-A bot is a person, not a robot: a dark suit traced with light, under an oversized closed helmet, about two heads tall.
-At 32 pixels a person is read from the gaps: between the legs, between an arm and the body, between helmet and shoulders.
-The visor and the suit's lines are pure white; the game tints them per account. A bot that is off shows neither.
+A bot is a person, not a robot: stocky, about two heads tall, under an oversized closed helmet. The helmet is faceted and
+catches the light on its crown; a thick visor wraps round the face. The body is dark and compact, the arms are slabs, the
+boots are chunky with lit toes, and on its back it carries a ring of light. The bot that inspects holds that disc in its
+hand, and its back is bare.
+
+A bot's light is drawn in three marker colours, which the game swaps for the bot's colourway: white is the light itself,
+cyan-white its highlight, teal its dim partner. A bot that is off shows none of them.
 
 A bot is modelled facing +x, which the camera shows as facing south-east. kit.TURN gives the other three facings.
 """
+import bpy
 import numpy as np
 
 import kit
-from kit import PALETTE, ball, box, disc, hex_rgb, light, limb, record, render
+from kit import PALETTE, box, disc, hex_rgb, light, record, render
 
 FACINGS = [("se", 0), ("ne", 1), ("nw", 2), ("sw", 3)]
 POSES = ["stand", "walk-a", "walk-b", "type", "inspect", "signal", "off"]
-SUIT = ("g2", "g1", "k1")
+SUIT, SLAB, BOOT = ("g2", "g0", "k1"), ("c0", "g5", "g3"), ("g5", "g3", "g1")
+HELMET = ["c1", "c0", "g5", "g5", "g3", "g4", "g2"]     # the crown; then upper, middle and lower, each on the lit side and the far side
+
+
+def helmet(cx, cy, z, r):
+    """A faceted helmet: few faces, each one flat. Its tone falls from the crown down, and from the lit side to the other."""
+    cx, cy, _, _ = kit._turned(cx, cy)
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=10, ring_count=6, radius=r, location=(cx, cy, z))
+    o = bpy.context.object
+    o.scale = (1, 1, .9)
+    for c in HELMET:
+        o.data.materials.append(kit.mat(PALETTE[c]))
+    for p in o.data.polygons:
+        n = p.normal
+        band = 0 if n.z > .8 else 1 if n.z > .3 else 2 if n.z > -.3 else 3
+        p.material_index = 0 if band == 0 else 2 * band - 1 + (0 if -n.y > n.x else 1)
 
 
 def bot(pose="stand", s=1.0):
     """One bot at the origin, facing +x. s scales it; a subagent is drawn at three fifths."""
     lit = pose != "off"
-    line = "white" if lit else "g3"
+    main, hi, dim = ("white", "cyanw", "teal") if lit else ("g4", "g5", "g3")
     def b(x, y, z, w, d, h, *c): box(x * s, y * s, z * s, w * s, d * s, h * s, *c)
     def l(x, y, z, w, d, h, c): light(x * s, y * s, z * s, w * s, d * s, h * s, c)
-    def col(x, y, z, r, h, c, r2=None): limb(x * s, y * s, z * s, r * s, h * s, c, None if r2 is None else r2 * s)
-    def orb(x, y, z, r, c): ball(x * s, y * s, z * s, r * s, c)
-
-    stride = {"walk-a": .07, "walk-b": -.07}.get(pose, 0)
-    l(0, 0, .001, .3, .28, .001, "k1")                                # its shadow, small: the gap between the legs must show
+    def ring(x, y, z, r, h, c, axis="z"): disc(x * s, y * s, z * s, r * s, h * s, c, axis=axis)
     near = -1 if kit.TURN % 4 in (0, 1) else 1                        # the arm on the side the camera sees does the acting
-    for side in (-1, 1):                                              # legs apart; a stride moves one forward, one back
-        y, x = side * .095, side * stride
-        b(x + .02, y, 0, .15, .1, .055, "g5", "g2", "k1")            # boots, chunky, toes forward
-        col(x, y, .055, .042, .19, "g2", .05)
-        if lit:
-            l(x, y + side * .05, .08, .02, .012, .13, line)           # a line of light down the outside of each leg
-    col(0, 0, .24, .075, .21, "g1", .14)                              # torso: narrow at the waist, wide at the shoulders
-    l(.11, 0, .37, .012, .12, .018, line); l(.1, 0, .29, .012, .018, .09, line)       # the mark on the chest
-    l(-.11, 0, .29, .012, .018, .15, line); l(-.12, 0, .42, .012, .14, .018, line)    # the spine and the shoulder bar, behind
+    stride = {"walk-a": .08, "walk-b": -.08}.get(pose, 0)
+
+    l(0, 0, .001, .26, .28, .001, "k1")                               # its shadow
+    for side in (-1, 1):                                              # a stride moves one leg forward, one back
+        y, x = side * .1, side * stride
+        b(x + .035, y, 0, .2, .13, .075, *BOOT)                       # boots, chunky
+        l(x + .125, y, .03, .025, .1, .045, main)                     # a lit toe
+        b(x, y, .075, .11, .11, .16, *SUIT)
+    b(0, 0, .235, .2, .3, .2, *SUIT)                                  # the body: dark, compact
+    l(.103, 0, .32, .012, .12, .06, main)                             # the mark on the chest
+
+    if pose == "inspect":                                             # its disc is in its hand
+        ring(.23, near * .17, .43, .085, .035, main); ring(.23, near * .17, .43, .045, .04, "k1")
+    else:                                                             # or on its back: a ring of light
+        ring(-.115, 0, .345, .115, .03, main, "x"); ring(-.125, 0, .345, .065, .03, "k1", "x")
 
     for side in (-1, 1):
-        y = side * .22
-        orb(0, y, .44, .05, "g4")                                     # shoulder
-        raised = pose in ("signal", "inspect") and side == near
-        if pose == "type" or pose == "inspect" and side == near:      # arm held forward
-            reach = .26 if pose == "type" else .2
-            b(reach / 2, y, .36 if pose == "type" else .4, reach, .06, .06, "g3", "g2", "g1")
-            orb(reach + .01, y, .39 if pose == "type" else .43, .042, "g5")
-        elif pose == "signal" and side == near:                       # hand up to the helmet
-            b(.02, y, .44, .06, .06, .2, "g3", "g2", "g1"); orb(.04, y * .9, .66, .042, "g5")
-        else:                                                         # at the side, swinging against the stride
+        y = side * .205
+        if pose == "type":                                            # both held forward, to a keyboard
+            b(.12, y, .33, .26, .09, .09, *SLAB); l(.25, y, .335, .03, .09, .08, main)
+        elif pose == "inspect" and side == near:                      # one held forward, under the disc
+            b(.09, y, .33, .2, .09, .09, *SLAB)
+        elif pose == "signal" and side == near:                       # a hand up to the helmet
+            b(.03, y, .36, .1, .09, .2, *SLAB); l(.05, y, .53, .09, .09, .04, main)
+        else:                                                         # a slab at its side, swinging against the stride
             sw = -side * stride
-            col(sw, y, .25, .034, .19, "g3"); orb(sw, y, .24, .042, "g5")
-        if lit and not raised and pose != "type":
-            l(0, y + side * .037, .28, .02, .012, .13, line)
-    if pose == "inspect":                                             # the disc it is looking at
-        disc(.25, near * .22, .5, .08, .03, "white" if lit else "g3", "g5", axis="x")
+            b(sw, y, .2, .11, .09, .22, *SLAB); l(sw, y + side * .046, .22, .07, .012, .14, dim)
 
-    col(0, 0, .45, .05, .04, "k1")                                    # the neck: a dark gap under the helmet
-    orb(0, 0, .65, .19, "g3")                                         # the helmet: oversized, closed
-    orb(.02, -.04, .7, .15, "g5")                                     # where light catches its crown
-    l(.1, 0, .59, .2, .27, .075, line if lit else "glass")            # the visor: one band across the face
+    helmet(0, 0, .64 * s, .225 * s)                                   # oversized, closed
+    # The visor is a band set a little forward of the helmet's middle: it stands proud of the helmet across the face and
+    # round to each side, and is inside it everywhere else.
+    ring(.035, 0, .6, .21, .085, main if lit else "glass")
+    if lit:
+        ring(.035, 0, .655, .213, .03, hi)
 
 
 def all_bots():
@@ -74,7 +92,7 @@ def all_bots():
 
 
 def bike():
-    """A courier leaning over a bike, facing +x. The line of light along the bike and the visor are white, for tinting."""
+    """A courier leaning over a bike, facing +x. The line of light along the bike, its lamp and the visor are the bot's light."""
     light(0, 0, .001, 1.05, .3, .001, "k1")
     for x in (-.36, .36):
         disc(x, 0, .17, .17, .1, "k1", "k0", axis="y"); disc(x, 0, .17, .07, .12, "g5", "g4", axis="y")
@@ -85,8 +103,8 @@ def bike():
     box(-.3, 0, .29, .16, .1, .06, "g4", "g3", "g2")                 # tail
     box(-.06, 0, .29, .3, .16, .15, "g2", "g1", "k1")                # the rider, leaning forward over the tank
     box(.12, 0, .4, .16, .2, .06, "g3", "g2", "g1")                  # arms to the bars
-    ball(.1, 0, .56, .15, "g3"); ball(.11, -.03, .6, .12, "g5")
-    light(.18, 0, .52, .15, .22, .06, "white")
+    helmet(.1, 0, .56, .16)
+    disc(.125, 0, .53, .15, .06, "white"); disc(.125, 0, .575, .15, .015, "cyanw")
 
 
 def all_bikes():
