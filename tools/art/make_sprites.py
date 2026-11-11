@@ -71,6 +71,7 @@ SCENE, CAM = setup()
 MATS = {}
 TURN = 0    # quarter turns applied to everything built, so one model gives four facings
 SCALE = 1.0
+TALL = 1.0   # heights are stretched by this; buildings are drawn half again as tall as modelled, towers over the riders
 
 
 def mat(h):
@@ -90,6 +91,7 @@ def box(cx, cy, z0, w, d, h, top, left=None, right=None):
     for _ in range(TURN % 4):
         cx, cy, w, d = -cy, cx, d, w
     cx, cy, z0, w, d, h = (v * SCALE for v in (cx, cy, z0, w, d, h))
+    z0, h = z0 * TALL, h * TALL
     bpy.ops.mesh.primitive_cube_add(size=1, location=(cx, cy, z0 + h / 2))
     o = bpy.context.object
     o.scale = (w, d, h)
@@ -161,7 +163,7 @@ def tile(name, fill, edge):
     render(name, 64, 32, 16)
 
 
-# ---- buildings: 128 by 160, a 2 by 2 tile footprint whose near corner touches the bottom edge ----------------------
+# ---- buildings: 128 by 192, a 2 by 2 tile footprint whose near corner touches the bottom edge ----------------------
 
 def slab(fill=N3, edge=N4):
     box(0, 0, 0, 2, 2, .04, fill, N1, N0)
@@ -372,20 +374,22 @@ def contact_sheet():
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    global TURN, SCALE
+    global TURN, SCALE, TALL
     pal = np.ones((1, len(PALETTE), 4))
     pal[0, :, :3] = PAL
     save(pal, os.path.join(OUT, "palette.png"))
 
-    tile("tile-ground", N1, N2)
-    tile("tile-plot", N3, N4)
-    tile("tile-road", N4, N5)
+    # Every tile carries a strip of light along two edges; side by side they make the grid.
+    tile("tile-ground", N0, N2)
+    tile("tile-plot", N1, CYAN_DIM)
+    tile("tile-road", N3, CYAN)
 
+    TALL = 1.5
     for name, build in BUILDINGS:
         build()
-        render(name, 128, 160, 32)       # footprint is 2 tiles: its centre sits 32 above the bottom edge, its near corner on it
+        render(name, 128, 192, 32)       # footprint is 2 tiles: its centre sits 32 above the bottom edge, its near corner on it
 
-    SCALE = 1.5
+    TALL, SCALE = 1.0, 1.5
     for facing, turns in FACINGS:
         TURN = turns
         rider()

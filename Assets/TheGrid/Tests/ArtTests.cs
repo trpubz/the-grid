@@ -15,7 +15,7 @@ namespace TheGrid.Core.Tests
         static IEnumerable<TestCaseData> All()
         {
             foreach (var n in Tiles) yield return new TestCaseData(n, 64, 32, 32f, 16f);
-            foreach (var n in Buildings) yield return new TestCaseData(n, 128, 160, 64f, 32f);
+            foreach (var n in Buildings) yield return new TestCaseData(n, 128, 192, 64f, 32f);
             foreach (var n in Riders) yield return new TestCaseData(n, 64, 64, 32f, 18f);
             yield return new TestCaseData("rider-small", 32, 32, 16f, 9f);
             yield return new TestCaseData("marker", 12, 16, 6f, 0f);

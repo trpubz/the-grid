@@ -10,7 +10,7 @@ From the repo root (Blender 5.1 or later):
 /Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python tools/art/make_sprites.py
 ```
 
-This rewrites every PNG and `docs/art/contact-sheet.png`, a picture of the whole set. Look at the contact sheet after every change.
+This rewrites every PNG and `docs/art/contact-sheet.png`, a picture of the whole set. Look at the contact sheet after every change. To see the sprites standing in a city, run **The Grid > Render World Pictures** in Unity and look at `Logs/world-near.png`.
 
 ## How it works
 
@@ -18,7 +18,8 @@ This rewrites every PNG and `docs/art/contact-sheet.png`, a picture of the whole
 - **The camera** looks down at 30 degrees, turned 45 degrees, with no perspective. A 1 by 1 square of ground becomes a diamond 64 pixels wide and 32 high: one tile.
 - **Three shades per block.** With flat lighting nothing is shaded for you, so `box(...)` takes a colour for the top, the left face and the right face. Light on top, darker to the left, darkest to the right.
 - **One palette.** `PALETTE` at the top of the script lists every colour. After rendering, each pixel is moved to its nearest palette colour. `palette.png` is that list as a picture, and a test checks every sprite against it.
-- **Glow** is just a thin box in a bright colour.
+- **Glow** is just a thin box in a bright colour. Every ground tile has a strip of it along two edges; laid side by side the tiles make a grid of light.
+- **Buildings are stretched** to one and a half times their modelled height (`TALL`), so they tower over the riders. Write heights as if they were not.
 - **Riders** are drawn in grey with a pure white glow line. The game tints them per account, so the white becomes that account's colour.
 
 ## What is where in a picture
@@ -26,7 +27,7 @@ This rewrites every PNG and `docs/art/contact-sheet.png`, a picture of the whole
 | Sprite | Size | The ground point is |
 |---|---|---|
 | `tile-*` | 64×32 | the centre |
-| `b-*` (buildings) | 128×160 | the centre of the 2 by 2 tile footprint, 32 pixels above the bottom edge |
+| `b-*` (buildings) | 128×192 | the centre of the 2 by 2 tile footprint, 32 pixels above the bottom edge |
 | `rider-se`, `-ne`, `-nw`, `-sw` | 64×64 | under the bike, 18 pixels above the bottom edge |
 | `rider-small` | 32×32 | 9 pixels above the bottom edge |
 | `marker` | 12×16 | the bottom edge |
