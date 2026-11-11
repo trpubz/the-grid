@@ -161,6 +161,9 @@ namespace TheGrid.Core
             return m;
         }
 
+        // A socket path or a desktop-app session id, as opposed to a session name.
+        static bool IsAddress(string to) => to.StartsWith("uds:", StringComparison.Ordinal) || to.StartsWith("local_", StringComparison.Ordinal);
+
         static string BodyKey(string account, string body)
         {
             using (var sha = SHA1.Create())
@@ -229,10 +232,13 @@ namespace TheGrid.Core
                             m.bodyKey = BodyKey(m.account, e.Body);
                         }
                         m.recvRef = e.Ref;
-                        if (file.name != "") m.to = file.name; // the recipient's own name beats the address the sender wrote
+                        // Names as the messaging layer gave them win: the name the sender addressed, and the sender's name on the receipt.
+                        // A transcript's own label is often a generated title, so it only stands in for an address or a missing record.
+                        if (file.name != "" && (m.to == "" || IsAddress(m.to))) m.to = file.name;
                         m.toRepo = RepoResolver.Resolve(e.Cwd).Root;
                         m.receivedAt = e.At;
-                        if (m.from == "") m.from = e.PeerName != "" ? e.PeerName : e.Peer;
+                        if (e.PeerName != "") m.from = e.PeerName;
+                        else if (m.from == "") m.from = e.Peer;
                         if (m.firstLine == "") m.firstLine = PileFormat.FirstLine(e.Body);
                         if (m.srcPath == "") { m.srcPath = transcriptPath; m.srcOffset = e.Offset; }
                         Index(m);
@@ -251,7 +257,7 @@ namespace TheGrid.Core
             if (keep.recvRef == "") keep.recvRef = other.recvRef;
             if (keep.from == "") keep.from = other.from;
             if (keep.fromRepo == "") keep.fromRepo = other.fromRepo;
-            if (keep.to == "") keep.to = other.to;
+            if (keep.to == "" || (other.sendRef != "" && other.to != "" && !IsAddress(other.to))) keep.to = other.to; // the name the sender wrote
             if (keep.toRepo == "") keep.toRepo = other.toRepo;
             if (keep.summary == "") keep.summary = other.summary;
             if (keep.firstLine == "") keep.firstLine = other.firstLine;
@@ -280,8 +286,9 @@ namespace TheGrid.Core
                 if (sent.id != "" || sent.sendRef == "" || sent.recvRef != "" || !waiting.TryGetValue(sent.bodyKey, out var list) || list.Count == 0) continue;
                 var received = list[0];
                 list.RemoveAt(0);
-                // Here `sent` is kept: it has been on screen longer, and the recipient's name still wins.
-                if (received.to != "") sent.to = received.to;
+                // Here `sent` is kept: it has been on screen longer. It was addressed by id, so the names come from the receipt.
+                if (received.to != "" && (sent.to == "" || IsAddress(sent.to))) sent.to = received.to;
+                if (received.from != "") sent.from = received.from;
                 Merge(sent, received);
                 any = true;
             }

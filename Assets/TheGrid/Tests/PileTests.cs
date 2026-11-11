@@ -94,7 +94,7 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual("alpha-02", reply.to);
 
             var desk = rows.Single(r => r.summary == "Synthetic desktop note"); // no shared id: paired by text
-            Assert.AreEqual("alpha-02", desk.from);
+            Assert.AreEqual("Alpha desk", desk.from); // the name the desktop app gave the sender
             Assert.AreEqual("Gamma review", desk.to);
             Assert.AreEqual("gamma", desk.toRepoName);
 
@@ -154,6 +154,37 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual("Synthetic handoff", row.summary);
             Assert.AreEqual("alpha", row.fromRepoName);
             Assert.AreEqual(1767268805000L, row.at); // the time it was sent, now that it is known
+        }
+
+        static string ReceivedLine(string uuid, string msgId, string senderName) =>
+            "{\"type\":\"user\",\"uuid\":\"" + uuid + "\",\"timestamp\":\"2026-01-02T09:00:01.000Z\",\"cwd\":\"/nowhere\",\"message\":{\"role\":\"user\",\"content\":\"Hello.\"},\"origin\":{\"kind\":\"peer\",\"from\":\"uds:/tmp/demo-socks/9.sock\",\"name\":\""
+            + senderName + "\",\"msg_id\":\"" + msgId + "\",\"body\":\"Hello.\"}}\n";
+
+        // Many sessions have no name of their own, only a title the agent app generated. The names used in the message itself are better.
+        [TestCase(true)]
+        [TestCase(false)]
+        public void NamesUsedInTheMessageBeatATranscriptsGeneratedTitle(bool receiptReadFirst)
+        {
+            foreach (var f in new[] { senderPath, recipientPath, desktopPath }) File.Delete(f);
+            var sender = Path.Combine(cfg, "projects", "p1", "a.jsonl");
+            var recipient = Path.Combine(cfg, "projects", "p2", "b.jsonl");
+            File.WriteAllText(sender, "{\"type\":\"ai-title\",\"aiTitle\":\"Sender generated title\"}\n" + SentLine("toolu_n1", "written-name", "Hello.") + ResultLine("toolu_n1", "m-n1"));
+            File.WriteAllText(recipient, "{\"type\":\"ai-title\",\"aiTitle\":\"Recipient generated title\"}\n" + ReceivedLine("n-u1", "m-n1", "sender-name"));
+            File.SetLastWriteTimeUtc(receiptReadFirst ? sender : recipient, DateTime.UtcNow.AddMinutes(-5)); // the newer file is read first
+            var row = pile.Poll(Now).rows.Single();
+            Assert.AreEqual("sender-name", row.from);
+            Assert.AreEqual("written-name", row.to);
+        }
+
+        [Test]
+        public void ATranscriptsOwnLabelStandsInWhenTheMessageNamesNobody()
+        {
+            foreach (var f in new[] { senderPath, recipientPath, desktopPath }) File.Delete(f);
+            var recipient = Path.Combine(cfg, "projects", "p2", "b.jsonl");
+            File.WriteAllText(recipient, "{\"type\":\"ai-title\",\"aiTitle\":\"Recipient generated title\"}\n" + ReceivedLine("n-u1", "m-n1", ""));
+            var row = pile.Poll(Now).rows.Single();
+            Assert.AreEqual("uds:/tmp/demo-socks/9.sock", row.from); // no name given: the address is all there is
+            Assert.AreEqual("Recipient generated title", row.to);
         }
 
         [Test]

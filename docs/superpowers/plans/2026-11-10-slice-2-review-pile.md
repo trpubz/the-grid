@@ -256,7 +256,7 @@ Rules for `Apply` (`file` is the per-transcript entry `{ path, offset, name }` k
 | `Sent` | if a message has `sendRef == Ref`: nothing. Else a new message: `sendRef`, `from = file.name`, `fromRepo`, `to = Peer`, `summary`, `firstLine`, `sentAt`, `bodyKey = account + ":" + hash of Body` |
 | `SendResult`, `OwnSubagent` | remove the message with that `sendRef` |
 | `SendResult` with `MsgId` | set `id` on the message with that `sendRef`; if another message already has that `id`, merge the two |
-| `Received` with `MsgId` | find or create by `id`. If it has no `recvRef`: set `recvRef`, `to = file.name` (keep the written `to` when the file has no name), `toRepo`, `receivedAt`; fill `from` from `PeerName` and `firstLine` when empty |
+| `Received` with `MsgId` | find or create by `id`. If it has no `recvRef`: set `recvRef`, `toRepo`, `receivedAt`; `from = PeerName` when the receipt gives one; `to = file.name` only when the sender wrote an address (`uds:…`, `local_…`) or the sent record is unknown; fill `firstLine` when empty. Names used in the message win because a transcript's own label is often just a generated title (found on real data, 2026-11-10) |
 | `Received` without `MsgId` | if a message has `recvRef == Ref`: nothing. Else a new message with `recvRef`, `from = PeerName`, the recipient fields and `bodyKey` |
 
 After a pass, every message with `sendRef`, no `id` and no `recvRef` is merged with the oldest message of the same `bodyKey` that has `recvRef`, no `id` and no `sendRef`. A merge keeps the first message's `key`, fills its empty fields from the second, and ors `ticked` and `archived`. `key` is assigned once from a counter stored in `pile.json` and never changes.
