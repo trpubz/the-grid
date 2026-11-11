@@ -71,6 +71,7 @@ SCENE, CAM = setup()
 MATS = {}
 TURN = 0    # quarter turns applied to everything built, so one model gives four facings
 SCALE = 1.0
+TALL = 1.0   # heights are stretched by this; buildings are drawn half again as tall as modelled, towers over the riders
 
 
 def mat(h):
@@ -90,6 +91,7 @@ def box(cx, cy, z0, w, d, h, top, left=None, right=None):
     for _ in range(TURN % 4):
         cx, cy, w, d = -cy, cx, d, w
     cx, cy, z0, w, d, h = (v * SCALE for v in (cx, cy, z0, w, d, h))
+    z0, h = z0 * TALL, h * TALL
     bpy.ops.mesh.primitive_cube_add(size=1, location=(cx, cy, z0 + h / 2))
     o = bpy.context.object
     o.scale = (w, d, h)
@@ -154,19 +156,24 @@ def render(name, w, h, anchor_up_px):
 
 # ---- tiles: 64 by 32, centred -------------------------------------------------------------------------------------
 
-def tile(name, fill, edge):
+def tile(name, fill, kerb=None, alley=None):
+    """Ground. Light is a strip along one edge, never a grid: a kerb strip runs the way a street runs, along the fronts of a
+    row of buildings; an alley strip runs between two buildings, along their sides."""
     box(0, 0, -.02, 1, 1, .02, fill)
-    box(0, .485, 0, 1, .03, .001, edge)      # two far edges only, so neighbouring tiles share one line
-    box(.485, 0, 0, .03, 1, .001, edge)
+    if kerb:
+        box(0, .455, 0, 1, .09, .001, kerb)
+    if alley:
+        box(.455, 0, 0, .09, 1, .001, alley)
     render(name, 64, 32, 16)
 
 
-# ---- buildings: 128 by 160, a 2 by 2 tile footprint whose near corner touches the bottom edge ----------------------
+# ---- buildings: 128 by 192, a 2 by 2 tile footprint whose near corner touches the bottom edge ----------------------
 
 def slab(fill=N3, edge=N4):
-    box(0, 0, 0, 2, 2, .04, fill, N1, N0)
-    box(0, -.97, .04, 2, .04, .01, edge)
-    box(.97, 0, .04, .04, 2, .01, edge)
+    """The pad a building stands on. A little smaller than the 2 by 2 footprint, so an alley shows between neighbours."""
+    box(0, 0, 0, 1.8, 1.8, .04, fill, N1, N0)
+    box(0, -.88, .04, 1.8, .04, .01, edge)
+    box(.88, 0, .04, .04, 1.8, .01, edge)
 
 
 def trim(cx, cy, z, w, d, colour):
@@ -303,6 +310,52 @@ BUILDINGS = [("b-garage", b_garage), ("b-library", b_library), ("b-lab", b_lab),
              ("b-lot", b_lot), ("b-depot", b_depot)]
 
 
+# ---- outlands: what lies beyond the plots, out to the edge of the view. Dark and dim, so it never competes with a city. --
+
+ROCK = (N2, N1, N0)
+ROCK_HI = (N3, N2, N1)
+
+
+def column(cx, cy, w, h, faces=ROCK, seam=None):
+    """One square column of stone. A seam is a crack of light down its front."""
+    box(cx, cy, 0, w, w, h, *faces)
+    if seam:
+        glow(cx - w * .15, cy - w / 2 - .01, h * .2, .05, .02, h * .55, seam)
+
+
+def o_stones():      # a scatter of low stones
+    column(-.5, .2, .5, .25)
+    column(.1, -.3, .7, .4)
+    column(.55, .35, .4, .2)
+    column(-.15, .5, .35, .55, ROCK_HI)
+
+
+def o_outcrop():     # a stand of columns, one of them cracked
+    column(-.3, .3, .7, 1.1)
+    column(.6, .55, .4, 1.4, ROCK_HI)
+    column(.3, .1, .6, .7, seam=CYAN_DIM)
+    column(-.1, -.35, .5, .4)
+    column(-.7, -.1, .35, .3)
+
+
+def o_spire():       # a tower of stone with one lit seam, seen from far off
+    column(0, .2, .8, 1.2)
+    column(.1, .25, .55, 2.6, ROCK_HI, seam=CYAN_DIM)
+    column(-.35, -.2, .45, .6)
+    column(.5, -.1, .35, .9)
+
+
+OUTLANDS = [("o-stones", o_stones), ("o-outcrop", o_outcrop), ("o-spire", o_spire)]
+
+
+def water():
+    """A tile of still water: darker than the land, with two glints."""
+    box(0, 0, -.02, 1, 1, .02, K0)
+    glow(-.15, .2, 0, .4, .04, .001, CYAN_DIM)
+    glow(.2, -.2, 0, .25, .04, .001, N6)
+    render("tile-water", 64, 32, 16)
+
+
 # ---- riders: the glow is pure white so the game can tint it per account -------------------------------------------
 
 def rider():
@@ -350,7 +403,8 @@ def contact_sheet():
     scale = lambda name: 4 if name.startswith("rider") or name == "marker" else 2     # small things shown larger
     big = [(n, np.repeat(np.repeat(p, scale(n), axis=0), scale(n), axis=1)) for n, p in SPRITES]
     rows = [[s for s in big if s[0].startswith("tile") or s[0].startswith("rider") or s[0] == "marker"],
-            [s for s in big if s[0].startswith("b-")][:5], [s for s in big if s[0].startswith("b-")][5:]]
+            [s for s in big if s[0].startswith("b-")][:5], [s for s in big if s[0].startswith("b-")][5:],
+            [s for s in big if s[0].startswith("o-")]]
     k = 1
     width = max(sum(p.shape[1] * k + pad for _, p in r) for r in rows) + pad
     height = sum(max(p.shape[0] for _, p in r) * k + pad for r in rows) + pad
@@ -372,18 +426,28 @@ def contact_sheet():
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    global TURN, SCALE
+    global TURN, SCALE, TALL
     pal = np.ones((1, len(PALETTE), 4))
     pal[0, :, :3] = PAL
     save(pal, os.path.join(OUT, "palette.png"))
 
-    tile("tile-ground", N1, N2)
-    tile("tile-plot", N3, N4)
-    tile("tile-road", N4, N5)
+    tile("tile-ground", N0)
+    tile("tile-plot", N1)
+    tile("tile-kerb", N1, kerb=CYAN)
+    tile("tile-alley", N1, alley=CYAN)
+    tile("tile-road", N3)
+    tile("tile-road-kerb", N3, kerb=CYAN)
+    water()
 
+    TALL = 1.5
     for name, build in BUILDINGS:
         build()
-        render(name, 128, 160, 32)       # footprint is 2 tiles: its centre sits 32 above the bottom edge, its near corner on it
+        render(name, 128, 192, 32)       # footprint is 2 tiles: its centre sits 32 above the bottom edge, its near corner on it
+
+    TALL = 1.0
+    for name, build in OUTLANDS:
+        build()
+        render(name, 128, 192, 32)
 
     SCALE = 1.5
     for facing, turns in FACINGS:

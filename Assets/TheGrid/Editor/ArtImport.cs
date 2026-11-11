@@ -10,7 +10,7 @@ namespace TheGrid.EditorTools
     {
         const string Folder = "Assets/TheGrid/Resources/Art/";
 
-        public override uint GetVersion() => 1;
+        public override uint GetVersion() => 3;
 
         void OnPreprocessTexture()
         {
@@ -38,7 +38,7 @@ namespace TheGrid.EditorTools
         // Where the ground point is in each picture, as tools/art/README.md lists it.
         static Vector2 Pivot(string name)
         {
-            if (name.StartsWith("b-")) return new Vector2(.5f, 32f / 160f);
+            if (name.StartsWith("b-") || name.StartsWith("o-")) return new Vector2(.5f, 32f / 192f);
             if (name == "rider-small") return new Vector2(.5f, 9f / 32f);
             if (name.StartsWith("rider-")) return new Vector2(.5f, 18f / 64f);
             if (name == "marker") return new Vector2(.5f, 0f);
