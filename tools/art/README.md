@@ -23,7 +23,6 @@ This rewrites every PNG, `sprites.json` beside them, and `docs/art/contact-sheet
 | `buildings.py` | The six buildings |
 | `bots.py` | Bots in every pose and facing, the courier's bike, badges, the pulse |
 | `make_sprites.py` | The entry point. It also still holds the first sprite set, which goes when the world stops using it |
-| `studies/` | Renders made while settling the art direction. Not part of the set |
 
 ## How it stays pixel art
 

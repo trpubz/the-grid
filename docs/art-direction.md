@@ -2,7 +2,7 @@
 
 How The Grid should look. This is the target every sprite and every screen is judged against. It was set by the project's owner on 2026-11-11 and replaces the look of the first sprite set (navy boxes, riders on bikes, stones and lakes).
 
-Three studies made with the project's own script show the direction. They are studies, not the shipped art.
+Three studies made with the project's own sprite kit show the direction. They are studies, not the shipped art; the shipped set is on `docs/art/contact-sheet.png`.
 
 ![A server tower and bots at the game's pixel density](art/direction-tower.png)
 ![Bots, close up](art/direction-bots.png)
