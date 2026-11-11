@@ -7,6 +7,9 @@ using UnityEngine.Tilemaps;
 namespace TheGrid
 {
     // The world: one isometric map with a plot per repo. Draws nothing but the WorldModel it is shown.
+    // The map is drawn into a picture and the picture is put on screen every frame; the map itself is drawn again only when
+    // something in it changed. Most of the day nothing does, and several hundred sprites ten times a second is what an idle
+    // world would otherwise cost.
     // A rider moves only when its agent's building or place changes; the only other motion is the bounce of a marker.
     public sealed class WorldView : MonoBehaviour
     {
@@ -45,6 +48,10 @@ namespace TheGrid
         readonly List<string> accounts = new List<string>();
 
         WorldModel model = new WorldModel();
+        RenderTexture picture;    // the last drawing of the map
+        bool stale = true;        // the map has changed since it was drawn
+        bool syncedFar, lastUp;
+        int markersShown;
         Rect view, bounds;        // view: where the map is, in points
         float pointScale = 1f;
         int pixelW, pixelH, level = 2;
@@ -64,7 +71,22 @@ namespace TheGrid
             view = viewPoints;
             pointScale = scale;
             Lay(world, Mathf.RoundToInt(view.width * scale), Mathf.RoundToInt(view.height * scale));
-            cam.pixelRect = new Rect(Mathf.RoundToInt(view.x * scale), Screen.height - Mathf.RoundToInt(view.yMax * scale), pixelW, pixelH);
+            Draw();
+        }
+
+        // Draws the map into its picture, if anything in it changed since the last drawing.
+        void Draw()
+        {
+            if (!stale) return;
+            stale = false;
+            var old = RenderTexture.active;
+            cam.Render();
+            RenderTexture.active = old;
+        }
+
+        void OnDestroy()
+        {
+            if (picture != null) picture.Release();
         }
 
         public void Hide()
@@ -81,18 +103,15 @@ namespace TheGrid
             Lay(world, width, height);
             if (!far) LookAtFirstNeed();
             PlaceCamera();
-            var rt = RenderTexture.GetTemporary(width, height, 0);
-            cam.targetTexture = rt;
-            cam.Render();
+            stale = true;
+            Draw();
             var old = RenderTexture.active;
-            RenderTexture.active = rt;
-            var picture = new Texture2D(width, height, TextureFormat.RGB24, false);
-            picture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-            picture.Apply();
+            RenderTexture.active = picture;
+            var copy = new Texture2D(pixelW, pixelH, TextureFormat.RGB24, false);
+            copy.ReadPixels(new Rect(0, 0, pixelW, pixelH), 0, 0);
+            copy.Apply();
             RenderTexture.active = old;
-            cam.targetTexture = null;
-            RenderTexture.ReleaseTemporary(rt);
-            return picture;
+            return copy;
         }
 
         public void LookAtAll()
@@ -117,11 +136,23 @@ namespace TheGrid
         void Lay(WorldModel world, int width, int height)
         {
             if (root == null) Create();
-            root.gameObject.SetActive(true);
-            model = world;
+            if (!root.gameObject.activeSelf)
+            {
+                root.gameObject.SetActive(true);
+                stale = true;
+            }
             pixelW = Mathf.Max(2, width & ~1);    // even, so the centre of the view falls between two pixels and art stays crisp
             pixelH = Mathf.Max(2, height & ~1);
+            // The model is a new object only when the roster changed, and far or near changes only on a zoom. The rest of the
+            // time there is nothing to lay out, only the camera to keep where it should be.
+            if (!ReferenceEquals(world, model) || Far != syncedFar) Sync(world);
+            PlaceCamera();
+        }
 
+        void Sync(WorldModel world)
+        {
+            model = world;
+            stale = true;
             var cells = new List<Vector2Int>();
             foreach (var city in world.cities)
             {
@@ -157,7 +188,10 @@ namespace TheGrid
                 riders.Remove(key);
             }
             if (Selected != "" && !riders.ContainsKey(Selected)) Selected = "";
-            PlaceCamera();
+            markersShown = 0;
+            foreach (var r in riders.Values)
+                if (r.marker.enabled) markersShown++;
+            syncedFar = Far;
         }
 
         void Create()
@@ -170,7 +204,7 @@ namespace TheGrid
             cam.orthographic = true;
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(.035f, .055f, .085f);
-            cam.depth = 1;   // over the window's own camera, inside its own rectangle
+            cam.enabled = false;   // it draws when Draw says so, into the picture, never on its own
             cam.nearClipPlane = -10;
             cam.farClipPlane = 10;
             // Lower on the screen is nearer the viewer, so it is drawn later and covers what stands behind it.
@@ -405,14 +439,25 @@ namespace TheGrid
             if (root == null || !root.gameObject.activeSelf) return;
             float now = Time.unscaledTime;
             bool up = (int)(now / BounceSeconds) % 2 == 0;
+            if (up != lastUp)
+            {
+                lastUp = up;
+                if (markersShown > 0) stale = true;   // a marker on screen has just jumped
+            }
             foreach (var r in riders.Values)
             {
                 float t = Mathf.Clamp01((now - r.started) / RideSeconds);
                 var p = Vector2.Lerp(r.from, r.to, t);
-                r.at.localPosition = new Vector3(Mathf.Round(p.x), Mathf.Round(p.y), 0);
+                var at = new Vector3(Mathf.Round(p.x), Mathf.Round(p.y), 0);
                 var d = r.to - r.from;
                 // Parked, a bike faces its building; riding, the way it travels.
-                r.body.sprite = facing[t >= 1f ? 1 : d.x >= 0 ? (d.y < 0 ? 0 : 1) : (d.y >= 0 ? 2 : 3)];
+                var sprite = facing[t >= 1f ? 1 : d.x >= 0 ? (d.y < 0 ? 0 : 1) : (d.y >= 0 ? 2 : 3)];
+                if (r.at.localPosition != at || r.body.sprite != sprite)
+                {
+                    r.at.localPosition = at;
+                    r.body.sprite = sprite;
+                    stale = true;
+                }
                 r.marker.transform.localPosition = new Vector3(0, up ? 46 : 44, 0);
                 if (t < 1f) fastUntil = now + .2f;
             }
@@ -428,10 +473,20 @@ namespace TheGrid
                 centre.x = Mathf.Clamp(centre.x, bounds.xMin, bounds.xMax);
                 centre.y = Mathf.Clamp(centre.y, bounds.yMin, bounds.yMax);
             }
-            cam.orthographicSize = pixelH / (2f * zoom);
-            cam.aspect = (float)pixelW / pixelH;
+            if (picture == null || picture.width != pixelW || picture.height != pixelH)
+            {
+                if (picture != null) picture.Release();
+                picture = new RenderTexture(pixelW, pixelH, 16) { filterMode = FilterMode.Point };
+                cam.targetTexture = picture;
+                stale = true;
+            }
+            float size = pixelH / (2f * zoom), aspect = (float)pixelW / pixelH;
             // Whole screen pixels only, or the art shimmers as it moves.
-            cam.transform.localPosition = new Vector3(Mathf.Round(centre.x * zoom) / zoom, Mathf.Round(centre.y * zoom) / zoom, 0);
+            var at = new Vector3(Mathf.Round(centre.x * zoom) / zoom, Mathf.Round(centre.y * zoom) / zoom, 0);
+            if (cam.orthographicSize != size || cam.aspect != aspect || cam.transform.localPosition != at) stale = true;
+            cam.orthographicSize = size;
+            cam.aspect = aspect;
+            cam.transform.localPosition = at;
         }
 
         // Where a point of the map is in the view, in points from the view's top left corner.
@@ -457,6 +512,7 @@ namespace TheGrid
             Handle(e);
             if (e.type != EventType.Repaint) return;
 
+            if (picture != null) GUI.DrawTexture(new Rect(view.x, view.y, pixelW / pointScale, pixelH / pointScale), picture, ScaleMode.StretchToFill, false);
             GUI.BeginGroup(view);
             if (model.cities.Count == 0) GUI.Label(new Rect(8, 8, view.width - 16, 20), "No live agent sessions.", label);
             bool up = (int)(Time.unscaledTime / BounceSeconds) % 2 == 0;

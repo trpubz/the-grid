@@ -31,6 +31,7 @@ namespace TheGrid
         bool worldOpen, nextWorldOpen;
         WorldView world;
         WorldModel worldDrawn = new WorldModel();
+        RosterSnapshot worldFrom;   // the snapshot worldDrawn was built from
         Plots plots;
         string plotsPath, selected = "", shotsDir;
         int plotsWarned = -1;
@@ -210,7 +211,12 @@ namespace TheGrid
             var map = new Rect(area.x, area.y, area.width, area.height - rowHeight);
             if (Event.current.type == EventType.Layout)
             {
-                worldDrawn = World.Build(drawn, plots);
+                // The same snapshot gives the same world: build it once, so the view can tell that nothing changed.
+                if (!ReferenceEquals(drawn, worldFrom))
+                {
+                    worldFrom = drawn;
+                    worldDrawn = World.Build(drawn, plots);
+                }
                 if (fixedSnap == null)
                 {
                     // A failed write is tried again on the next pass, so new plots are not lost when the disk recovers; it is logged once, not ten times a second.
