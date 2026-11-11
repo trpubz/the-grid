@@ -261,9 +261,10 @@ namespace TheGrid
         void Paint(WorldCity city)
         {
             var o = Iso.PlotOrigin(city.cell);
-            for (int col = 0; col < Iso.PlotTiles; col++)
-                for (int row = 0; row < Iso.PlotTiles; row++)
-                    ground.SetTile(At(o.x + col, o.y + row), Ground(col, row));
+            // The plot, and the path round it. A neighbour paints the stretch between the two again, the same way.
+            for (int col = -Iso.PathTiles; col < Iso.PlotTiles + Iso.PathTiles; col++)
+                for (int row = -Iso.PathTiles; row < Iso.PlotTiles + Iso.PathTiles; row++)
+                    ground.SetTile(At(o.x + col, o.y + row), Iso.OnPath(city.cell, o.x + col, o.y + row) ? Path(col, row) : Ground(col, row));
             foreach (Building b in Enum.GetValues(typeof(Building)))
                 NewSprite(BuildingNames[(int)b], buildingSprites[(int)b], root).transform.localPosition = Iso.BuildingSpot(city.cell, b);
         }
@@ -272,32 +273,13 @@ namespace TheGrid
         static Vector3Int At(int col, int row) => new Vector3Int(-row, -col, 0);
 
         // The outlands: the land does not stop at the last plot. Every empty cell near a plot gets stones, outcrops, now and then a
-        // spire or a lake, so the view runs on to its edges the way a tycoon map runs on into trees and shoreline. Through it run
-        // the thoroughfares that keep every city in company on two sides. It is scenery: it says nothing about any agent, and it
-        // never moves. It follows only from where the plots are, so it is laid out afresh whenever a plot is added.
+        // spire or a lake, so the view runs on to its edges the way a tycoon map runs on into trees and shoreline. It is scenery:
+        // it says nothing about any agent, and it never moves. It keeps to the inside of its cell, clear of the paths.
         void LayOutlands(List<Vector2Int> cells)
         {
             if (cells.Count == outlandsFor || cells.Count == 0) return;
             outlandsFor = cells.Count;
             var taken = new HashSet<Vector2Int>(cells);
-            foreach (var kv in outlands)
-            {
-                Kill(kv.Value);
-                if (taken.Contains(kv.Key)) continue;   // a new repo was given this cell: its plot is already painted there
-                var o = Iso.PlotOrigin(kv.Key);
-                for (int col = 0; col < Iso.PlotTiles; col++)
-                    for (int row = 0; row < Iso.PlotTiles; row++)
-                        ground.SetTile(At(o.x + col, o.y + row), null);
-            }
-            outlands.Clear();
-
-            var roads = new Dictionary<Vector2Int, List<Vector2Int>>();
-            foreach (var road in Iso.Thoroughfares(cells))
-            {
-                if (!roads.TryGetValue(road.cell, out var through)) roads[road.cell] = through = new List<Vector2Int>();
-                through.Add(road.toCity);
-            }
-
             int x0 = int.MaxValue, x1 = int.MinValue, y0 = int.MaxValue, y1 = int.MinValue;
             foreach (var c in cells)
             {
@@ -307,23 +289,27 @@ namespace TheGrid
                 for (int y = y0 - OutlandRing; y <= y1 + OutlandRing; y++)
                 {
                     var cell = new Vector2Int(x, y);
-                    if (taken.Contains(cell)) continue;
-                    roads.TryGetValue(cell, out var through);
-                    outlands[cell] = Scenery(cell, through);
+                    if (!taken.Contains(cell))
+                    {
+                        if (!outlands.ContainsKey(cell)) outlands[cell] = Scenery(cell);
+                    }
+                    else if (outlands.TryGetValue(cell, out var old))
+                    {
+                        // A new repo was given this cell: its plot has already been painted over the ground, so only the stones go.
+                        Kill(old);
+                        outlands.Remove(cell);
+                    }
                 }
         }
 
-        GameObject Scenery(Vector2Int cell, List<Vector2Int> roadsToward)
+        GameObject Scenery(Vector2Int cell)
         {
             var holder = new GameObject("Outlands " + cell.x + " " + cell.y).transform;
             holder.SetParent(root, false);
             var o = Iso.PlotOrigin(cell);
             var rng = new System.Random(cell.x * 73856093 ^ cell.y * 19349663);   // the same land every time the app opens
 
-            var used = new HashSet<Vector2Int>();   // tiles under a road or a lake: nothing else goes there
-            if (roadsToward != null)
-                foreach (var toCity in roadsToward) Road(o, toCity, used);
-
+            var water = new HashSet<Vector2Int>();
             if (rng.Next(3) == 0)
             {
                 int cx = rng.Next(2, 10), cy = rng.Next(2, 10);
@@ -332,7 +318,8 @@ namespace TheGrid
                     for (int row = 0; row < Iso.PlotTiles; row++)
                     {
                         float dx = (col - cx) / rx, dy = (row - cy) / ry;
-                        if (dx * dx + dy * dy > 1f || !used.Add(new Vector2Int(col, row))) continue;
+                        if (dx * dx + dy * dy > 1f) continue;
+                        water.Add(new Vector2Int(col, row));
                         ground.SetTile(At(o.x + col, o.y + row), waterTile);
                     }
             }
@@ -342,30 +329,26 @@ namespace TheGrid
                 int kind = rng.Next(10);
                 // A spire hides what stands behind it, so it keeps to the middle of its cell, clear of any plot next door.
                 int col = kind < 9 ? rng.Next(0, 11) : rng.Next(3, 8), row = kind < 9 ? rng.Next(0, 11) : rng.Next(3, 8);
-                bool free = true;
+                bool wet = false;
                 for (int c = col; c <= col + 1; c++)
                     for (int r = row; r <= row + 1; r++)
-                        free &= !used.Contains(new Vector2Int(c, r));
-                if (!free) continue;
+                        wet |= water.Contains(new Vector2Int(c, r));
+                if (wet) continue;
                 var at = (Iso.TileCentre(o.x + col, o.y + row) + Iso.TileCentre(o.x + col + 1, o.y + row + 1)) / 2;
                 NewSprite("stone", outlandSprites[kind < 5 ? 0 : kind < 9 ? 1 : 2], holder).transform.localPosition = at;
             }
             return holder.gameObject;
         }
 
-        // A thoroughfare: a road down the side of an empty cell that faces a city, the length of that side. Three tiles across:
-        // a lit kerb on each edge of the roadway and a strip of verge. Where two roads meet, the crossing is open road.
-        void Road(Vector2Int o, Vector2Int toCity, HashSet<Vector2Int> used)
+        // The path round a plot: a roadway two tiles across with one line of light down its middle, which is what tells a path from
+        // a city's own streets with their two lit kerbs. Where paths meet at a corner the crossing is open road.
+        Tile Path(int col, int row)
         {
-            bool alongColumns = toCity.x == 0;   // the city is up-right or down-left of here, so the road runs the way columns run
-            var lanes = alongColumns ? new[] { roadKerbTile, roadTile, kerbTile } : new[] { alleyTile, roadTile, roadAlleyTile };
-            int first = toCity.x + toCity.y < 0 ? 0 : Iso.PlotTiles - lanes.Length;   // against the edge the city is on
-            for (int i = 0; i < Iso.PlotTiles; i++)
-                for (int lane = 0; lane < lanes.Length; lane++)
-                {
-                    var t = alongColumns ? new Vector2Int(i, first + lane) : new Vector2Int(first + lane, i);
-                    ground.SetTile(At(o.x + t.x, o.y + t.y), used.Add(t) ? lanes[lane] : roadTile);
-                }
+            bool alongColumns = row < 0 || row >= Iso.PlotTiles, alongRows = col < 0 || col >= Iso.PlotTiles;
+            if (alongColumns && alongRows) return roadTile;
+            // The line is the strip on the edge the two tiles share: the nearer tile's far edge one way, the farther tile's the other.
+            if (alongColumns) return (row + Iso.PathTiles) % Iso.Pitch == 1 ? roadKerbTile : roadTile;
+            return (col + Iso.PathTiles) % Iso.Pitch == 0 ? roadAlleyTile : roadTile;
         }
 
         // Light follows the buildings, not the tiles: a strip along each kerb of the two streets, which run past the buildings' fronts,

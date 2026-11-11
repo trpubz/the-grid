@@ -72,7 +72,7 @@ The shape of the data the window draws is described in [docs/roster-snapshot.md]
 | Lot | done with its turn |
 | Depot | offline |
 
-Past the last plot the land carries on to the edge of the window: stones, outcrops, a spire or a lake here and there. No city stands stranded in it: each has another city or a thoroughfare on at least two sides, and where the map has a notch between two cities the road runs through the notch. All of that is scenery, worked out from where the cities are; it says nothing about any agent.
+Past the last plot the land carries on to the edge of the window: stones, outcrops, a spire or a lake here and there. A path runs round every city, so between any two neighbours there is one, and the paths of the whole map join up; a path has one line of light down its middle, where a city's own streets have a lit kerb on each side. Paths and outlands are scenery, worked out from where the cities are; they say nothing about any agent.
 
 The Booth, the Gate and the Yard are where you are needed. The tall work buildings stand along the back street of a plot and the low ones along the front, so no tower hides a rider.
 

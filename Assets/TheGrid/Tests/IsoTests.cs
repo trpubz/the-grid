@@ -39,10 +39,11 @@ namespace TheGrid.Core.Tests
         {
             var cells = new[] { new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(0, 1), new Vector2Int(-1, -1) };
             var origins = cells.Select(Iso.PlotOrigin).ToList();
+            Assert.AreEqual(14, Iso.Pitch);   // a plot and the path beside it
             Assert.AreEqual(new Vector2Int(0, 0), origins[0]);
-            Assert.AreEqual(new Vector2Int(12, 0), origins[1]);
-            Assert.AreEqual(new Vector2Int(0, 12), origins[2]);
-            Assert.AreEqual(new Vector2Int(-12, -12), origins[3]);
+            Assert.AreEqual(new Vector2Int(14, 0), origins[1]);
+            Assert.AreEqual(new Vector2Int(0, 14), origins[2]);
+            Assert.AreEqual(new Vector2Int(-14, -14), origins[3]);
         }
 
         [Test]
@@ -57,70 +58,63 @@ namespace TheGrid.Core.Tests
             Assert.AreNotEqual(Iso.RiderSpot(new Vector2Int(0, 0), Building.Garage, 0), Iso.RiderSpot(cell, Building.Garage, 0));
         }
 
-        static readonly Vector2Int LowerLeft = new Vector2Int(0, 1), LowerRight = new Vector2Int(1, 0), UpperLeft = new Vector2Int(-1, 0), UpperRight = new Vector2Int(0, -1);
-
-        [Test]
-        public void ThreeCitiesInAnLShareOneNotch()
+        static IEnumerable<Vector2Int> PlotTiles(Vector2Int cell)
         {
-            // The owner's example: alpha, beta beside it, and a third below beta. The first and the third each touch only beta,
-            // and the empty cell between them is where both get their road.
-            Vector2Int alpha = new Vector2Int(0, 0), beta = new Vector2Int(1, 0), third = new Vector2Int(1, 1), notch = new Vector2Int(0, 1);
-            var roads = Iso.Thoroughfares(new[] { alpha, beta, third });
-            Assert.AreEqual(2, roads.Count);
-            CollectionAssert.Contains(roads, (notch, alpha - notch));   // along alpha's lower-left side
-            CollectionAssert.Contains(roads, (notch, third - notch));   // along the third city's upper-left side: its left
-            Assert.AreEqual(UpperLeft, notch - third);
+            var o = Iso.PlotOrigin(cell);
+            for (int c = 0; c < Iso.PlotTiles; c++) for (int r = 0; r < Iso.PlotTiles; r++) yield return new Vector2Int(o.x + c, o.y + r);
         }
 
         [Test]
-        public void ACityOnItsOwnGetsRoadsOnItsTwoFrontSides()
+        public void APathRunsAlongAllFourSidesOfACityAndRoundItsCorners()
         {
-            var city = new Vector2Int(3, -2);
-            var roads = Iso.Thoroughfares(new[] { city });
-            Assert.AreEqual(2, roads.Count);
-            CollectionAssert.Contains(roads, (city + LowerLeft, -LowerLeft));
-            CollectionAssert.Contains(roads, (city + LowerRight, -LowerRight));
+            var cell = new Vector2Int(2, -1);
+            var o = Iso.PlotOrigin(cell);
+            int far = Iso.PlotTiles + Iso.PathTiles - 1;   // the last path tile beyond the plot
+            foreach (var t in new[] { new Vector2Int(5, -1), new Vector2Int(5, Iso.PlotTiles), new Vector2Int(-1, 5), new Vector2Int(Iso.PlotTiles, 5),      // beside each side
+                                      new Vector2Int(-Iso.PathTiles, -Iso.PathTiles), new Vector2Int(far, far), new Vector2Int(-Iso.PathTiles, far) })                  // corners
+                Assert.IsTrue(Iso.OnPath(cell, o.x + t.x, o.y + t.y), t + " should be path");
+            foreach (var t in new[] { new Vector2Int(0, 0), new Vector2Int(11, 11), new Vector2Int(5, 5), new Vector2Int(-Iso.PathTiles - 1, 5), new Vector2Int(5, far + 1) })
+                Assert.IsFalse(Iso.OnPath(cell, o.x + t.x, o.y + t.y), t + " should not be path");
+            // the path is as wide as PathTiles all the way round: a 16 by 16 square less the 12 by 12 plot
+            int count = 0;
+            for (int c = -5; c < 20; c++) for (int r = -5; r < 20; r++) if (Iso.OnPath(cell, o.x + c, o.y + r)) count++;
+            Assert.AreEqual(16 * 16 - 12 * 12, count);
         }
 
         [Test]
-        public void CitiesWithTwoNeighboursNeedNoRoads()
+        public void NeighbouringCitiesShareThePathBetweenThemAndNoPathRunsThroughAPlot()
         {
-            Assert.AreEqual(0, Iso.Thoroughfares(new[] { new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(1, 1), new Vector2Int(0, 1) }).Count);
-            Assert.AreEqual(0, Iso.Thoroughfares(new Vector2Int[0]).Count);
-        }
+            Vector2Int a = new Vector2Int(0, 0), right = new Vector2Int(1, 0), below = new Vector2Int(0, 1);
+            for (int i = 0; i < Iso.PlotTiles; i++)
+                for (int lane = 0; lane < Iso.PathTiles; lane++)
+                {
+                    Assert.IsTrue(Iso.OnPath(a, Iso.PlotTiles + lane, i) && Iso.OnPath(right, Iso.PlotTiles + lane, i), "between a city and the one beside it");
+                    Assert.IsTrue(Iso.OnPath(a, i, Iso.PlotTiles + lane) && Iso.OnPath(below, i, Iso.PlotTiles + lane), "between a city and the one below it");
+                }
 
-        [Test]
-        public void HoweverManyCitiesEachHasCompanyOnTwoSidesAndNoRoadRunsThroughACity()
-        {
-            for (int n = 1; n <= 40; n++)
+            var cells = Enumerable.Range(0, 40).Select(Plots.Cell).ToList();
+            var plots = new HashSet<Vector2Int>(cells.SelectMany(PlotTiles));
+            Assert.AreEqual(40 * Iso.PlotTiles * Iso.PlotTiles, plots.Count, "plots share no tile");
+            foreach (var cell in cells)
             {
-                var cities = Enumerable.Range(0, n).Select(Plots.Cell).ToList();
-                var roads = Iso.Thoroughfares(cities);
-                CollectionAssert.AreEqual(roads, Iso.Thoroughfares(cities), "the same cities give the same roads");
-                foreach (var r in roads)
-                {
-                    CollectionAssert.DoesNotContain(cities, r.cell, n + " cities: a road runs through a city");
-                    CollectionAssert.Contains(cities, r.cell + r.toCity, n + " cities: a road serves no city");
-                }
-                foreach (var city in cities)
-                {
-                    int company = Iso.Sides.Count(side => cities.Contains(city + side) || roads.Contains((city + side, -side)));
-                    Assert.GreaterOrEqual(company, 2, n + " cities: " + city + " is stranded");
-                    Assert.AreEqual(Math.Max(0, 2 - Iso.Sides.Count(side => cities.Contains(city + side))), roads.Count(r => r.cell + r.toCity == city), n + " cities: " + city + " has roads it does not need");
-                }
+                var o = Iso.PlotOrigin(cell);
+                for (int c = -Iso.PathTiles; c < Iso.PlotTiles + Iso.PathTiles; c++)
+                    for (int r = -Iso.PathTiles; r < Iso.PlotTiles + Iso.PathTiles; r++)
+                        Assert.AreEqual(!plots.Contains(new Vector2Int(o.x + c, o.y + r)), Iso.OnPath(cell, o.x + c, o.y + r), cell + ": tile " + c + ", " + r);
             }
         }
 
         [Test]
         public void BoundsCoverThePlots()
         {
+            // a plot and the path round it: 16 tiles each way
             var one = Iso.Bounds(new[] { new Vector2Int(0, 0) });
-            Assert.AreEqual(768f, one.width, .01f);
-            Assert.AreEqual(384f, one.height, .01f);
+            Assert.AreEqual(1024f, one.width, .01f);
+            Assert.AreEqual(512f, one.height, .01f);
             Assert.AreEqual(0f, one.center.x, .01f);                      // plot 0 is centred under its north corner
             var two = Iso.Bounds(new[] { new Vector2Int(0, 0), new Vector2Int(1, 0) });
-            Assert.AreEqual(768f + 384f, two.width, .01f);                // the neighbour sits half a plot across and half a plot down
-            Assert.AreEqual(384f + 192f, two.height, .01f);
+            Assert.AreEqual(1024f + 448f, two.width, .01f);               // the neighbour sits one pitch along: half its width across, a quarter down
+            Assert.AreEqual(512f + 224f, two.height, .01f);
             Assert.AreEqual(0f, Iso.Bounds(new Vector2Int[0]).width);
         }
 
