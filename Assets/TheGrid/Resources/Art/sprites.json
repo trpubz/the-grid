@@ -383,6 +383,326 @@
    "groundX": 144,
    "groundY": 88,
    "palette": 2
+  },
+  {
+   "name": "bot-stand-se",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-stand-ne",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-stand-nw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-stand-sw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-walk-a-se",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-walk-a-ne",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-walk-a-nw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-walk-a-sw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-walk-b-se",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-walk-b-ne",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-walk-b-nw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-walk-b-sw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-type-se",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-type-ne",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-type-nw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-type-sw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-inspect-se",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-inspect-ne",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-inspect-nw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-inspect-sw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-signal-se",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-signal-ne",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-signal-nw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-signal-sw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-off-se",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-off-ne",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-off-nw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-off-sw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8,
+   "palette": 2
+  },
+  {
+   "name": "bot-small",
+   "width": 24,
+   "height": 32,
+   "groundX": 12,
+   "groundY": 5,
+   "palette": 2
+  },
+  {
+   "name": "bike-se",
+   "width": 72,
+   "height": 56,
+   "groundX": 36,
+   "groundY": 14,
+   "palette": 2
+  },
+  {
+   "name": "bike-ne",
+   "width": 72,
+   "height": 56,
+   "groundX": 36,
+   "groundY": 14,
+   "palette": 2
+  },
+  {
+   "name": "bike-nw",
+   "width": 72,
+   "height": 56,
+   "groundX": 36,
+   "groundY": 14,
+   "palette": 2
+  },
+  {
+   "name": "bike-sw",
+   "width": 72,
+   "height": 56,
+   "groundX": 36,
+   "groundY": 14,
+   "palette": 2
+  },
+  {
+   "name": "badge-question",
+   "width": 16,
+   "height": 20,
+   "groundX": 8,
+   "groundY": 2,
+   "palette": 2
+  },
+  {
+   "name": "badge-approve",
+   "width": 16,
+   "height": 20,
+   "groundX": 8,
+   "groundY": 2,
+   "palette": 2
+  },
+  {
+   "name": "badge-done",
+   "width": 16,
+   "height": 20,
+   "groundX": 8,
+   "groundY": 2,
+   "palette": 2
+  },
+  {
+   "name": "badge-fault",
+   "width": 16,
+   "height": 20,
+   "groundX": 8,
+   "groundY": 2,
+   "palette": 2
+  },
+  {
+   "name": "pulse-0",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16,
+   "palette": 2
+  },
+  {
+   "name": "pulse-1",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16,
+   "palette": 2
+  },
+  {
+   "name": "pulse-2",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16,
+   "palette": 2
   }
  ]
 }

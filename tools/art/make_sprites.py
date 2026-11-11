@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kit
 import ground
 import buildings
+import bots
 from kit import hex_rgb, mat
 
 import bpy
@@ -344,6 +345,7 @@ def main():
     # ---- art direction 2: see docs/art-direction.md ----
     ground.make()
     buildings.make()
+    bots.make()
 
     kit.write_manifest()
     kit.contact_sheet()

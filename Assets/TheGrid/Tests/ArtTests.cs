@@ -124,6 +124,50 @@ namespace TheGrid.Core.Tests
             }
         }
 
+        // How many separate runs of solid pixels a row of a picture has.
+        static int Runs(Texture2D t, int y)
+        {
+            int runs = 0;
+            bool inside = false;
+            for (int x = 0; x < t.width; x++)
+            {
+                bool solid = t.GetPixel(x, y).a > 0;
+                if (solid && !inside) runs++;
+                inside = solid;
+            }
+            return runs;
+        }
+
+        [Test]
+        public void ABotIsReadFromItsGaps()
+        {
+            // A person, not a peg: daylight between the legs, and between an arm and the body.
+            var t = Load("bot-stand-se").texture;
+            // measured from where it stands, not from the bottom of its shadow
+            int bottom = Find("bot-stand-se").groundY, top = Enumerable.Range(0, t.height).Last(y => Runs(t, y) > 0);
+            int tall = top - bottom + 1;
+            Assert.That(tall, Is.InRange(28, 38), "a bot is about 32 pixels tall");
+            int legRows = Enumerable.Range(bottom + 3, tall / 4).Count(y => Runs(t, y) >= 2);
+            Assert.GreaterOrEqual(legRows, 4, "no gap between the legs");
+            int armRows = Enumerable.Range(bottom + tall * 35 / 100, tall / 4).Count(y => Runs(t, y) >= 2);
+            Assert.GreaterOrEqual(armRows, 2, "no gap between an arm and the body");
+        }
+
+        [Test]
+        public void OnlyTheVisorAndSuitLinesAreWhite()
+        {
+            // White is what the game tints per account. A lit bot shows it from every side; a bot that is off shows none.
+            var white = new Color32(255, 255, 255, 255);
+            var bots = Read().sprites.Select(s => s.name).Where(n => n.StartsWith("bot-")).ToList();
+            Assert.AreEqual(7 * 4 + 1, bots.Count, "seven poses in four facings, and the small one");
+            foreach (var name in bots)
+            {
+                int n = Load(name).texture.GetPixels32().Count(c => c.Equals(white));
+                if (name.StartsWith("bot-off-")) Assert.AreEqual(0, n, name);
+                else Assert.GreaterOrEqual(n, name == "bot-small" ? 4 : 12, name);
+            }
+        }
+
         [Test]
         public void NoTwoBuildingsFiguresOrFacingsAreTheSamePicture()
         {
