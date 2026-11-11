@@ -126,8 +126,9 @@ namespace TheGrid.Core
 
         // Calls onLine(line, byte offset of the line) for every complete line after `offset` that contains one of `markers`,
         // and returns the offset just past the last complete line. A last line with no newline is left for the next call.
-        // A file shorter than `offset` was replaced and is read from the start. Transcripts reach a gigabyte, so markers are
-        // matched on the raw bytes and only matching lines are decoded.
+        // A file shorter than `offset` was replaced and is read from the start. Returns -1 when the file could not be read, so the
+        // caller tries again rather than treating it as read. Transcripts reach a gigabyte, so markers are matched on the raw
+        // bytes and only matching lines are decoded.
         public static long ReadNewLines(string path, long offset, string[] markers, Action<string, long> onLine, int bufferBytes = 1 << 20)
         {
             var needles = Array.ConvertAll(markers, m => Encoding.UTF8.GetBytes(m));
@@ -162,7 +163,7 @@ namespace TheGrid.Core
                     }
                 }
             }
-            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException) { }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException) { return -1; }
             return offset;
         }
 

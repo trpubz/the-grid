@@ -51,8 +51,8 @@ namespace TheGrid.Core.Tests
         string Fixture(string name) =>
             File.ReadAllText(Path.Combine(Directory.GetCurrentDirectory(), "fixtures", "claude-code", "messages", name)).Replace("/work/", Path.Combine(tmp, "repos") + "/");
 
-        static string SentLine(string tool, string to, string message) =>
-            "{\"type\":\"assistant\",\"uuid\":\"x-" + tool + "\",\"timestamp\":\"2026-01-02T09:00:00.000Z\",\"cwd\":\"/nowhere\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"" + tool
+        static string SentLine(string tool, string to, string message, string time = "09:00:00") =>
+            "{\"type\":\"assistant\",\"uuid\":\"x-" + tool + "\",\"timestamp\":\"2026-01-02T" + time + ".000Z\",\"cwd\":\"/nowhere\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"" + tool
             + "\",\"name\":\"SendMessage\",\"input\":{\"to\":\"" + to + "\",\"message\":\"" + message + "\",\"recipient_kind\":\"name\"}}]}}\n";
 
         static string ResultLine(string tool, string msgId) =>
@@ -176,8 +176,8 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual("written-name", row.to);
         }
 
-        static string DesktopReceivedLine(string uuid, string body) =>
-            "{\"type\":\"user\",\"uuid\":\"" + uuid + "\",\"timestamp\":\"2026-01-02T08:00:00.000Z\",\"cwd\":\"/nowhere\",\"message\":{\"role\":\"user\",\"content\":\"Another session sent a message:\\n<cross-session-message from=\\\"local_0009\\\" name=\\\"Desk\\\">\\n"
+        static string DesktopReceivedLine(string uuid, string body, string time = "08:00:00") =>
+            "{\"type\":\"user\",\"uuid\":\"" + uuid + "\",\"timestamp\":\"2026-01-02T" + time + ".000Z\",\"cwd\":\"/nowhere\",\"message\":{\"role\":\"user\",\"content\":\"Another session sent a message:\\n<cross-session-message from=\\\"local_0009\\\" name=\\\"Desk\\\">\\n"
             + body + "\\n</cross-session-message>\"},\"origin\":{\"kind\":\"peer\",\"from\":\"local_0009\",\"hostInjected\":true}}\n";
 
         // Pairing by text is for sends to a desktop-app session, which never get an id. A send to a named session gets one a moment
@@ -199,6 +199,50 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(2, rows.Count);
             Assert.AreEqual("written-name", rows.Single(r => r.from == "sender-name").to);
             Assert.AreEqual("Desk", rows.Single(r => r.from != "sender-name").from);
+        }
+
+        // The same words sent to two desktop sessions: each send belongs with the receipt that followed it, whichever transcript is read first.
+        [Test]
+        public void RepeatedTextPairsEachSendWithTheReceiptThatFollowedIt()
+        {
+            foreach (var f in new[] { senderPath, recipientPath, desktopPath }) File.Delete(f);
+            var sender = Path.Combine(cfg, "projects", "p1", "a.jsonl");
+            var one = Path.Combine(cfg, "projects", "p2", "one.jsonl");
+            var two = Path.Combine(cfg, "projects", "p3", "two.jsonl");
+            File.WriteAllText(sender, SentLine("toolu_d1", "local_0001", "Same words.", "09:00:00") + SentLine("toolu_d2", "local_0002", "Same words.", "09:00:10"));
+            File.WriteAllText(one, "{\"type\":\"custom-title\",\"customTitle\":\"Desk one\"}\n" + DesktopReceivedLine("h-u1", "Same words.", "09:00:01"));
+            File.WriteAllText(two, "{\"type\":\"custom-title\",\"customTitle\":\"Desk two\"}\n" + DesktopReceivedLine("h-u2", "Same words.", "09:00:11"));
+            File.SetLastWriteTimeUtc(one, DateTime.UtcNow.AddMinutes(-5)); // the later receipt's transcript is read first
+            var rows = pile.Poll(Now).rows;
+            Assert.AreEqual(2, rows.Count);
+            Assert.AreEqual("Desk two", rows[0].to); // newest first: the 09:00:10 send
+            Assert.AreEqual("Desk one", rows[1].to);
+        }
+
+        [Test]
+        public void AReceiptOlderThanASendIsNotItsReceipt()
+        {
+            foreach (var f in new[] { senderPath, recipientPath, desktopPath }) File.Delete(f);
+            File.WriteAllText(Path.Combine(cfg, "projects", "p1", "a.jsonl"), SentLine("toolu_d1", "local_0001", "Same words.", "09:00:00"));
+            File.WriteAllText(Path.Combine(cfg, "projects", "p2", "one.jsonl"), DesktopReceivedLine("h-u1", "Same words.", "08:00:00")); // an hour before the send
+            Assert.AreEqual(2, pile.Poll(Now).rows.Count);
+        }
+
+        // A transcript that could not be opened is tried again on the next pass, even if it has not grown since.
+        [Test]
+        public void ATranscriptThatCouldNotBeReadIsTriedAgain()
+        {
+            Chmod("000", recipientPath);
+            try { Assert.IsFalse(pile.Poll(Now).rows.Any(r => r.toRepoName == "beta")); } // no receipt has been read
+            finally { Chmod("644", recipientPath); }
+            var rows = pile.Poll(Now + 2000).rows;
+            Assert.AreEqual(4, rows.Count);
+            Assert.AreEqual(2, rows.Count(r => r.toRepoName == "beta"));
+        }
+
+        static void Chmod(string mode, string path)
+        {
+            using (var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("/bin/chmod", mode + " \"" + path + "\"") { UseShellExecute = false })) p.WaitForExit();
         }
 
         [Test]

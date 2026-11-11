@@ -47,7 +47,7 @@ The reviewer's to veto:
 2. **Tabs, not side by side.** The window must work at 360 points, so the roster and the pile are two tabs: `Agents (n)` and `Messages (n unticked)`.
 3. **First launch lists the whole history** (about 600 messages here), newest first, read once in the background. To make that backlog clearable there is a `Tick shown` button beside `Clear ticked`; it is a toggle, reading `Untick shown` once every drawn row is ticked (asked for by the owner, 2026-11-10). The list draws the newest 200 rows and says how many more there are.
 4. **Only the first line and the sender's summary are shown.** Reading a whole message stays in the terminal for now.
-5. **Desktop-app messages pair by exact text** within one account, because their records carry no shared id. Two identical texts pair in the order seen.
+5. **Desktop-app messages pair by exact text** within one account, because their records carry no shared id. Only a send addressed to a desktop session id pairs this way, and each pairs with the first unpaired receipt of the same text that came after it, oldest send first (tightened in review).
 6. **The flag needs both sides.** A message is flagged only when both its sent and received records were found and the two repos' workspaces differ. A message nobody has received yet is not flagged.
 7. **The pile runs on its own thread**, so the first long read never delays the roster.
 
@@ -96,7 +96,7 @@ Written "run the core tests" below. Pass means `Logs/editmode.xml` has `result="
 ```csharp
 public static List<string> Transcripts(string configDir);   // <configDir>/projects/*/*.jsonl, top level only; empty when the folder is missing
 // Calls onLine for every complete line after `offset` that contains one of `markers`, and returns the offset just past the last complete line.
-// A last line with no newline is left for the next call. A file shorter than `offset` is read from 0. An unreadable file returns `offset`.
+// A last line with no newline is left for the next call. A file shorter than `offset` is read from 0. An unreadable file returns -1, so the caller tries again (changed in review).
 public static long ReadNewLines(string path, long offset, string[] markers, Action<string, long> onLine, int bufferBytes = 1 << 20);   // onLine(line, byte offset of the line)
 public static string ReadLineAt(string path, long offset, int maxBytes = 4 << 20);   // the one line starting at `offset`, or null when it cannot be read
 ```

@@ -271,28 +271,37 @@ namespace TheGrid.Core
             Reindex();
         }
 
-        // Messages to a desktop-app session carry no shared id: pair a sent one with the oldest unpaired received one of the same text.
+        // Messages to a desktop-app session carry no shared id: pair each such send with the first unpaired receipt of the same
+        // text that came after it. Oldest send first, by the messages' own times, so the order transcripts were read in does not matter.
         // Only a send addressed to a desktop session id qualifies. Any other send with no id is either waiting a moment for its
         // result or was refused, and pairing it by text would swallow a different message that says the same thing.
         bool PairByText()
         {
-            bool any = false;
             var waiting = new Dictionary<string, List<PileMessage>>();
+            var sends = new List<PileMessage>();
             foreach (var m in state.messages)
-                if (m.id == "" && m.sendRef == "" && m.recvRef != "")
+            {
+                if (m.id != "") continue;
+                if (m.sendRef == "" && m.recvRef != "")
                 {
                     if (!waiting.TryGetValue(m.bodyKey, out var list)) waiting[m.bodyKey] = list = new List<PileMessage>();
                     list.Add(m);
                 }
-            if (waiting.Count == 0) return false;
-            foreach (var sent in state.messages.ToArray())
+                else if (m.sendRef != "" && m.recvRef == "" && m.to.StartsWith(DesktopAddress, StringComparison.Ordinal)) sends.Add(m);
+            }
+            if (waiting.Count == 0 || sends.Count == 0) return false;
+            foreach (var list in waiting.Values) list.Sort((x, y) => x.receivedAt.CompareTo(y.receivedAt));
+            sends.Sort((x, y) => x.sentAt.CompareTo(y.sentAt));
+            bool any = false;
+            foreach (var sent in sends)
             {
-                if (sent.id != "" || sent.sendRef == "" || sent.recvRef != "" || !sent.to.StartsWith(DesktopAddress, StringComparison.Ordinal)) continue;
-                if (!waiting.TryGetValue(sent.bodyKey, out var list) || list.Count == 0) continue;
-                var received = list[0];
-                list.RemoveAt(0);
-                // Here `sent` is kept: it has been on screen longer. It was addressed by id, so the names come from the receipt.
-                if (received.to != "" && (sent.to == "" || IsAddress(sent.to))) sent.to = received.to;
+                if (!waiting.TryGetValue(sent.bodyKey, out var list)) continue;
+                int i = list.FindIndex(r => r.receivedAt >= sent.sentAt); // a receipt cannot come before its send
+                if (i < 0) continue;
+                var received = list[i];
+                list.RemoveAt(i);
+                // `sent` is kept: it has been on screen longer. It was addressed by id, so the names come from the receipt.
+                if (received.to != "") sent.to = received.to;
                 if (received.from != "") sent.from = received.from;
                 Merge(sent, received);
                 any = true;
@@ -334,6 +343,7 @@ namespace TheGrid.Core
                     Messages.Parse(line, events);
                     for (int i = first; i < events.Count; i++) events[i].Offset = at;
                 });
+                if (offset < 0) continue; // could not be read: nothing is recorded about it, so the next pass tries again
                 lock (gate)
                 {
                     bool fileChanged = false;

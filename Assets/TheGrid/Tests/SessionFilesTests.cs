@@ -163,7 +163,7 @@ namespace TheGrid.Core.Tests
             CollectionAssert.AreEqual(new[] { longLine, "{\"k\":\"hit\"}", "{\"é\":\"hit\"}" }, seen);
             Assert.AreEqual(new FileInfo(p).Length, end);
             foreach (var i in new[] { 0, 1, 2 }) Assert.AreEqual(seen[i], SessionFiles.ReadLineAt(p, offsets[i]));
-            Assert.AreEqual(7, SessionFiles.ReadNewLines("/no/such/file", 7, markers, (l, o) => seen.Add(l)));
+            Assert.AreEqual(-1, SessionFiles.ReadNewLines("/no/such/file", 7, markers, (l, o) => seen.Add(l))); // could not be read: try again later
         }
 
         [Test]
