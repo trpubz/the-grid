@@ -28,7 +28,7 @@ The first working piece: a window that lists your live Claude Code sessions on t
 
 The first time a build runs, macOS asks whether The Grid can access folders such as Documents, because your repos live there. Until you answer, the roster shows an error saying `claude agents did not answer`. It asks once: **Build Mac App** signs every build with the first Apple Development certificate in your keychain (Xcode creates one for any Apple account, free or paid), so a rebuilt app is still the same app to macOS. To sign with a different certificate, put its name or SHA-1, as `security find-identity -v -p codesigning` prints it, on one line in `UserSettings/TheGridSignIdentity.txt`; that folder is not tracked. With no certificate at all the build is left unsigned and macOS asks again after every rebuild. Run one copy at a time: two open copies with different signatures, such as an older unsigned build beside a new signed one, are one app by name but not by identity, and macOS then asks over and over until one of them is closed.
 
-Each row shows the state (question, permission, done, running and so on), the session name, its account, how long it has been in that state, the repo, the ticket read from the branch name, the pull request, and the workspace. Click the pull request to open it. Click the workspace to move the repo to the next one.
+Each row shows the state (question, permission, done, running and so on), what a running agent is doing (reading, editing, testing, reviewing, or just working when it cannot be told), the session name, its account, how long it has been in that state, the repo, the ticket read from the branch name, the pull request, and the workspace. Click the pull request to open it. Click the workspace to move the repo to the next one.
 
 Settings live in `~/Library/Application Support/DefaultCompany/The Grid/settings.json`, created on first launch. Edit the file to add workspaces; the app re-reads it the next time you click a workspace.
 
@@ -43,7 +43,7 @@ Settings live in `~/Library/Application Support/DefaultCompany/The Grid/settings
 
 Beside the roster, the window lists every message your Claude Code sessions sent each other on this Mac, newest first, once each. The Grid only observes these messages. It never sends, changes or deletes one.
 
-- At 720 points or wider the roster is on the left and the pile on the right. Narrower, they are two tabs: **Agents** and **Messages**.
+- At 720 points or wider the roster is on the left and the pile on the right, under **Lists**. Narrower, they are two tabs: **Agents** and **Messages**. **World** is beside them either way.
 - Each row shows who sent it, who received it, how long ago, and the sender's summary or the first line. Click the names to read the whole message; it is read from the session's transcript at that moment.
 - Tick a message once you have reviewed it. **Clear ticked** archives the ticked rows: they leave the list and stay archived. **Tick shown** ticks every row on screen, which helps with the backlog on first launch; once they are all ticked the same button reads **Untick shown** and takes the ticks back.
 - A row drawn in red, starting with two workspace names such as `Work → Personal`, is a message whose sender and recipient repos belong to different workspaces. A message is only flagged once both its sent and its received record have been found.
@@ -53,6 +53,50 @@ Clearing changes The Grid's own list and nothing else. The pile lives in `pile.j
 
 The shape of the data the window draws is described in [docs/roster-snapshot.md](docs/roster-snapshot.md).
 
+## The world
+
+**World** shows the same agents as the roster, as riders in a city. Every repo gets a plot on one isometric map, and the map grows as new repos turn up. A rider stands at the building that matches what its agent is doing, and rides to another when that changes. Nothing else moves, except a marker that bounces over every rider that needs you.
+
+![The world, zoomed in on one city](docs/art/world-near.png)
+
+| Building | A rider is here when its agent is |
+|---|---|
+| Garage | editing files |
+| Library | reading or searching |
+| Lab | running tests |
+| Review hall | looking at diffs, commits or a pull request |
+| Workshop | working, when it cannot be told on what |
+| Booth | blocked on a question to you |
+| Gate | waiting for a permission, or on something else |
+| Yard | errored, or in a state The Grid does not know |
+| Lot | done with its turn |
+| Depot | offline |
+
+Past the last plot the land carries on to the edge of the window: stones, outcrops, a spire or a lake here and there. That is scenery, laid out the same way every time; it says nothing about any agent.
+
+The Booth, the Gate and the Yard are where you are needed. The tall work buildings stand along the back street of a plot and the low ones along the front, so no tower hides a rider.
+
+- **Move:** drag, or scroll with two fingers.
+- **Zoom:** the **−** and **+** buttons, the `-` and `+` keys, or scroll while holding Command. There are five levels, each double the last. The view opens at the closest one that shows every plot.
+- **Far out,** each city shows its name and how many riders need you. **Closer in,** buildings and riders are named. A rider's glow colour is its account. Small bikes beside a rider are its subagents.
+- **Click a rider** to see that agent's roster row under the map.
+
+Which repo has which plot is kept in `world.json` beside `settings.json`. A repo keeps its plot for good, also after its sessions are gone; delete the file to start the map again. If its contents are damaged it is kept as `world.json.bad` and the map starts empty.
+
+To look at the world without any agent sessions, start the app on a roster snapshot file. It then reads no agent data and writes nothing:
+
+```bash
+Builds/TheGrid.app/Contents/MacOS/"The Grid" -snapshot "$PWD/fixtures/world/snapshot.json"
+```
+
+Add `-shots <folder>` and it saves `far.png` and `near.png` there and quits. With the editor closed, **The Grid > Render World Pictures** does much the same without a window, into `Logs/`, though without the names:
+
+```bash
+/Applications/Unity/Hub/Editor/6000.4.3f1/Unity.app/Contents/MacOS/Unity -batchmode -projectPath "$PWD" -executeMethod TheGrid.EditorTools.GridMenu.WorldPictures -quit
+```
+
+The sprites are made by a script; see [tools/art/README.md](tools/art/README.md).
+
 ## Package map
 
 | Path | Purpose |
@@ -61,6 +105,8 @@ The shape of the data the window draws is described in [docs/roster-snapshot.md]
 | Assets/TheGrid/Demo.unity | Scene with GridReplay attached. Open it and press Play. |
 | Assets/TheGrid/Core/ | Reads live sessions and builds the roster. No scene or editor code. |
 | Assets/TheGrid/RosterApp.cs, Roster.unity | The roster window and its scene. |
+| Assets/TheGrid/WorldView.cs | The world: the map, the riders, moving and zooming. |
+| Assets/TheGrid/Resources/Art/, tools/art/ | The sprites, and the Blender script that makes them. |
 | Assets/TheGrid/Tests/ | EditMode tests for Core. |
 | fixtures/ | Hand-written sample records and the pinned roster snapshot. |
 | Assets/TheGrid/Resources/grid-demo.json | Ordered offline projection for two synthetic users, sessions, and messages. |

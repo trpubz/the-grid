@@ -8,13 +8,19 @@ namespace TheGrid.Core
 {
     public sealed class SessionFileInfo { public long StatusUpdatedAt; public string Entrypoint = ""; }
 
-    public sealed class TranscriptMeta { public string Branch = ""; public int PrNumber; public string PrUrl = ""; }
+    // Activity is "" when the window read holds no record of the agent's own.
+    public sealed class TranscriptMeta { public string Branch = ""; public int PrNumber; public string PrUrl = ""; public string Activity = ""; }
 
     // Read-only access to files Claude Code writes under a config directory.
     public static class SessionFiles
     {
         [Serializable] sealed class SessionJson { public long statusUpdatedAt; public string entrypoint; }
         [Serializable] sealed class Line { public string type, gitBranch, prUrl; public int prNumber; }
+        // An assistant record is parsed with its own class: a user record's content is a string, not a list of blocks.
+        [Serializable] sealed class AssistantLine { public string type; public bool isSidechain; public AssistantMessage message; }
+        [Serializable] sealed class AssistantMessage { public List<Block> content; }
+        [Serializable] sealed class Block { public string type, name, text; public BlockInput input; }
+        [Serializable] sealed class BlockInput { public string command, skill; }
 
         // <configDir>/sessions/<pid>.json. Undocumented by Claude Code, so every failure is just "no info".
         public static bool TryReadSessionFile(string configDir, int pid, out SessionFileInfo info)
@@ -92,10 +98,16 @@ namespace TheGrid.Core
 
             // Newest first, and stop parsing branch lines once one is found: nearly every line carries the branch.
             var lines = text.Substring(from, end - from).Split('\n');
-            bool haveBranch = false, havePr = false;
-            for (int i = lines.Length - 1; i >= 0 && !(haveBranch && havePr); i--)
+            bool haveBranch = false, havePr = false, haveActivity = false;
+            for (int i = lines.Length - 1; i >= 0 && !(haveBranch && havePr && haveActivity); i--)
             {
                 var line = lines[i];
+                // The newest record of the agent's own decides what it is doing.
+                if (!haveActivity && line.IndexOf("\"assistant\"", StringComparison.Ordinal) >= 0 && TryActivity(line, out var activity))
+                {
+                    meta.Activity = activity;
+                    haveActivity = true;
+                }
                 bool branchLine = !haveBranch && line.IndexOf("\"gitBranch\"", StringComparison.Ordinal) >= 0;
                 bool prLine = !havePr && line.IndexOf("\"pr-link\"", StringComparison.Ordinal) >= 0;
                 if (!branchLine && !prLine) continue;
@@ -107,6 +119,29 @@ namespace TheGrid.Core
                 if (prLine && r.type == "pr-link" && r.prNumber > 0) { meta.PrNumber = r.prNumber; meta.PrUrl = r.prUrl ?? ""; havePr = true; }
             }
             return meta;
+        }
+
+        // True when the line is an assistant record of the session itself (not a subagent's). Its last tool call decides;
+        // with no tool call, its last text does.
+        static bool TryActivity(string line, out string activity)
+        {
+            activity = "";
+            AssistantLine r;
+            try { r = JsonUtility.FromJson<AssistantLine>(line); }
+            catch (ArgumentException) { return false; }
+            if (r == null || r.type != "assistant" || r.isSidechain) return false;
+            var blocks = r.message != null ? r.message.content : null;
+            Block tool = null, text = null;
+            if (blocks != null)
+                foreach (var b in blocks)
+                {
+                    if (b == null) continue;
+                    if (b.type == "tool_use") tool = b;
+                    else if (b.type == "text") text = b;
+                }
+            if (tool != null) activity = TheGrid.Core.Activity.Classify(tool.name, tool.input == null ? "" : !string.IsNullOrEmpty(tool.input.command) ? tool.input.command : tool.input.skill, "");
+            else activity = TheGrid.Core.Activity.Classify("", "", text != null ? text.text : "");
+            return true;
         }
 
         // Every session transcript: <configDir>/projects/*/*.jsonl. Subagent transcripts sit deeper and are not listed.

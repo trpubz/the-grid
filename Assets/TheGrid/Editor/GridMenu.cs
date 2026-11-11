@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
+using TheGrid.Core;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
@@ -24,6 +25,18 @@ namespace TheGrid.EditorTools
             if (!EditorSceneManager.SaveScene(scene, RosterScene)) throw new InvalidOperationException("could not save " + RosterScene);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(RosterScene, true), new EditorBuildSettingsScene(DemoScene, true) };
             AssetDatabase.SaveAssets();
+        }
+
+        // Draws the world from the synthetic fixture into Logs/world-far.png and Logs/world-near.png, without a window or any agent
+        // data: a quick look at new sprites standing where the game puts them. Names and counts are text and are not in these pictures.
+        [MenuItem("The Grid/Render World Pictures")]
+        public static void WorldPictures()
+        {
+            var snap = JsonUtility.FromJson<RosterSnapshot>(File.ReadAllText("fixtures/world/snapshot.json"));
+            var view = new GameObject("World pictures").AddComponent<WorldView>();
+            foreach (var far in new[] { true, false })
+                File.WriteAllBytes("Logs/world-" + (far ? "far" : "near") + ".png", view.Picture(World.Build(snap, new Plots()), 2000, 1250, far).EncodeToPNG());
+            UnityEngine.Object.DestroyImmediate(view.gameObject);
         }
 
         // Builds Builds/TheGrid.app: a resizable window that keeps running when it is not in front.

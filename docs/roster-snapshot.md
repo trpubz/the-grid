@@ -26,6 +26,7 @@ The exact JSON is pinned by a test against [`fixtures/roster/snapshot.json`](../
 | `ticket` | Ticket id, such as `DEMO-12`; empty when none | First `letters-digits` token in `branch` |
 | `prNumber`, `prUrl` | Pull request; `0` and empty when none | Pull request record in the transcript. Once seen it is kept |
 | `state` | One of the states below | Mapped from the live session list |
+| `activity` | What a running agent is doing: `reading`, `editing`, `testing`, `reviewing`, or `working` when it cannot be told. Empty in every other state | The newest record of the agent's own in its transcript: the last tool it used, or keywords in what it said |
 | `rawStatus` | The agent app's own words, such as `waiting / input needed` | Live session list |
 | `workspace` | Workspace the repo is assigned to; `Personal` when unassigned | Settings |
 | `stateSince` | When the agent entered `state`, in milliseconds since 1970 UTC | Per-process session file, else the first time the roster saw that state |
@@ -48,3 +49,22 @@ A subagent has `agentId`, `description` (what it was asked to do) and `agentType
 | `Offline` | The session was live and is gone. Kept for 12 hours |
 
 Within one state, the agent that has been in it longest comes first.
+
+## The world
+
+The world view is built from the same snapshot (`World.Build`), so the two never disagree. Each repo is a city on its own plot; sessions with no repo share one. A rider's building follows from `state`, and for a running agent from `activity`:
+
+| `state` | `activity` | Building | Needs the owner |
+|---|---|---|---|
+| `Running` | `editing` | Garage | |
+| `Running` | `reading` | Library | |
+| `Running` | `testing` | Lab | |
+| `Running` | `reviewing` | Review hall | |
+| `Running` | anything else | Workshop | |
+| `BlockedOnQuestion` | | Booth | yes |
+| `WaitingForPermission`, `WaitingOther`, `BackgroundBlocked` | | Gate | yes |
+| `Errored`, `Unknown`, or a state not in the list above | | Yard | yes |
+| `Finished` | | Lot | |
+| `Offline` | | Depot | |
+
+A rider is one agent, told apart by `account` and `sessionId` together. Its place at a building follows that pair, not the roster's order, so riders do not shuffle when the roster re-sorts. `fixtures/world/snapshot.json` is a synthetic snapshot with every state and activity in it.

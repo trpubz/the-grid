@@ -9,6 +9,8 @@ namespace TheGrid.Core
     public sealed class AgentRow
     {
         public string sessionId = "", name = "", account = "", app = "", repoRoot = "", repoName = "", branch = "", ticket = "", prUrl = "", state = "", rawStatus = "", workspace = "";
+        // What a running agent is doing: reading, editing, testing, reviewing or working. Empty in every other state.
+        public string activity = "";
         public int prNumber;
         public long stateSince;
         public List<SubagentRow> subagents = new List<SubagentRow>();
@@ -55,6 +57,7 @@ namespace TheGrid.Core
             public bool Seen;
             public string TranscriptPath;
             public long TranscriptStamp;
+            public string Activity = "";
         }
 
         readonly Settings settings;
@@ -89,6 +92,7 @@ namespace TheGrid.Core
                     m.State = AgentState.Offline;
                     m.Row.state = AgentState.Offline.ToString();
                     m.Row.rawStatus = "";
+                    m.Row.activity = ""; // a session that is gone is not doing anything
                     m.Row.stateSince = nowMs;
                     m.Row.subagents = new List<SubagentRow>();
                 }
@@ -152,8 +156,11 @@ namespace TheGrid.Core
                     if (meta.Branch != "") { row.branch = meta.Branch; row.ticket = Ticket.FromBranch(meta.Branch); }
                     // A pull request once seen is kept: a later tail read may no longer contain its record.
                     if (meta.PrNumber > 0) { row.prNumber = meta.PrNumber; row.prUrl = meta.PrUrl; }
+                    m.Activity = meta.Activity;
                 }
             }
+            // Only a running agent is doing anything; when the transcript cannot say what, it is just working.
+            row.activity = state != AgentState.Running ? "" : m.Activity != "" ? m.Activity : Activity.Working;
             row.subagents = Subagents.ReadActive(m.TranscriptPath, nowMs);
         }
 

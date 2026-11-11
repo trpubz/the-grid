@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using TheGrid.Core;
@@ -6,7 +7,9 @@ using UnityEngine;
 
 namespace TheGrid
 {
-    // The window: the roster of agents and the review pile of their messages. Draws nothing but RosterSnapshot and PileSnapshot.
+    // The window: the roster of agents, the review pile of their messages, and the world. Draws nothing but RosterSnapshot and PileSnapshot.
+    // Started with -snapshot <file>, it shows the world from that roster snapshot and reads no agent data; with -shots <folder> too,
+    // it saves far.png and near.png there and quits.
     public sealed class RosterApp : MonoBehaviour
     {
         static readonly Color Background = new Color(.035f, .055f, .085f);
@@ -20,11 +23,18 @@ namespace TheGrid
 
         Collector collector;
         Pile pile;
-        Vector2 scroll, pileScroll;
+        Vector2 scroll, pileScroll, rowScroll;
         RosterSnapshot logged, drawn = new RosterSnapshot();
         PileSnapshot pileDrawn = new PileSnapshot();
         // A click changes the "next" value; it takes effect on the following Layout event, so both IMGUI passes draw the same controls.
         int tab, nextTab;
+        bool worldOpen, nextWorldOpen;
+        WorldView world;
+        WorldModel worldDrawn = new WorldModel();
+        Plots plots;
+        string plotsPath, selected = "", shotsDir;
+        int plotsWarned = -1;
+        RosterSnapshot fixedSnap;   // picture mode: the one snapshot there is
         string openKey = "", nextOpenKey = "", openBody = "";
         bool pileLogged;
         readonly Dictionary<string, string> lastState = new Dictionary<string, string>();
@@ -42,6 +52,18 @@ namespace TheGrid
             {
                 Camera.main.clearFlags = CameraClearFlags.SolidColor;
                 Camera.main.backgroundColor = Background;
+                Camera.main.cullingMask = 0;   // it only clears the window; the world has a camera of its own
+            }
+            world = gameObject.AddComponent<WorldView>();
+            var snapshotFile = Arg("-snapshot");
+            if (snapshotFile != "")
+            {
+                fixedSnap = JsonUtility.FromJson<RosterSnapshot>(File.ReadAllText(snapshotFile));
+                plots = new Plots();   // never the owner's world.json
+                worldOpen = nextWorldOpen = true;
+                shotsDir = Arg("-shots");
+                if (shotsDir != "") StartCoroutine(Shots());
+                return;
             }
             var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             settingsPath = Path.Combine(Application.persistentDataPath, "settings.json");
@@ -53,6 +75,36 @@ namespace TheGrid
             // The pile's file sits beside settings.json, never under an agent app's folder.
             pile = new Pile(settings, home, Path.Combine(Application.persistentDataPath, "pile.json"));
             pile.Start();
+            // The world's own file: which repo has which plot.
+            plotsPath = Path.Combine(Application.persistentDataPath, "world.json");
+            plots = Plots.Load(plotsPath);
+        }
+
+        static string Arg(string name)
+        {
+            var args = Environment.GetCommandLineArgs();
+            int i = Array.IndexOf(args, name);
+            return i >= 0 && i + 1 < args.Length ? args[i + 1] : "";
+        }
+
+        IEnumerator Shots()
+        {
+            Directory.CreateDirectory(shotsDir);
+            for (int i = 0; i < 5; i++) yield return null;   // let the window open and the first layout run
+            world.LookAtAll();
+            yield return Shot("far.png");
+            world.LookAtFirstNeed();
+            yield return Shot("near.png");
+            Application.Quit();
+        }
+
+        IEnumerator Shot(string file)
+        {
+            yield return null;
+            yield return null;
+            ScreenCapture.CaptureScreenshot(Path.Combine(shotsDir, file));
+            yield return null;
+            yield return null;
         }
 
         void OnDestroy()
@@ -63,6 +115,7 @@ namespace TheGrid
 
         void Update()
         {
+            if (collector == null) return;
             if (!pileLogged && !pile.Latest.reading)
             {
                 pileLogged = true;
@@ -85,7 +138,7 @@ namespace TheGrid
 
         void OnGUI()
         {
-            if (collector == null) return;
+            if (collector == null && fixedSnap == null) return;
             if (chip == null) MakeStyles();
             // Retina screens report pixels; draw in points so text keeps its size.
             float scale = Screen.dpi >= 160f ? 2f : 1f;
@@ -93,9 +146,11 @@ namespace TheGrid
             // IMGUI calls OnGUI once to lay out and again to paint; both passes must see the same rows.
             if (Event.current.type == EventType.Layout)
             {
-                drawn = collector.Latest;
-                pileDrawn = pile.Latest;
+                drawn = fixedSnap ?? collector.Latest;
+                if (pile != null) pileDrawn = pile.Latest;
                 tab = nextTab;
+                worldOpen = nextWorldOpen;
+                selected = world.Selected;
                 if (openKey != nextOpenKey)
                 {
                     openKey = nextOpenKey;
@@ -105,22 +160,78 @@ namespace TheGrid
             long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
             float width = Screen.width / scale - 16, height = Screen.height / scale - 12;
-            if (Screen.width / scale >= SideBySideWidth)
-            {
-                float half = (width - 12) / 2;
-                DrawRoster(new Rect(8, 6, half, height), drawn, now);
-                DrawPile(new Rect(8 + half + 12, 6, half, height), pileDrawn, now);
-            }
+            bool wide = Screen.width / scale >= SideBySideWidth;
+            var area = new Rect(8, 32, width, height - 26);
+
+            // The view switch. Wide: the two lists side by side, or the world. Narrow: one of the three.
+            GUILayout.BeginArea(new Rect(8, 6, width, 24));
+            GUILayout.BeginHorizontal();
+            if (fixedSnap != null) GUILayout.Label("Snapshot", dim);
+            else if (wide) nextWorldOpen = GUILayout.Toolbar(worldOpen ? 1 : 0, new[] { "Lists", "World" }, button, GUILayout.Width(160)) == 1;
             else
             {
                 int unticked = 0;
                 foreach (var r in pileDrawn.rows) if (!r.ticked) unticked++;
-                GUILayout.BeginArea(new Rect(8, 6, width, 24));
-                nextTab = GUILayout.Toolbar(tab, new[] { "Agents (" + drawn.agents.Count + ")", "Messages (" + unticked + ")" }, button);
-                GUILayout.EndArea();
-                var area = new Rect(8, 32, width, height - 26);
-                if (tab == 0) DrawRoster(area, drawn, now); else DrawPile(area, pileDrawn, now);
+                int picked = GUILayout.Toolbar(worldOpen ? 2 : tab, new[] { "Agents (" + drawn.agents.Count + ")", "Messages (" + unticked + ")", "World" }, button);
+                nextWorldOpen = picked == 2;
+                if (picked < 2) nextTab = picked;
             }
+            GUILayout.FlexibleSpace();
+            if (worldOpen)
+            {
+                if (GUILayout.Button("−", button, GUILayout.Width(28))) world.ZoomBy(-1);
+                if (GUILayout.Button("+", button, GUILayout.Width(28))) world.ZoomBy(1);
+            }
+            GUILayout.EndHorizontal();
+            GUILayout.EndArea();
+
+            if (worldOpen) DrawWorld(area, scale, now);
+            else
+            {
+                if (Event.current.type == EventType.Layout) world.Hide();
+                if (wide)
+                {
+                    float half = (width - 12) / 2;
+                    DrawRoster(new Rect(8, 32, half, area.height), drawn, now);
+                    DrawPile(new Rect(8 + half + 12, 32, half, area.height), pileDrawn, now);
+                }
+                else if (tab == 0) DrawRoster(area, drawn, now);
+                else DrawPile(area, pileDrawn, now);
+            }
+        }
+
+        // The map, and under it the roster row of the rider that was clicked. Built from the same snapshot the lists draw.
+        void DrawWorld(Rect area, float scale, long now)
+        {
+            var row = selected == "" ? null : drawn.agents.Find(a => a.account + "|" + a.sessionId == selected);
+            // The row never takes more than half the view, however many subagents it lists or however short the window: there is
+            // always a map to click, which is also how a selection is cleared. What does not fit scrolls.
+            float rowHeight = row == null ? 0 : Mathf.Min(60 + 16 * row.subagents.Count, area.height / 2);
+            var map = new Rect(area.x, area.y, area.width, area.height - rowHeight);
+            if (Event.current.type == EventType.Layout)
+            {
+                worldDrawn = World.Build(drawn, plots);
+                if (fixedSnap == null)
+                {
+                    // A failed write is tried again on the next pass, so new plots are not lost when the disk recovers; it is logged once, not ten times a second.
+                    try { plots.SaveIfGrown(plotsPath); }
+                    catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+                    {
+                        if (plotsWarned != plots.repos.Count) Debug.LogWarning("[world] could not save plots, will keep trying: " + e.Message);
+                        plotsWarned = plots.repos.Count;
+                    }
+                }
+                world.Show(worldDrawn, map, scale);
+            }
+            world.Gui(detail, title);
+            if (drawn.errors.Count > 0) GUI.Label(new Rect(map.x + 4, map.y + 4, map.width - 8, 32), string.Join(" | ", drawn.errors), error);
+            if (row == null) return;
+            rowWidth = area.width;
+            GUILayout.BeginArea(new Rect(area.x, map.yMax + 4, area.width, rowHeight - 4));
+            rowScroll = GUILayout.BeginScrollView(rowScroll);
+            DrawAgent(row, now);
+            GUILayout.EndScrollView();
+            GUILayout.EndArea();
         }
 
         void DrawRoster(Rect area, RosterSnapshot snap, long now)
@@ -224,6 +335,7 @@ namespace TheGrid
             GUILayout.Space(88);
             var parts = new List<string>();
             if (a.state == "Unknown" || a.state == "WaitingOther") parts.Add("(" + a.rawStatus + ")");
+            if (a.activity != "") parts.Add(a.activity);
             parts.Add(a.repoName);
             if (a.ticket != "") parts.Add(a.ticket);
             GUILayout.Label(string.Join("  ·  ", parts), detail);
@@ -257,6 +369,7 @@ namespace TheGrid
         // The collector reads these settings on its own thread; a read that overlaps this change shows up as one error line for one pass.
         void CycleWorkspace(string repoRoot)
         {
+            if (fixedSnap != null) return; // a picture of a snapshot changes nothing
             settings.Reload(settingsPath); // pick up workspaces added by hand since the app started
             settings.CycleWorkspace(repoRoot);
             TrySave();

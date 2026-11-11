@@ -125,12 +125,39 @@ namespace TheGrid.Core.Tests
         public void WhenNothingChangedTheCommandIsNotRunAndTheSnapshotIsKept()
         {
             int calls = 0;
-            using (var c = new Collector(settings, home, dir => { calls++; return agentsJson; }, dir => "same"))
+            using (var c = new Collector(settings, home, dir => { calls++; return IdleJson; }, dir => "same"))
             {
                 var first = c.Poll(Now);
                 var second = c.Poll(Now + 2000);
                 Assert.AreEqual(1, calls);
                 Assert.AreSame(first, second);
+            }
+        }
+
+        const string IdleJson = "[{\"pid\":1,\"cwd\":\"/work/a\",\"kind\":\"interactive\",\"startedAt\":1,\"sessionId\":\"s-1\",\"name\":\"a\",\"status\":\"idle\"}]";
+        const string BusyJson = "[{\"pid\":1,\"cwd\":\"/work/a\",\"kind\":\"interactive\",\"startedAt\":1,\"sessionId\":\"s-1\",\"name\":\"a\",\"status\":\"busy\"}]";
+
+        static string Assistant(string tool, string input) =>
+            "{\"type\":\"assistant\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"t\",\"name\":\"" + tool + "\",\"input\":" + input + "}]}}\n";
+
+        [Test]
+        public void WhileAnAgentRunsItsActivityIsRefreshedWithoutRunningTheCommand()
+        {
+            var project = Path.Combine(home, ".claude", "projects", "p");
+            Directory.CreateDirectory(project);
+            var transcript = Path.Combine(project, "s-1.jsonl");
+            File.WriteAllText(transcript, Assistant("Edit", "{}"));
+            int calls = 0;
+            using (var c = new Collector(settings, home, dir => { calls++; return BusyJson; }, dir => "same"))
+            {
+                var first = c.Poll(Now);
+                Assert.AreEqual("editing", first.agents[0].activity);
+                File.AppendAllText(transcript, Assistant("Bash", "{\"command\":\"npm test\"}"));
+                var second = c.Poll(Now + 2000);
+                Assert.AreEqual(1, calls);
+                Assert.AreNotSame(first, second);
+                Assert.AreEqual("testing", second.agents[0].activity);
+                Assert.AreEqual(Now + 2000, second.generatedAt);
             }
         }
 
