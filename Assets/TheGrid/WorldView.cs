@@ -30,7 +30,7 @@ namespace TheGrid
             public readonly List<SpriteRenderer> small = new List<SpriteRenderer>();
             public Vector2 from, to;
             public float started = -100f;
-            public WorldRider data;
+            public WorldBot data;
         }
 
         Camera cam;
@@ -127,7 +127,7 @@ namespace TheGrid
         public void LookAtFirstNeed()
         {
             level = 3;
-            foreach (var c in model.cities)
+            foreach (var c in model.sectors)
                 if (c.needOwner > 0) { centre = Iso.Bounds(new[] { c.cell }).center; return; }
         }
 
@@ -154,7 +154,7 @@ namespace TheGrid
             model = world;
             stale = true;
             var cells = new List<Vector2Int>();
-            foreach (var city in world.cities)
+            foreach (var city in world.sectors)
             {
                 cells.Add(city.cell);
                 if (painted.Add(city.plot)) Paint(city);   // a new plot is drawn once; the others are not touched
@@ -168,17 +168,17 @@ namespace TheGrid
             }
 
             accounts.Clear();
-            foreach (var city in world.cities)
-                foreach (var r in city.riders)
+            foreach (var city in world.sectors)
+                foreach (var r in city.bots)
                     if (!accounts.Contains(r.account)) accounts.Add(r.account);
             accounts.Sort(StringComparer.Ordinal);
 
             var seen = new HashSet<string>();
-            foreach (var city in world.cities)
-                foreach (var r in city.riders)
+            foreach (var city in world.sectors)
+                foreach (var r in city.bots)
                 {
                     seen.Add(r.key);
-                    Place(r, Iso.RiderSpot(city.cell, r.building, r.slot));
+                    Place(r, Iso.RiderSpot(city.cell, r.building, r.buildingSlot));
                 }
             var gone = new List<string>();
             foreach (var kv in riders) if (!seen.Contains(kv.Key)) gone.Add(kv.Key);
@@ -258,7 +258,7 @@ namespace TheGrid
             return t;
         }
 
-        void Paint(WorldCity city)
+        void Paint(WorldSector city)
         {
             var o = Iso.PlotOrigin(city.cell);
             // The plot, and the path round it. A neighbour paints the stretch between the two again, the same way.
@@ -375,7 +375,7 @@ namespace TheGrid
             return sr;
         }
 
-        void Place(WorldRider data, Vector2 spot)
+        void Place(WorldBot data, Vector2 spot)
         {
             if (!riders.TryGetValue(data.key, out var r))
             {
@@ -500,9 +500,9 @@ namespace TheGrid
 
             if (picture != null) GUI.DrawTexture(new Rect(view.x, view.y, pixelW / pointScale, pixelH / pointScale), picture, ScaleMode.StretchToFill, false);
             GUI.BeginGroup(view);
-            if (model.cities.Count == 0) GUI.Label(new Rect(8, 8, view.width - 16, 20), "No live agent sessions.", label);
+            if (model.sectors.Count == 0) GUI.Label(new Rect(8, 8, view.width - 16, 20), "No live agent sessions.", label);
             bool up = (int)(Time.unscaledTime / BounceSeconds) % 2 == 0;
-            foreach (var city in model.cities)
+            foreach (var city in model.sectors)
             {
                 if (Far)
                 {
@@ -526,8 +526,8 @@ namespace TheGrid
             }
             // Riders are named last, over everything: where two plots meet, a rider's name matters more than a roof's.
             if (!Far)
-                foreach (var city in model.cities)
-                    foreach (var r in city.riders)
+                foreach (var city in model.sectors)
+                    foreach (var r in city.bots)
                         if (riders.TryGetValue(r.key, out var rider))
                             Text(ToView((Vector2)rider.at.localPosition - new Vector2(0, 10)), r.subagents > 0 ? r.name + " +" + r.subagents : r.name, r.key == Selected ? loud : label);
             GUI.EndGroup();

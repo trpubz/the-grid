@@ -52,19 +52,19 @@ Within one state, the agent that has been in it longest comes first.
 
 ## The world
 
-The world view is built from the same snapshot (`World.Build`), so the two never disagree. Each repo is a city on its own plot; sessions with no repo share one. A rider's building follows from `state`, and for a running agent from `activity`:
+The world view is built from the same snapshot (`World.Build`), so the two never disagree. Each repo is a sector on its own plot; sessions with no repo share one. Each agent is one bot. State is on the bot: a building stands only for a kind of work, and everything else is where the bot stands, how it holds itself, and the badge it carries.
 
-| `state` | `activity` | Building | Needs the owner |
-|---|---|---|---|
-| `Running` | `editing` | Garage | |
-| `Running` | `reading` | Library | |
-| `Running` | `testing` | Lab | |
-| `Running` | `reviewing` | Review hall | |
-| `Running` | anything else | Workshop | |
-| `BlockedOnQuestion` | | Booth | yes |
-| `WaitingForPermission`, `WaitingOther`, `BackgroundBlocked` | | Gate | yes |
-| `Errored`, `Unknown`, or a state not in the list above | | Yard | yes |
-| `Finished` | | Lot | |
-| `Offline` | | Depot | |
+| `state` | `activity` | Stands at | Stance | Badge | Needs the owner |
+|---|---|---|---|---|---|
+| `Running` | `reading` | the server tower | inspecting | | |
+| `Running` | `editing` | the assembly bay | typing | | |
+| `Running` | `testing` | the test workshop | typing | | |
+| `Running` | `reviewing` | the review hall | inspecting | | |
+| `Running` | anything else | the works | standing | | |
+| `BlockedOnQuestion` | | the forecourt | standing | question | yes |
+| `WaitingForPermission`, `WaitingOther`, `BackgroundBlocked` | | the forecourt | standing | approve | yes |
+| `Errored`, `Unknown`, or a state not in the list above | | the forecourt | standing | fault | yes |
+| `Finished` | | the plaza | standing | done | |
+| `Offline` | | the dock | off, unlit | | |
 
-A rider is one agent, told apart by `account` and `sessionId` together. Its place at a building follows that pair, not the roster's order, so riders do not shuffle when the roster re-sorts. `fixtures/world/snapshot.json` is a synthetic snapshot with every state and activity in it.
+A bot is one agent, told apart by `account` and `sessionId` together. Its place among the other bots at the same spot follows that pair, not the roster's order, so bots do not shuffle when the roster re-sorts. `fixtures/world/snapshot.json` is a synthetic snapshot with every state and activity in it.
