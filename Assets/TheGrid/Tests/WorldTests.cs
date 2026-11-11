@@ -83,31 +83,12 @@ namespace TheGrid.Core.Tests
             CollectionAssert.AreEqual(new[] { "/work/alpha", "/work/beta" }, Plots.Load(file).repos);
         }
 
-        [TestCase("Running", "editing", Building.Garage)]
-        [TestCase("Running", "reading", Building.Library)]
-        [TestCase("Running", "testing", Building.Lab)]
-        [TestCase("Running", "reviewing", Building.ReviewHall)]
-        [TestCase("Running", "working", Building.Workshop)]
-        [TestCase("Running", "", Building.Workshop)]
-        [TestCase("Running", "juggling", Building.Workshop)]
-        [TestCase("BlockedOnQuestion", "", Building.Booth)]
-        [TestCase("BlockedOnQuestion", "editing", Building.Booth)]
-        [TestCase("WaitingForPermission", "", Building.Gate)]
-        [TestCase("WaitingOther", "", Building.Gate)]
-        [TestCase("BackgroundBlocked", "", Building.Gate)]
-        [TestCase("Errored", "", Building.Yard)]
-        [TestCase("Unknown", "", Building.Yard)]
-        [TestCase("something new", "", Building.Yard)]
-        [TestCase("Finished", "", Building.Lot)]
-        [TestCase("Offline", "", Building.Depot)]
-        public void WorkOrStateDecidesTheBuilding(string state, string activity, Building expected) => Assert.AreEqual(expected, World.BuildingFor(state, activity));
-
         [TestCase(2, 1, "2 need you · 1 done")]
         [TestCase(1, 0, "1 needs you")]
         [TestCase(1, 4, "1 needs you · 4 done")]
         [TestCase(0, 3, "3 done")]
         [TestCase(0, 0, "")]
-        public void ACitySeenFromFarSaysHowManyNeedTheOwnerAndHowManyAreDone(int need, int done, string expected) =>
+        public void ASectorSeenFromFarSaysHowManyNeedTheOwnerAndHowManyAreDone(int need, int done, string expected) =>
             Assert.AreEqual(expected, World.Summary(new WorldSector { needOwner = need, done = done }));
 
         // State is on the bot: a building stands for a kind of work, and everything else is where the bot stands, how, and its badge.
@@ -145,7 +126,7 @@ namespace TheGrid.Core.Tests
         [TestCase("Running", false)]
         [TestCase("Finished", false)]
         [TestCase("Offline", false)]
-        public void OnlyStoppedAndStuckRidersNeedTheOwner(string state, bool expected) => Assert.AreEqual(expected, World.NeedsOwner(state));
+        public void OnlyStoppedAndStuckBotsNeedTheOwner(string state, bool expected) => Assert.AreEqual(expected, World.NeedsOwner(state));
 
         [Test]
         public void TheWorldAndTheRosterNeverDisagree()
@@ -162,7 +143,6 @@ namespace TheGrid.Core.Tests
                 var found = w.sectors.SelectMany(c => c.bots.Select(r => new { c, r })).Where(x => x.r.key == a.account + "|" + a.sessionId).ToList();
                 Assert.AreEqual(1, found.Count, a.name);
                 Assert.AreEqual(a.repoRoot, found[0].c.repoRoot);
-                Assert.AreEqual(World.BuildingFor(a.state, a.activity), found[0].r.building);
                 Assert.AreEqual(World.NeedsOwner(a.state), found[0].r.needsOwner);
                 Assert.AreEqual(World.PlaceFor(a.state, a.activity), found[0].r.place);
                 Assert.AreEqual(World.StanceFor(a.state, a.activity), found[0].r.stance);
@@ -174,26 +154,24 @@ namespace TheGrid.Core.Tests
             var alpha = w.sectors[0];
             Assert.AreEqual(2, alpha.needOwner); // one blocked on a question, one waiting for permission
             Assert.AreEqual(1, alpha.done);
-            Assert.AreEqual(3, alpha.running);
+            Assert.AreEqual(6, alpha.running);
             Assert.AreEqual("Work", w.sectors[1].workspace);
             foreach (var c in w.sectors)
             {
                 foreach (var g in c.bots.GroupBy(r => r.place))
                     CollectionAssert.AreEqual(Enumerable.Range(0, g.Count()).ToArray(), g.OrderBy(r => r.key, StringComparer.Ordinal).Select(r => r.slot).ToArray());
-                foreach (var g in c.bots.GroupBy(r => r.building))   // the first sprite set's places, until the world stops using it
-                    CollectionAssert.AreEqual(Enumerable.Range(0, g.Count()).ToArray(), g.OrderBy(r => r.key, StringComparer.Ordinal).Select(r => r.buildingSlot).ToArray());
             }
         }
 
         [Test]
-        public void TwoAccountsWithTheSameSessionAreTwoRiders()
+        public void TwoAccountsWithTheSameSessionAreTwoBots()
         {
             var twin = new RosterSnapshot();
             twin.agents.Add(new AgentRow { sessionId = "s", name = "same", account = "one", state = "Finished", repoRoot = "/work/alpha", repoName = "alpha" });
             twin.agents.Add(new AgentRow { sessionId = "s", name = "same", account = "two", state = "Finished", repoRoot = "/work/alpha", repoName = "alpha" });
-            var riders = World.Build(twin, new Plots()).sectors[0].bots;
-            Assert.AreEqual(2, riders.Count);
-            CollectionAssert.AreEqual(new[] { 0, 1 }, riders.OrderBy(r => r.key, StringComparer.Ordinal).Select(r => r.slot).ToArray());
+            var bots = World.Build(twin, new Plots()).sectors[0].bots;
+            Assert.AreEqual(2, bots.Count);
+            CollectionAssert.AreEqual(new[] { 0, 1 }, bots.OrderBy(r => r.key, StringComparer.Ordinal).Select(r => r.slot).ToArray());
         }
 
         [Test]
@@ -203,7 +181,7 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
-        public void PlotsOutliveTheirRidersAndNewReposTakeTheNextPlot()
+        public void PlotsOutliveTheirBotsAndNewReposTakeTheNextPlot()
         {
             var plots = new Plots();
             var first = JsonUtility.ToJson(World.Build(snap, plots));

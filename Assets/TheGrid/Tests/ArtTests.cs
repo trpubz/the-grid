@@ -12,7 +12,7 @@ namespace TheGrid.Core.Tests
     public class ArtTests
     {
         [Serializable] sealed class Manifest { public List<Entry> sprites = new List<Entry>(); }
-        [Serializable] sealed class Entry { public string name = ""; public int width, height, groundX, groundY, palette; }
+        [Serializable] sealed class Entry { public string name = ""; public int width, height, groundX, groundY; }
 
         static readonly string[] Palette2 =
         {
@@ -56,7 +56,7 @@ namespace TheGrid.Core.Tests
         public void EveryPictureInTheFolderIsInTheManifestAndTheOtherWayRound()
         {
             var folder = Path.Combine(Application.dataPath, "TheGrid", "Resources", "Art");
-            var onDisk = Directory.GetFiles(folder, "*.png").Select(Path.GetFileNameWithoutExtension).Where(n => n != "palette" && n != "palette-1").OrderBy(n => n, StringComparer.Ordinal).ToList();
+            var onDisk = Directory.GetFiles(folder, "*.png").Select(Path.GetFileNameWithoutExtension).Where(n => n != "palette").OrderBy(n => n, StringComparer.Ordinal).ToList();
             var listed = Read().sprites.Select(s => s.name).OrderBy(n => n, StringComparer.Ordinal).ToList();
             CollectionAssert.AreEqual(onDisk, listed);
             Assert.AreEqual(listed.Count, listed.Distinct().Count(), "a name is listed twice");
@@ -75,13 +75,13 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(1f, s.pixelsPerUnit);
             Assert.AreEqual(1, s.texture.mipmapCount);
 
-            var palette = Colours(e.palette == 1 ? "palette-1" : "palette");
+            var palette = Colours("palette");
             int solid = 0;
             foreach (var c in s.texture.GetPixels32())
             {
                 if (c.a == 0) continue;
                 Assert.AreEqual(255, c.a, name + " has a half-transparent pixel");
-                Assert.IsTrue(palette.Contains(c), name + " has a colour outside its palette: " + c);
+                Assert.IsTrue(palette.Contains(c), name + " has a colour outside the palette: " + c);
                 solid++;
             }
             Assert.Greater(solid, 20, name + " is nearly empty");
@@ -90,8 +90,7 @@ namespace TheGrid.Core.Tests
         [TestCaseSource(nameof(Names))]
         public void NothingIsCutOffAtTheEdgeOfItsPicture(string name)
         {
-            var e = Find(name);
-            if (e.palette == 1 || IsTile(name)) Assert.Pass("the first sprite set and ground tiles reach their edges by design");
+            if (IsTile(name)) Assert.Pass("ground tiles reach their edges by design");
             var t = Load(name).texture;
             for (int x = 0; x < t.width; x++)
                 Assert.IsTrue(t.GetPixel(x, 0).a == 0 && t.GetPixel(x, t.height - 1).a == 0, name + " touches its top or bottom edge at column " + x);

@@ -94,7 +94,7 @@ namespace TheGrid
             for (int i = 0; i < 5; i++) yield return null;   // let the window open and the first layout run
             world.LookAtAll();
             yield return Shot("far.png");
-            world.LookAtFirstNeed();
+            world.LookAtOpening();
             yield return Shot("near.png");
             Application.Quit();
         }
@@ -201,7 +201,7 @@ namespace TheGrid
             }
         }
 
-        // The map, and under it the roster row of the rider that was clicked. Built from the same snapshot the lists draw.
+        // The map, and under it the roster row of the bot that was clicked. Built from the same snapshot the lists draw.
         void DrawWorld(Rect area, float scale, long now)
         {
             var row = selected == "" ? null : drawn.agents.Find(a => a.account + "|" + a.sessionId == selected);

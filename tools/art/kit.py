@@ -36,12 +36,6 @@ PALETTE = {
     "fault": "#ff4d4d",
     "white": "#ffffff",                                                      # the part of a bot the game tints
 }
-# The first sprite set's colours, kept until that set is removed.
-PALETTE_1 = [
-    "#070d1a", "#0a1222", "#0f1a2e", "#101b33", "#182746", "#22355c", "#2a416f", "#2c4470", "#3a5a94",
-    "#05080f", "#121826", "#232c40", "#3a4660", "#8a97ad", "#ffffff",
-    "#35f2ff", "#1a8f9c", "#ffb23e", "#ff7a2e", "#ff4d4d", "#ff4fd8", "#5cf28a", "#4d8dff", "#a070ff",
-]
 GLOW = {"cyan": (("cg0", .6), ("cg1", .36), ("cg2", .16)), "violet": (("vg0", .5), ("vg1", .24))}   # colour and reach, far to near
 
 
@@ -49,7 +43,7 @@ def hex_rgb(h):
     return tuple(int(h[i:i + 2], 16) / 255 for i in (1, 3, 5))
 
 
-PALS = {1: np.array([hex_rgb(h) for h in PALETTE_1]), 2: np.array([hex_rgb(h) for h in PALETTE.values()])}
+PAL = np.array([hex_rgb(h) for h in PALETTE.values()])
 BG = hex_rgb(PALETTE["ground"])
 
 
@@ -163,9 +157,9 @@ def clear():
         bpy.data.objects.remove(o, do_unlink=True)
 
 
-def snap(px, palette=2):
+def snap(px):
     """Every visible pixel becomes its nearest palette colour; alpha becomes fully on or fully off."""
-    pal = PALS[palette]
+    pal = PAL
     out = np.zeros_like(px)
     on = px[..., 3] > 0.5
     rgb = px[..., :3][on]
@@ -185,16 +179,16 @@ def save(px, path):
     bpy.data.images.remove(img)
 
 
-SPRITES = []    # every sprite made, in order: (name, pixels, ground_y, palette)
+SPRITES = []    # every sprite made, in order: (name, pixels, ground_y)
 
 
-def record(name, px, ground_y, palette=2):
+def record(name, px, ground_y):
     """Saves a finished picture and notes it for the manifest and the contact sheet."""
     save(px, os.path.join(OUT, name + ".png"))
-    SPRITES.append((name, px, ground_y, palette))
+    SPRITES.append((name, px, ground_y))
 
 
-def render(name, w, h, ground_y, palette=2):
+def render(name, w, h, ground_y):
     """Renders what is in the scene to name.png, w by h, and clears the scene. The ground point (0, 0, 0) lands at the
     horizontal centre, ground_y pixels above the bottom edge."""
     SCENE.render.resolution_x, SCENE.render.resolution_y = w, h
@@ -205,24 +199,23 @@ def render(name, w, h, ground_y, palette=2):
     SCENE.render.filepath = TMP
     bpy.ops.render.render(write_still=True)
     img = bpy.data.images.load(TMP, check_existing=False)
-    px = snap(np.array(img.pixels[:]).reshape(h, w, 4), palette)
+    px = snap(np.array(img.pixels[:]).reshape(h, w, 4))
     bpy.data.images.remove(img)
-    record(name, px, ground_y, palette)
+    record(name, px, ground_y)
     clear()
 
 
-def write_palettes():
-    """palette.png is the palette as a picture, one pixel a colour, in order; palette-1.png the first set's."""
-    for name, pal in (("palette", PALS[2]), ("palette-1", PALS[1])):
-        px = np.ones((1, len(pal), 4))
-        px[0, :, :3] = pal
-        save(px, os.path.join(OUT, name + ".png"))
+def write_palette():
+    """palette.png is the palette as a picture, one pixel a colour, in order."""
+    px = np.ones((1, len(PAL), 4))
+    px[0, :, :3] = PAL
+    save(px, os.path.join(OUT, "palette.png"))
 
 
 def write_manifest():
     """sprites.json: what every sprite is. The importer takes pivots from it, the tests their expectations."""
-    sprites = [{"name": n, "width": int(p.shape[1]), "height": int(p.shape[0]), "groundX": int(p.shape[1]) // 2, "groundY": int(g), "palette": pal}
-               for n, p, g, pal in SPRITES]
+    sprites = [{"name": n, "width": int(p.shape[1]), "height": int(p.shape[0]), "groundX": int(p.shape[1]) // 2, "groundY": int(g)}
+               for n, p, g in SPRITES]
     with open(os.path.join(OUT, "sprites.json"), "w") as f:
         json.dump({"sprites": sprites}, f, indent=1)
         f.write("\n")
@@ -238,7 +231,7 @@ def contact_sheet(max_width=2200, pad=12):
     rows = []
     for kind in kinds:
         row, width = [], pad
-        for name, px, _, _ in SPRITES:
+        for name, px, _ in SPRITES:
             if name.split("-")[0] != kind:
                 continue
             k = 2 if px.shape[0] > 64 else 3

@@ -10,40 +10,23 @@ namespace TheGrid.Core
 
     public static class Iso
     {
-        public const int TileW = 64, TileH = 32, PlotTiles = 12, RidersPerRow = 2;
+        public const int TileW = 64, TileH = 32, PlotTiles = 12;
 
-        // A path runs round every plot, so between two neighbouring plots there is one, and the paths of the whole map join up.
-        public const int PathTiles = 2, Pitch = PlotTiles + PathTiles;
+        // A lane runs round every plot, so between two neighbouring plots there is one, and the lanes of the whole map join up.
+        public const int LaneTiles = 2, Pitch = PlotTiles + LaneTiles;
 
         // Screen pixels per art pixel. Each level doubles the last, so pixels stay whole.
         public static readonly float[] Zoom = { .25f, .5f, 1f, 2f, 4f };
 
-        // Two streets of five 2 by 2 footprints, each with a two-tile road in front. A tower hides whatever stands within four tiles
-        // behind it, so the tall work buildings line the back street, where behind them is only the next plot's empty front margin;
-        // the low buildings line the front street, across an open plaza, and hide nobody.
-        static readonly Vector2Int[] Tiles =
-        {
-            new Vector2Int(9, 0),   // Garage
-            new Vector2Int(1, 0),   // Library
-            new Vector2Int(5, 0),   // Lab
-            new Vector2Int(3, 0),   // ReviewHall
-            new Vector2Int(7, 0),   // Workshop
-            new Vector2Int(1, 6),   // Booth
-            new Vector2Int(3, 6),   // Gate
-            new Vector2Int(5, 6),   // Yard
-            new Vector2Int(7, 6),   // Lot
-            new Vector2Int(9, 6),   // Depot
-        };
-
         public static Vector2Int PlotOrigin(Vector2Int cell) => new Vector2Int(cell.x * Pitch, cell.y * Pitch);
 
-        // True for a tile of the path round the plot at this cell: the strip beyond each of its four sides, corners included.
-        public static bool OnPath(Vector2Int cell, int col, int row)
+        // True for a tile of the lane round the plot at this cell: the strip beyond each of its four sides, corners included.
+        public static bool OnLane(Vector2Int cell, int col, int row)
         {
             var o = PlotOrigin(cell);
             int c = col - o.x, r = row - o.y;
             bool inPlot = c >= 0 && r >= 0 && c < PlotTiles && r < PlotTiles;
-            return !inPlot && c >= -PathTiles && r >= -PathTiles && c < PlotTiles + PathTiles && r < PlotTiles + PathTiles;
+            return !inPlot && c >= -LaneTiles && r >= -LaneTiles && c < PlotTiles + LaneTiles && r < PlotTiles + LaneTiles;
         }
 
         public static Vector2 TileCentre(int col, int row) => Point(col, row);
@@ -102,26 +85,7 @@ namespace TheGrid.Core
             return Point(o.x + s.col + slot % s.perRow * s.along, o.y + s.row + slot / s.perRow * s.away);
         }
 
-        public static Vector2Int BuildingTile(Building b) => Tiles[(int)b];
-
-        // The centre of a building's footprint.
-        public static Vector2 BuildingSpot(Vector2Int cell, Building b)
-        {
-            var o = PlotOrigin(cell) + BuildingTile(b);
-            return Point(o.x + .5f, o.y + .5f);
-        }
-
-        // Riders park on the road in front of their building, two to a row, rows stepping away from it.
-        // shortcut: the road holds 8 riders a building; more spill over the tiles in front. Widen the rows if crowds that size turn out to be common.
-        public static Vector2 RiderSpot(Vector2Int cell, Building b, int slot)
-        {
-            var t = BuildingTile(b);
-            var o = PlotOrigin(cell) + t;
-            // The front street is nudged a quarter tile along, so a crowd that spills across the plaza never lands on its spots.
-            return Point(o.x + slot % RidersPerRow + t.y / 6 * .25f, o.y + 1.75f + slot / RidersPerRow * .5f);
-        }
-
-        // The pixel rectangle that covers these plots' ground and the paths round them.
+        // The pixel rectangle that covers these plots' ground and the lanes round them.
         public static Rect Bounds(IEnumerable<Vector2Int> cells)
         {
             bool any = false;
@@ -129,7 +93,7 @@ namespace TheGrid.Core
             foreach (var cell in cells)
             {
                 var o = PlotOrigin(cell);
-                int first = -PathTiles, last = PlotTiles + PathTiles - 1;
+                int first = -LaneTiles, last = PlotTiles + LaneTiles - 1;
                 float l = (o.x - o.y + first - last) * (TileW / 2) - TileW / 2, r = (o.x - o.y + last - first) * (TileW / 2) + TileW / 2;
                 float top = -(o.x + o.y + 2 * first) * (TileH / 2) + TileH / 2, bottom = -(o.x + o.y + 2 * last) * (TileH / 2) - TileH / 2;
                 if (!any) { xMin = l; xMax = r; yMin = bottom; yMax = top; any = true; continue; }

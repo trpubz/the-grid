@@ -5,9 +5,6 @@ using UnityEngine;
 
 namespace TheGrid.Core
 {
-    // Five buildings for kinds of work, five for riders that have stopped. See docs/roster-snapshot.md.
-    public enum Building { Garage, Library, Lab, ReviewHall, Workshop, Booth, Gate, Yard, Lot, Depot }
-
     // Where a bot stands in its sector. Five places are buildings, one for each kind of work; the rest are open ground.
     public enum Place { ServerTower, ReviewHall, Works, AssemblyBay, Workshop, Plaza, Forecourt, Dock }
 
@@ -27,9 +24,6 @@ namespace TheGrid.Core
         public Badge badge;
         public int slot, subagents;       // slot: its number among the bots of its sector at the same place, in key order
         public bool needsOwner;
-        // For the first sprite set, until the world stops drawing it.
-        public Building building;
-        public int buildingSlot;
     }
 
     // One repo's area of the map.
@@ -54,29 +48,6 @@ namespace TheGrid.Core
     public static class World
     {
         public const string NoProject = "No project";
-
-        public static Building BuildingFor(string state, string activity)
-        {
-            switch (state)
-            {
-                case "Running":
-                    switch (activity)
-                    {
-                        case Activity.Editing: return Building.Garage;
-                        case Activity.Reading: return Building.Library;
-                        case Activity.Testing: return Building.Lab;
-                        case Activity.Reviewing: return Building.ReviewHall;
-                        default: return Building.Workshop;
-                    }
-                case "BlockedOnQuestion": return Building.Booth;
-                case "WaitingForPermission":
-                case "WaitingOther":
-                case "BackgroundBlocked": return Building.Gate;
-                case "Finished": return Building.Lot;
-                case "Offline": return Building.Depot;
-                default: return Building.Yard;   // errored, unknown, or a state this build has never heard of
-            }
-        }
 
         public static Place PlaceFor(string state, string activity)
         {
@@ -134,11 +105,11 @@ namespace TheGrid.Core
         }
 
         // What a sector says about itself when it is too far off to make out bots: "2 need you · 1 done". Empty when neither applies.
-        public static string Summary(WorldSector city)
+        public static string Summary(WorldSector sector)
         {
             var parts = new List<string>();
-            if (city.needOwner > 0) parts.Add(city.needOwner + (city.needOwner == 1 ? " needs you" : " need you"));
-            if (city.done > 0) parts.Add(city.done + " done");
+            if (sector.needOwner > 0) parts.Add(sector.needOwner + (sector.needOwner == 1 ? " needs you" : " need you"));
+            if (sector.done > 0) parts.Add(sector.done + " done");
             return string.Join(" · ", parts);
         }
 
@@ -159,34 +130,29 @@ namespace TheGrid.Core
 
             foreach (var a in snap.agents)
             {
-                var city = world.sectors[plots.IndexFor(a.repoRoot, out _)];
-                if (!string.IsNullOrEmpty(a.repoName)) city.name = a.repoName;
-                city.workspace = a.workspace;
+                var sector = world.sectors[plots.IndexFor(a.repoRoot, out _)];
+                if (!string.IsNullOrEmpty(a.repoName)) sector.name = a.repoName;
+                sector.workspace = a.workspace;
                 var r = new WorldBot
                 {
                     key = a.account + "|" + a.sessionId, sessionId = a.sessionId, name = a.name, account = a.account, app = a.app,
-                    state = a.state, activity = a.activity, building = BuildingFor(a.state, a.activity),
+                    state = a.state, activity = a.activity,
                     place = PlaceFor(a.state, a.activity), stance = StanceFor(a.state, a.activity), badge = BadgeFor(a.state),
                     subagents = a.subagents.Count, needsOwner = NeedsOwner(a.state),
                 };
-                city.bots.Add(r);
-                if (r.needsOwner) city.needOwner++;
-                if (r.badge == Badge.Done) city.done++;
-                if (a.state == "Running") city.running++;
+                sector.bots.Add(r);
+                if (r.needsOwner) sector.needOwner++;
+                if (r.badge == Badge.Done) sector.done++;
+                if (a.state == "Running") sector.running++;
             }
 
             // A bot's place among the others follows its key, so it does not shuffle when the roster reorders.
-            foreach (var city in world.sectors)
+            foreach (var sector in world.sectors)
             {
-                var byKey = new List<WorldBot>(city.bots);
+                var byKey = new List<WorldBot>(sector.bots);
                 byKey.Sort((x, y) => string.CompareOrdinal(x.key, y.key));
-                var atBuilding = new int[10];
                 var atPlace = new int[8];
-                foreach (var r in byKey)
-                {
-                    r.buildingSlot = atBuilding[(int)r.building]++;
-                    r.slot = atPlace[(int)r.place]++;
-                }
+                foreach (var b in byKey) b.slot = atPlace[(int)b.place]++;
             }
             return world;
         }
