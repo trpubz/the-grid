@@ -196,5 +196,31 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(Now - 86400000, snap.agents.First(a => a.name == "old-timer").stateSince);
             Assert.AreEqual(Now, snap.agents.First(a => a.name == "no-start").stateSince);
         }
+
+        static string Assistant(string tool, string input) =>
+            "{\"type\":\"assistant\",\"gitBranch\":\"feature/demo-12-example-change\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"t\",\"name\":\"" + tool + "\",\"input\":" + input + "}]}}\n";
+
+        [Test]
+        public void ActivityIsGivenOnlyWhileRunning()
+        {
+            var snap = new RosterBuilder(settings).Build(live, None, Now);
+            Assert.AreEqual("working", snap.agents.First(a => a.state == "Running").activity); // no transcript: cannot tell
+            Assert.IsTrue(snap.agents.Where(a => a.state != "Running").All(a => a.activity == ""));
+        }
+
+        [Test]
+        public void ActivityFollowsARunningSessionsTranscript()
+        {
+            var s = new LiveSession { SessionId = S2, Name = "alpha-02", Cwd = "/work/alpha", Kind = "interactive", Status = "busy", WaitingFor = "", State = "", ConfigDir = cfg };
+            var builder = new RosterBuilder(settings);
+            File.AppendAllText(transcript, Assistant("Edit", "{}"));
+            Assert.AreEqual("editing", builder.Build(new[] { s }, None, Now).agents[0].activity);
+            File.AppendAllText(transcript, Assistant("Bash", "{\"command\":\"pytest -q\"}"));
+            Assert.AreEqual("testing", builder.Build(new[] { s }, None, Now + 2000).agents[0].activity);
+            s.Status = "idle";
+            Assert.AreEqual("", builder.Build(new[] { s }, None, Now + 4000).agents[0].activity);
+            s.Status = "busy"; // running again, transcript untouched: what it was last doing is remembered
+            Assert.AreEqual("testing", builder.Build(new[] { s }, None, Now + 6000).agents[0].activity);
+        }
     }
 }

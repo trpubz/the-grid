@@ -109,7 +109,9 @@ namespace TheGrid.Core
                     // A failed read reuses the last good one, so a hiccup never looks like every agent going offline.
                     if (lastGood.TryGetValue(dir, out var keep)) live.AddRange(keep);
                 }
-                if (!anyRead) return latest; // nothing changed anywhere: no command run, no files read
+                // Nothing changed and nobody is working: no command run, no files read. While an agent runs, the roster is
+                // rebuilt from the last session lists so its activity keeps up; only transcripts that changed are read again.
+                if (!anyRead && !live.Exists(s => LiveSessions.Map(s) == AgentState.Running)) return latest;
                 return latest = builder.Build(live, errors, nowMs);
             }
         }

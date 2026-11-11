@@ -14,6 +14,7 @@
             "state": "BlockedOnQuestion",
             "rawStatus": "waiting / input needed",
             "workspace": "Personal",
+            "activity": "",
             "prNumber": 7,
             "stateSince": 1794000123000,
             "subagents": [
@@ -37,6 +38,7 @@
             "state": "WaitingForPermission",
             "rawStatus": "waiting / permission prompt",
             "workspace": "Personal",
+            "activity": "",
             "prNumber": 0,
             "stateSince": 1794000150000,
             "subagents": []
@@ -54,6 +56,7 @@
             "state": "BackgroundBlocked",
             "rawStatus": "blocked",
             "workspace": "Personal",
+            "activity": "",
             "prNumber": 0,
             "stateSince": 1794000300000,
             "subagents": []
@@ -71,6 +74,7 @@
             "state": "Finished",
             "rawStatus": "idle",
             "workspace": "Personal",
+            "activity": "",
             "prNumber": 0,
             "stateSince": 1794000200000,
             "subagents": []
@@ -88,6 +92,7 @@
             "state": "Running",
             "rawStatus": "busy",
             "workspace": "Personal",
+            "activity": "working",
             "prNumber": 0,
             "stateSince": 1794000000000,
             "subagents": []

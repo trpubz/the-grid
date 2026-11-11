@@ -224,6 +224,7 @@ namespace TheGrid
             GUILayout.Space(88);
             var parts = new List<string>();
             if (a.state == "Unknown" || a.state == "WaitingOther") parts.Add("(" + a.rawStatus + ")");
+            if (a.activity != "") parts.Add(a.activity);
             parts.Add(a.repoName);
             if (a.ticket != "") parts.Add(a.ticket);
             GUILayout.Label(string.Join("  ·  ", parts), detail);
