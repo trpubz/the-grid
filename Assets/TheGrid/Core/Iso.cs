@@ -5,6 +5,9 @@ namespace TheGrid.Core
 {
     // Where things stand on the map. Art pixels, y up; the origin is the centre of plot 0's north corner tile.
     // A tile is 64 by 32 pixels, the size classic tycoon games draw one. Columns run down to the right, rows down to the left.
+    // What stands in a sector: six buildings and the fountain.
+    public enum Structure { ServerTower, ReviewHall, Relay, Works, AssemblyBay, Fountain, Workshop }
+
     public static class Iso
     {
         public const int TileW = 64, TileH = 32, PlotTiles = 12, RidersPerRow = 2;
@@ -45,7 +48,59 @@ namespace TheGrid.Core
 
         public static Vector2 TileCentre(int col, int row) => Point(col, row);
 
-        static Vector2 Point(float col, float row) => new Vector2((col - row) * (TileW / 2), -(col + row) * (TileH / 2));
+        // Where a point of the map is in art pixels. A tile's centre is at whole numbers.
+        public static Vector2 Point(float col, float row) => new Vector2((col - row) * (TileW / 2), -(col + row) * (TileH / 2));
+
+        // A sector, in tiles from its plot's first tile. Tall things stand along the back, so they hide no bot; the low hall and
+        // the cut-away workshop stand in the middle, either side of the fountain; the front is open ground.
+        static readonly RectInt[] Footprints =
+        {
+            new RectInt(0, 0, 3, 3),    // ServerTower
+            new RectInt(4, 0, 3, 3),    // ReviewHall
+            new RectInt(7, 0, 2, 2),    // Relay
+            new RectInt(9, 0, 3, 3),    // Works
+            new RectInt(0, 5, 4, 3),    // AssemblyBay
+            new RectInt(5, 5, 2, 2),    // Fountain
+            new RectInt(8, 5, 4, 3),    // Workshop
+        };
+
+        // Where the bots of each place stand: the first spot, how many to a row, the step along the row and the step to the next
+        // row. The numbers are chosen so that fifty bots at every place are four hundred different points.
+        static readonly (float col, float row, int perRow, float along, float away)[] Spots =
+        {
+            (0.25f, 3.25f, 3, 1f, .5f),     // ServerTower: in front of its door
+            (4.25f, 3.25f, 3, 1f, .5f),     // ReviewHall
+            (9.25f, 3.25f, 3, 1f, .5f),     // Works
+            (0.4f, 8.25f, 4, 1f, .5f),      // AssemblyBay
+            (8.7f, 8.25f, 4, 1f, .5f),      // Workshop, from its third bot
+            (4.4f, 7.4f, 4, 1f, .5f),       // Plaza: done, in front of the fountain
+            (3.5f, 9.75f, 6, 1f, .75f),     // Forecourt: every bot that needs the owner, in the open at the front
+            (9.6f, 9.75f, 3, .8f, .75f),    // Dock: offline
+        };
+
+        public static RectInt Footprint(Structure s) => Footprints[(int)s];
+
+        // The centre of a structure's footprint.
+        public static Vector2 StructureSpot(Vector2Int cell, Structure s)
+        {
+            var o = PlotOrigin(cell);
+            var f = Footprint(s);
+            return Point(o.x + f.x + (f.width - 1) / 2f, o.y + f.y + (f.height - 1) / 2f);
+        }
+
+        public static Vector2 BotSpot(Vector2Int cell, Place place, int slot)
+        {
+            var o = PlotOrigin(cell);
+            if (place == Place.Workshop)
+            {
+                // The workshop's walls are cut away so its first two bots can be seen inside: one at the terminal, one at the bench.
+                if (slot == 0) return Point(o.x + 9.5f, o.y + 6.0f);
+                if (slot == 1) return Point(o.x + 10.5f, o.y + 6.6f);
+                slot -= 2;
+            }
+            var s = Spots[(int)place];
+            return Point(o.x + s.col + slot % s.perRow * s.along, o.y + s.row + slot / s.perRow * s.away);
+        }
 
         public static Vector2Int BuildingTile(Building b) => Tiles[(int)b];
 
