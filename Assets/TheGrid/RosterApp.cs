@@ -23,7 +23,7 @@ namespace TheGrid
 
         Collector collector;
         Pile pile;
-        Vector2 scroll, pileScroll;
+        Vector2 scroll, pileScroll, rowScroll;
         RosterSnapshot logged, drawn = new RosterSnapshot();
         PileSnapshot pileDrawn = new PileSnapshot();
         // A click changes the "next" value; it takes effect on the following Layout event, so both IMGUI passes draw the same controls.
@@ -204,7 +204,9 @@ namespace TheGrid
         void DrawWorld(Rect area, float scale, long now)
         {
             var row = selected == "" ? null : drawn.agents.Find(a => a.account + "|" + a.sessionId == selected);
-            float rowHeight = row == null ? 0 : 52 + 16 * row.subagents.Count;
+            // The row never takes more than half the view, however many subagents it lists or however short the window: there is
+            // always a map to click, which is also how a selection is cleared. What does not fit scrolls.
+            float rowHeight = row == null ? 0 : Mathf.Min(52 + 16 * row.subagents.Count, area.height / 2);
             var map = new Rect(area.x, area.y, area.width, area.height - rowHeight);
             if (Event.current.type == EventType.Layout)
             {
@@ -226,7 +228,9 @@ namespace TheGrid
             if (row == null) return;
             rowWidth = area.width;
             GUILayout.BeginArea(new Rect(area.x, map.yMax + 4, area.width, rowHeight - 4));
+            rowScroll = GUILayout.BeginScrollView(rowScroll);
             DrawAgent(row, now);
+            GUILayout.EndScrollView();
             GUILayout.EndArea();
         }
 

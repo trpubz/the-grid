@@ -79,7 +79,7 @@ The Booth, the Gate and the Yard are where you are needed. The tall work buildin
 - **Far out,** each city shows its name and how many riders need you. **Closer in,** buildings and riders are named. A rider's glow colour is its account. Small bikes beside a rider are its subagents.
 - **Click a rider** to see that agent's roster row under the map.
 
-Which repo has which plot is kept in `world.json` beside `settings.json`. A repo keeps its plot for good, also after its sessions are gone; delete the file to start the map again. If the file cannot be read it is kept as `world.json.bad` and the map starts empty.
+Which repo has which plot is kept in `world.json` beside `settings.json`. A repo keeps its plot for good, also after its sessions are gone; delete the file to start the map again. If its contents are damaged it is kept as `world.json.bad` and the map starts empty.
 
 To look at the world without any agent sessions, start the app on a roster snapshot file. It then reads no agent data and writes nothing:
 
