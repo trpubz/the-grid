@@ -358,10 +358,14 @@ namespace TheGrid
             }
             while (b.small.Count < want)
             {
-                var s = NewSprite("subagent", Lit("bot-small", Mathf.Max(0, accounts.IndexOf(data.account))), b.at);
+                var s = NewSprite("subagent", null, b.at);
                 s.transform.localPosition = new Vector3(11 * (b.small.Count + 1), -5 * (b.small.Count + 1), 0);
                 b.small.Add(s);
             }
+            // Every time, not only when one is made: which colourway an account has can change when another account's
+            // sessions come or go, and a bot's subagents must change with it.
+            var small = Lit("bot-small", Mathf.Max(0, accounts.IndexOf(data.account)));
+            foreach (var s in b.small) s.sprite = small;
         }
 
         static void Kill(GameObject go)
