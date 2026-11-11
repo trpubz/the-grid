@@ -92,6 +92,7 @@ namespace TheGrid.Core
                     m.State = AgentState.Offline;
                     m.Row.state = AgentState.Offline.ToString();
                     m.Row.rawStatus = "";
+                    m.Row.activity = ""; // a session that is gone is not doing anything
                     m.Row.stateSince = nowMs;
                     m.Row.subagents = new List<SubagentRow>();
                 }

@@ -222,5 +222,17 @@ namespace TheGrid.Core.Tests
             s.Status = "busy"; // running again, transcript untouched: what it was last doing is remembered
             Assert.AreEqual("testing", builder.Build(new[] { s }, None, Now + 6000).agents[0].activity);
         }
+
+        [Test]
+        public void ASessionThatGoesOfflineStopsShowingAnActivity()
+        {
+            var s = new LiveSession { SessionId = S2, Name = "alpha-02", Cwd = "/work/alpha", Kind = "interactive", Status = "busy", WaitingFor = "", State = "", ConfigDir = cfg };
+            var builder = new RosterBuilder(settings);
+            File.AppendAllText(transcript, Assistant("Edit", "{}"));
+            Assert.AreEqual("editing", builder.Build(new[] { s }, None, Now).agents[0].activity);
+            var gone = builder.Build(new LiveSession[0], None, Now + 2000).agents[0];
+            Assert.AreEqual("Offline", gone.state);
+            Assert.AreEqual("", gone.activity);
+        }
     }
 }
