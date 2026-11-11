@@ -12,5 +12,4 @@ EditorBuildSettings:
     path: Assets/TheGrid/Demo.unity
     guid: b1c2844f99de843b2b5a0f4ff164d4e0
   m_configObjects:
-    com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 0f8f896f8b97a4800aeca831b7917b98, type: 2}
