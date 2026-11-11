@@ -7,6 +7,7 @@ import math
 
 import bpy
 
+import kit
 from kit import PALETTE, box, disc, glow, light, mat, render
 
 
@@ -93,10 +94,12 @@ def block(name, w, d, h, lines):
 
 
 def make():
+    kit.DEPTH = False       # ground and the light on it are flat, edge to edge: no panels, shadows or outline
     paving("tile-paving"); paving("tile-paving-joint-a", "a"); paving("tile-paving-joint-b", "b")
     lane("tile-lane"); lane("tile-lane-chevron-a", "chevron-a"); lane("tile-lane-chevron-b", "chevron-b")
     lane("tile-crossing-a", "crossing-a"); lane("tile-crossing-b", "crossing-b")
     void()
     line("line-a", "a"); line("line-b", "b")
+    kit.DEPTH = True
     fountain()
     block("block-a", 1.7, 1.7, .6, 1); block("block-b", 1.6, 1.8, 1.2, 2); block("block-c", 1.5, 1.5, 2.0, 2)
