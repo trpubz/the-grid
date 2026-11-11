@@ -15,6 +15,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kit
+import ground
 from kit import hex_rgb, mat
 
 import bpy
@@ -338,6 +339,9 @@ def main():
     TURN, SCALE = 0, 1.0
 
     kit.record("marker", kit.snap(draw_marker(), 1), 0, palette=1)
+
+    # ---- art direction 2: see docs/art-direction.md ----
+    ground.make()
 
     kit.write_manifest()
     kit.contact_sheet()

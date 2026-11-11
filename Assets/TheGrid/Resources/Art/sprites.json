@@ -215,6 +215,126 @@
    "groundX": 6,
    "groundY": 0,
    "palette": 1
+  },
+  {
+   "name": "tile-paving",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16,
+   "palette": 2
+  },
+  {
+   "name": "tile-paving-joint-a",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16,
+   "palette": 2
+  },
+  {
+   "name": "tile-paving-joint-b",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16,
+   "palette": 2
+  },
+  {
+   "name": "tile-lane",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16,
+   "palette": 2
+  },
+  {
+   "name": "tile-lane-chevron-a",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16,
+   "palette": 2
+  },
+  {
+   "name": "tile-lane-chevron-b",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16,
+   "palette": 2
+  },
+  {
+   "name": "tile-crossing-a",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16,
+   "palette": 2
+  },
+  {
+   "name": "tile-crossing-b",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16,
+   "palette": 2
+  },
+  {
+   "name": "tile-void",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16,
+   "palette": 2
+  },
+  {
+   "name": "line-a",
+   "width": 96,
+   "height": 48,
+   "groundX": 48,
+   "groundY": 24,
+   "palette": 2
+  },
+  {
+   "name": "line-b",
+   "width": 96,
+   "height": 48,
+   "groundX": 48,
+   "groundY": 24,
+   "palette": 2
+  },
+  {
+   "name": "fountain",
+   "width": 192,
+   "height": 160,
+   "groundX": 96,
+   "groundY": 64,
+   "palette": 2
+  },
+  {
+   "name": "block-a",
+   "width": 128,
+   "height": 160,
+   "groundX": 64,
+   "groundY": 32,
+   "palette": 2
+  },
+  {
+   "name": "block-b",
+   "width": 128,
+   "height": 160,
+   "groundX": 64,
+   "groundY": 32,
+   "palette": 2
+  },
+  {
+   "name": "block-c",
+   "width": 128,
+   "height": 160,
+   "groundX": 64,
+   "groundY": 32,
+   "palette": 2
   }
  ]
 }
