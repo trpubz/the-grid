@@ -1,8 +1,12 @@
 using System;
+using System.Diagnostics;
+using System.IO;
+using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using Debug = UnityEngine.Debug;
 
 namespace TheGrid.EditorTools
 {
@@ -41,6 +45,49 @@ namespace TheGrid.EditorTools
                 options = BuildOptions.None,
             });
             if (report.summary.result != BuildResult.Succeeded) throw new InvalidOperationException("build failed: " + report.summary.result);
+            Sign("Builds/TheGrid.app");
+        }
+
+        // A person may name the certificate to sign with here: one line, a name or SHA-1 as `security find-identity` prints it. The folder is not tracked.
+        const string IdentityFile = "UserSettings/TheGridSignIdentity.txt";
+
+        // macOS remembers the answer to "may this app access your Documents folder" against the app's signature. Unity signs a build
+        // ad hoc, which pins it to the exact bytes, so every rebuild is a new app and macOS asks again. Signing each build with the
+        // same certificate gives them one identity, and the question is asked once.
+        static void Sign(string app)
+        {
+            string identity = File.Exists(IdentityFile) ? File.ReadAllText(IdentityFile).Trim() : "";
+            if (identity == "")
+            {
+                // The first development certificate in the keychain: Xcode makes one for any Apple account, paid or not.
+                Run("/usr/bin/security", "find-identity -v -p codesigning", out var listed);
+                identity = Regex.Match(listed, "^\\s*\\d+\\) ([0-9A-F]{40}) \"Apple Development: ", RegexOptions.Multiline).Groups[1].Value;
+            }
+            if (identity == "")
+            {
+                Debug.LogWarning("[build] not signed: no Apple Development certificate was found, and " + IdentityFile + " names none. macOS will ask for folder access again after every rebuild.");
+                return;
+            }
+            if (Run("/usr/bin/codesign", "--force --deep --sign \"" + identity + "\" \"" + app + "\"", out var output) != 0)
+                throw new InvalidOperationException("signing failed: " + output.Trim());
+            // Self-check: an identity that survives a rebuild is stated in terms of the certificate, never of this build's hash.
+            Run("/usr/bin/codesign", "-d -r- \"" + app + "\"", out var requirement);
+            if (!requirement.Contains("designated =>") || requirement.Contains("cdhash"))
+                throw new InvalidOperationException("signed, but the app's identity still changes with every build: " + requirement.Trim());
+            Debug.Log("[build] signed; macOS will ask for folder access once for builds signed this way");
+        }
+
+        static int Run(string exe, string args, out string output)
+        {
+            var psi = new ProcessStartInfo(exe, args) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+            using (var p = Process.Start(psi))
+            {
+                var stderr = p.StandardError.ReadToEndAsync();
+                output = p.StandardOutput.ReadToEnd();
+                p.WaitForExit();
+                output += stderr.Result;
+                return p.ExitCode;
+            }
         }
     }
 }
