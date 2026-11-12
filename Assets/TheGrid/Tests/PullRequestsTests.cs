@@ -34,6 +34,11 @@ namespace TheGrid.Core.Tests
                 { 13, "InReview: reviewers is asked to review" },
                 // GitHub works out whether a pull request merges only when asked, and says so until it has: not ready yet
                 { 14, "InReview: GitHub is checking whether it merges" },
+                // the last review is someone's comments and its author has not answered since: not ready, whoever they are
+                { 15, "InReview: The review bot's comments are unanswered" },
+                { 16, "InReview: pat's review is unanswered" },
+                { 17, "ForOwner: Ready to merge" },                                       // its author had the last word
+                { 18, "ForOwner: The review bot found nothing: ready to merge" },         // the bot's later thumbs-up is its last word
             };
             CollectionAssert.AreEquivalent(want.Select(kv => kv.Key + " " + kv.Value), got.Select(kv => kv.Key + " " + kv.Value));
             Assert.AreEqual("https://github.com/example/alpha/pull/4", pulls.Single(p => p.number == 4).url);
@@ -44,7 +49,7 @@ namespace TheGrid.Core.Tests
         public void TheOnesForTheOwnerComeFirstThenThoseInReviewThenDrafts()
         {
             PullRequests.TryParse(Fixture("pulls.json"), out var pulls, out _);
-            CollectionAssert.AreEqual(new[] { 2, 4, 9, 12, 3, 5, 6, 7, 8, 10, 11, 13, 14, 1 }, pulls.Select(p => p.number).ToArray());
+            CollectionAssert.AreEqual(new[] { 2, 4, 9, 12, 17, 18, 3, 5, 6, 7, 8, 10, 11, 13, 14, 15, 16, 1 }, pulls.Select(p => p.number).ToArray());
         }
 
         [Test]
@@ -54,7 +59,7 @@ namespace TheGrid.Core.Tests
             Assert.IsTrue(PullRequests.TryParse(Fixture("pulls-pages.json"), out var paged, out var problem), problem);
             PullRequests.TryParse(Fixture("pulls.json"), out var whole, out _);
             CollectionAssert.AreEqual(whole.Select(p => p.number + " " + p.state + " " + p.status).ToArray(), paged.Select(p => p.number + " " + p.state + " " + p.status).ToArray());
-            Assert.AreEqual(14, paged.Count);
+            Assert.AreEqual(18, paged.Count);
             // and it is asked for that way
             StringAssert.Contains("$endCursor:String", PullRequests.Query);
             StringAssert.Contains("after:$endCursor", PullRequests.Query);
@@ -98,7 +103,7 @@ namespace TheGrid.Core.Tests
             reader.Refresh(new[] { "/work/alpha", "/work/beta", "" });   // sessions with no repo have none to ask about
             CollectionAssert.AreEqual(new[] { "/work/alpha", "/work/beta" }, asked);
             var first = reader.Latest;
-            Assert.AreEqual(14, first.For("/work/alpha").open.Count);
+            Assert.AreEqual(18, first.For("/work/alpha").open.Count);
             Assert.AreEqual("", first.For("/work/alpha").problem);
             Assert.AreEqual(0, first.For("/work/beta").open.Count);
             Assert.AreEqual("gh: not a GitHub repo", first.For("/work/beta").problem);
@@ -107,7 +112,7 @@ namespace TheGrid.Core.Tests
             fail = true;
             reader.Refresh(new[] { "/work/alpha" });
             Assert.AreNotSame(first, reader.Latest);
-            Assert.AreEqual(14, reader.Latest.For("/work/alpha").open.Count, "the list from before the failure");
+            Assert.AreEqual(18, reader.Latest.For("/work/alpha").open.Count, "the list from before the failure");
             Assert.AreEqual("gh did not answer", reader.Latest.For("/work/alpha").problem);
             Assert.IsNull(reader.Latest.For("/work/beta"), "a repo no longer on the map is dropped");
         }
@@ -127,7 +132,7 @@ namespace TheGrid.Core.Tests
             var reader = new PullReader(root => { asked++; return Fixture("pulls.json"); }, () => on);
             reader.Refresh(new[] { "/work/alpha" });
             Assert.AreEqual(1, asked);
-            Assert.AreEqual(14, reader.Latest.For("/work/alpha").open.Count);
+            Assert.AreEqual(18, reader.Latest.For("/work/alpha").open.Count);
 
             on = false;   // the owner turned it off in the settings file while the app runs
             reader.Refresh(new[] { "/work/alpha" });
@@ -137,7 +142,7 @@ namespace TheGrid.Core.Tests
             on = true;
             reader.Refresh(new[] { "/work/alpha" });
             Assert.AreEqual(2, asked);
-            Assert.AreEqual(14, reader.Latest.For("/work/alpha").open.Count);
+            Assert.AreEqual(18, reader.Latest.For("/work/alpha").open.Count);
         }
 
         // gh says which repo a folder is, and on which host: github.com, or a company's own GitHub.

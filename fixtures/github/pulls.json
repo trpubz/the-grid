@@ -456,6 +456,161 @@
         }
        ]
       }
+     },
+     {
+      "number": 15,
+      "title": "The bot left comments, nobody answered",
+      "url": "https://github.com/example/alpha/pull/15",
+      "isDraft": false,
+      "reviewDecision": null,
+      "mergeable": "MERGEABLE",
+      "author": {
+       "login": "owner"
+      },
+      "reviewRequests": {
+       "nodes": []
+      },
+      "commits": {
+       "nodes": [
+        {
+         "commit": {
+          "statusCheckRollup": null
+         }
+        }
+       ]
+      },
+      "reactions": {
+       "nodes": []
+      },
+      "reviews": {
+       "nodes": [
+        {
+         "state": "COMMENTED",
+         "author": {
+          "__typename": "Bot",
+          "login": "review-bot"
+         }
+        }
+       ]
+      }
+     },
+     {
+      "number": 16,
+      "title": "A person left comments, nobody answered",
+      "url": "https://github.com/example/alpha/pull/16",
+      "isDraft": false,
+      "reviewDecision": null,
+      "mergeable": "MERGEABLE",
+      "author": {
+       "login": "owner"
+      },
+      "reviewRequests": {
+       "nodes": []
+      },
+      "commits": {
+       "nodes": [
+        {
+         "commit": {
+          "statusCheckRollup": null
+         }
+        }
+       ]
+      },
+      "reactions": {
+       "nodes": []
+      },
+      "reviews": {
+       "nodes": [
+        {
+         "state": "COMMENTED",
+         "author": {
+          "__typename": "User",
+          "login": "pat"
+         }
+        }
+       ]
+      }
+     },
+     {
+      "number": 17,
+      "title": "Comments were left, and its author answered last",
+      "url": "https://github.com/example/alpha/pull/17",
+      "isDraft": false,
+      "reviewDecision": null,
+      "mergeable": "MERGEABLE",
+      "author": {
+       "login": "owner"
+      },
+      "reviewRequests": {
+       "nodes": []
+      },
+      "commits": {
+       "nodes": [
+        {
+         "commit": {
+          "statusCheckRollup": null
+         }
+        }
+       ]
+      },
+      "reactions": {
+       "nodes": []
+      },
+      "reviews": {
+       "nodes": [
+        {
+         "state": "COMMENTED",
+         "author": {
+          "__typename": "User",
+          "login": "owner"
+         }
+        }
+       ]
+      }
+     },
+     {
+      "number": 18,
+      "title": "The bot left comments, then found nothing",
+      "url": "https://github.com/example/alpha/pull/18",
+      "isDraft": false,
+      "reviewDecision": null,
+      "mergeable": "MERGEABLE",
+      "author": {
+       "login": "owner"
+      },
+      "reviewRequests": {
+       "nodes": []
+      },
+      "commits": {
+       "nodes": [
+        {
+         "commit": {
+          "statusCheckRollup": null
+         }
+        }
+       ]
+      },
+      "reactions": {
+       "nodes": [
+        {
+         "content": "THUMBS_UP",
+         "user": {
+          "login": "review-bot[bot]"
+         }
+        }
+       ]
+      },
+      "reviews": {
+       "nodes": [
+        {
+         "state": "COMMENTED",
+         "author": {
+          "__typename": "Bot",
+          "login": "review-bot"
+         }
+        }
+       ]
+      }
      }
     ]
    }

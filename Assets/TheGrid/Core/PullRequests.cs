@@ -52,6 +52,7 @@ namespace TheGrid.Core
             "number title url isDraft reviewDecision mergeable author{login} " +
             "reviewRequests(first:10){nodes{requestedReviewer{... on User{login} ... on Bot{login} ... on Team{name}}}} " +
             "commits(last:1){nodes{commit{statusCheckRollup{state}}}} " +
+            "reviews(last:1){nodes{state author{__typename login}}} " +
             "reactions(first:20){nodes{content user{login}}}}}}}";
 
 #pragma warning disable 0649   // filled by JsonUtility
@@ -59,7 +60,7 @@ namespace TheGrid.Core
         [Serializable] sealed class Answer { public Data data; public List<Fault> errors; }
         [Serializable] sealed class Fault { public string message; }
         [Serializable] sealed class Data { public Who viewer; public Repo repository; }
-        [Serializable] sealed class Who { public string login, name; }
+        [Serializable] sealed class Who { public string login, name, __typename; }
         [Serializable] sealed class Repo { public Pulls pullRequests; }
         [Serializable] sealed class Pulls { public List<Node> nodes; }
         [Serializable]
@@ -68,10 +69,14 @@ namespace TheGrid.Core
             public int number;
             public string title, url, reviewDecision, mergeable;
             public bool isDraft;
+            public Who author;
+            public Reviews reviews;
             public Requests reviewRequests;
             public Commits commits;
             public Reactions reactions;
         }
+        [Serializable] sealed class Reviews { public List<Review> nodes; }
+        [Serializable] sealed class Review { public string state; public Who author; }
         [Serializable] sealed class Requests { public List<Request> nodes; }
         [Serializable] sealed class Request { public Who requestedReviewer; }
         [Serializable] sealed class Commits { public List<Last> nodes; }
@@ -116,7 +121,7 @@ namespace TheGrid.Core
 
         // What a pull request is to the owner, and why. The first thing that holds decides.
         // A review bot says what it is doing by a reaction on the description: eyes while it reads, a thumbs-up when it
-        // found nothing. A person's reaction is not a review.
+        // found nothing. A person's reaction is not a review. What it found, it leaves as a review of comments.
         static void Judge(Node n, string owner, out PullState state, out string status)
         {
             state = PullState.InReview;
@@ -142,6 +147,18 @@ namespace TheGrid.Core
             }
             if (botReading) { status = "The review bot is reviewing"; return; }
             if (n.reviewDecision == "CHANGES_REQUESTED") { status = "Changes are asked for"; return; }
+            // Comments left in a review, and no word from the pull request's author since: someone is owed an answer. A
+            // review bot that leaves findings says nothing else, so this is the only sign of them. Its later thumbs-up is
+            // its own last word and clears it.
+            // shortcut: this goes by the latest review alone, so an answer on one thread answers for all of them. Reading
+            // every thread's last comment costs some ten times the requests; do it if half-answered reviews get merged.
+            var reviews = n.reviews?.nodes;
+            var last = reviews != null && reviews.Count > 0 ? reviews[reviews.Count - 1] : null;
+            if (last != null && last.state == "COMMENTED" && !string.IsNullOrEmpty(last.author?.login) && last.author.login != n.author?.login)
+            {
+                bool bot = last.author.__typename == "Bot";
+                if (!bot || !botClean) { status = bot ? "The review bot's comments are unanswered" : last.author.login + "'s review is unanswered"; return; }
+            }
             if (asked != "") { status = asked + " is asked to review"; return; }
             if (n.reviewDecision == "REVIEW_REQUIRED") { status = "Waits for a review"; return; }
             // GitHub works out whether a pull request merges only once it is asked, and answers UNKNOWN until it has.
