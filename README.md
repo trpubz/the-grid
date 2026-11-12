@@ -87,7 +87,7 @@ A lane runs round every sector, so between any two neighbours there is one, and 
 
 - **Move:** drag, or scroll with two fingers.
 - **Zoom:** the **−** and **+** buttons, the `-` and `+` keys, or scroll while holding Command. There are five levels, each double the last.
-- **Far out,** each sector shows its name, how many bots need you and how many are done. **Closer in,** buildings and bots are named. The colour of a bot's light (blue, white or orange) is its account. Small bots beside a bot are its subagents.
+- **Far out,** each sector shows its name, how many bots need you and how many are done. **Closer in,** buildings and bots are named. The colour of a bot's light (blue, white or orange) is its account: an account gets the next colour the first time it is seen, and keeps it. Small bots beside a bot are its subagents.
 - **Click a bot** to see its card.
 
 Two panels lie over the map, down its right side:
@@ -103,7 +103,7 @@ When a message from one agent reaches another, the world shows it arriving. Betw
 
 The Grid only shows deliveries: it sends nothing and holds nothing back. A message is shown once, if it was received after you opened the world and both its sender and its recipient are bots on the map. The review pile has every message, shown or not.
 
-Which repo has which sector is kept in `world.json` beside `settings.json`. A repo keeps its place for good, also after its sessions are gone; delete the file to start the map again. If its contents are damaged it is kept as `world.json.bad` and the map starts empty.
+Which repo has which sector, and which account has which colour, is kept in `world.json` beside `settings.json`. A repo keeps its place and an account its colour for good, also after their sessions are gone; delete the file to start the map again. If its contents are damaged it is kept as `world.json.bad` and the map starts empty.
 
 To look at the world without any agent sessions, start the app on a roster snapshot file. It then reads no agent data and writes nothing:
 

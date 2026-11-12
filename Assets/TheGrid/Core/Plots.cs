@@ -5,14 +5,16 @@ using UnityEngine;
 
 namespace TheGrid.Core
 {
-    // Which repo owns which plot of the map. The world's own file; field names are the JSON keys.
+    // Which repo owns which plot of the map, and which account has which colour. The world's own file; field names are the JSON keys.
     [Serializable]
     public sealed class Plots
     {
         // A repo's index in this list is its plot number, for good. "" is the plot for sessions with no repo.
         public List<string> repos = new List<string>();
+        // An account's index in this list picks the colour of its bots' light, for good: the order accounts were first seen in.
+        public List<string> accounts = new List<string>();
 
-        int saved;   // how many of them the file on disk holds; not part of the file
+        int saved;   // how many repos and accounts the file on disk holds; not part of the file
 
         public static Plots Load(string path)
         {
@@ -26,7 +28,8 @@ namespace TheGrid.Core
             }
             p = p ?? new Plots();
             p.repos = p.repos ?? new List<string>();
-            p.saved = p.repos.Count;
+            p.accounts = p.accounts ?? new List<string>();
+            p.saved = p.repos.Count + p.accounts.Count;
             return p;
         }
 
@@ -36,13 +39,22 @@ namespace TheGrid.Core
             var tmp = path + ".tmp";
             File.WriteAllText(tmp, JsonUtility.ToJson(this, true));
             if (File.Exists(path)) File.Replace(tmp, path, null); else File.Move(tmp, path);
-            saved = repos.Count;
+            saved = repos.Count + accounts.Count;
         }
 
-        // Writes the file when plots were added since it was last written. A write that throws leaves them owed, so the next call tries again.
+        // Writes the file when plots or accounts were added since it was last written. A write that throws leaves them owed, so the next call tries again.
         public void SaveIfGrown(string path)
         {
-            if (repos.Count != saved) Save(path);
+            if (repos.Count + accounts.Count != saved) Save(path);
+        }
+
+        // The number that picks an account's colour. A new account takes the next one.
+        public int ColourFor(string account)
+        {
+            account = account ?? "";
+            int i = accounts.IndexOf(account);
+            if (i < 0) { accounts.Add(account); i = accounts.Count - 1; }
+            return i;
         }
 
         public int IndexFor(string repoRoot, out bool added)

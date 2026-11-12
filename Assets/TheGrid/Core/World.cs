@@ -23,6 +23,7 @@ namespace TheGrid.Core
         public Stance stance;
         public Badge badge;
         public int slot, subagents;       // slot: its number among the bots of its sector at the same place, in key order
+        public int colour;                // which colour its light is: its account's number, which the account keeps for good
         public bool needsOwner;
     }
 
@@ -143,7 +144,7 @@ namespace TheGrid.Core
                     key = a.account + "|" + a.sessionId, sessionId = a.sessionId, name = a.name, account = a.account, app = a.app,
                     state = a.state, activity = a.activity,
                     place = PlaceFor(a.state, a.activity), stance = StanceFor(a.state, a.activity), badge = BadgeFor(a.state),
-                    subagents = a.subagents.Count, needsOwner = NeedsOwner(a.state),
+                    subagents = a.subagents.Count, needsOwner = NeedsOwner(a.state), colour = plots.ColourFor(a.account),
                 };
                 sector.bots.Add(r);
                 if (r.needsOwner) sector.needOwner++;

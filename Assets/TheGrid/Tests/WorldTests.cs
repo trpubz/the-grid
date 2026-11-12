@@ -163,6 +163,55 @@ namespace TheGrid.Core.Tests
             }
         }
 
+        static RosterSnapshot Of(params string[] accounts)
+        {
+            var s = new RosterSnapshot();
+            for (int i = 0; i < accounts.Length; i++)
+                s.agents.Add(new AgentRow { sessionId = "s" + i, name = "n" + i, account = accounts[i], state = "Running", repoRoot = "/work/alpha", repoName = "alpha" });
+            return s;
+        }
+
+        static int Colour(WorldModel w, string account) => w.sectors.SelectMany(c => c.bots).First(b => b.account == account).colour;
+
+        [Test]
+        public void AnAccountKeepsItsColourWhenOthersComeAndGo()
+        {
+            var plots = new Plots();
+            var w = World.Build(Of("two", "one", "two"), plots);
+            Assert.AreEqual(0, Colour(w, "two"));   // in the order they were first seen, not the alphabet's
+            Assert.AreEqual(1, Colour(w, "one"));
+            Assert.IsTrue(w.sectors[0].bots.Where(b => b.account == "two").All(b => b.colour == 0));
+
+            // the first account's last session ends: the other does not change
+            Assert.AreEqual(1, Colour(World.Build(Of("one"), plots), "one"));
+            // a third turns up, earlier in the alphabet: it takes the next colour and moves nobody
+            w = World.Build(Of("aaa", "one"), plots);
+            Assert.AreEqual(2, Colour(w, "aaa"));
+            Assert.AreEqual(1, Colour(w, "one"));
+            // and the first is still itself when it comes back
+            Assert.AreEqual(0, Colour(World.Build(Of("two"), plots), "two"));
+        }
+
+        [Test]
+        public void AccountColoursAreKeptInTheWorldsFile()
+        {
+            string file = Path.Combine(tmp, "world.json");
+            var plots = new Plots();
+            World.Build(Of("two", "one"), plots);
+            plots.Save(file);
+            var again = Plots.Load(file);
+            CollectionAssert.AreEqual(new[] { "two", "one" }, again.accounts);
+            Assert.AreEqual(1, Colour(World.Build(Of("one"), again), "one"));
+
+            // a new account is owed to the file, like a new repo
+            File.Delete(file);
+            again.SaveIfGrown(file);
+            Assert.IsFalse(File.Exists(file), "nothing new: nothing written");
+            World.Build(Of("one", "three"), again);
+            again.SaveIfGrown(file);
+            CollectionAssert.AreEqual(new[] { "two", "one", "three" }, Plots.Load(file).accounts);
+        }
+
         [Test]
         public void TheWorldOpensWhereThereIsSomeoneToSee()
         {
