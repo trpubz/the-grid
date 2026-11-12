@@ -67,6 +67,8 @@ The world view is built from the same snapshot (`World.Build`), so the two never
 | `Finished` | | the plaza | standing | done | |
 | `Offline` | | the dock | off, unlit | | |
 
+Every sector has the same buildings and places, arranged and lit in its own way (`Layout`, from the sector's place on the map); what a place means is the same everywhere.
+
 A bot is one agent, told apart by `account` and `sessionId` together. Its place among the other bots at the same spot follows that pair, not the roster's order, so bots do not shuffle when the roster re-sorts. `fixtures/world/snapshot.json` is a synthetic snapshot with every state and activity in it.
 
 ### Messages arriving

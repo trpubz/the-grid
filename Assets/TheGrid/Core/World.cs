@@ -36,6 +36,7 @@ namespace TheGrid.Core
         public Vector2Int cell;
         public int needOwner, done, running;
         public List<WorldBot> bots = new List<WorldBot>();
+        [NonSerialized] public Layout layout = Layout.Of(0);   // how this sector is arranged and lit: follows from its plot
     }
 
     // What the world view draws: the roster snapshot, arranged as a map. Never changed after Build returns it.
@@ -129,7 +130,7 @@ namespace TheGrid.Core
                 var root = plots.repos[i] ?? "";
                 world.sectors.Add(new WorldSector
                 {
-                    repoRoot = root, plot = i, cell = Plots.Cell(i),
+                    repoRoot = root, plot = i, cell = Plots.Cell(i), layout = Layout.For(i),
                     name = root == "" ? NoProject : Path.GetFileName(root.TrimEnd('/')),
                 });
             }

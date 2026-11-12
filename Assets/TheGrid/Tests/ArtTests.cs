@@ -20,6 +20,8 @@ namespace TheGrid.Core.Tests
             "#2c3360", "#353d70", "#3f4780", "#101a34", "#35f2ff", "#c9fbff", "#1a8f9c", "#3f5a96", "#4a7fb4", "#62b4d6",
             "#a070ff", "#d9c8ff", "#4b4696", "#6657b8", "#ffb23e", "#b8741f", "#6e4a1c", "#ff4d4d", "#ffffff",
             "#8791c4", "#e4ecff", "#ff7a1e", "#ffc27a", "#a8501a",   // what a white and an orange bot's light becomes
+            "#a9c8ff", "#4d8dff", "#2a55b0", "#2f4a96", "#3a62c0", "#5b8be6",   // a building lit blue: line, dim line, window, glow far to near
+            "#b6ffe6", "#3ef2b0", "#1a9c78", "#2f6f7a", "#3a9c8c", "#5cd6b0",   // and mint
         };
 
         // A bot's light is drawn in three marker colours, which the game swaps for its colourway.
@@ -122,11 +124,58 @@ namespace TheGrid.Core.Tests
         public void ThePaletteIsTheOneTheArtDirectionPlanLists()
         {
             var t = Load("palette").texture;
-            Assert.AreEqual(36, t.width);
+            Assert.AreEqual(48, t.width);
             Assert.AreEqual(1, t.height);
             var got = t.GetPixels32().Select(c => "#" + c.r.ToString("x2") + c.g.ToString("x2") + c.b.ToString("x2")).ToArray();
             CollectionAssert.AreEqual(Palette2, got);
             Assert.IsTrue(t.GetPixels32().All(c => c.a == 255));
+        }
+
+        static Color32 Hex(int rgb) => new Color32((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb, 255);
+
+        [Test]
+        public void EveryLightABuildingCanCarryIsInThePalette()
+        {
+            var palette = Colours("palette");
+            for (int light = 0; light < Lights.Count; light++)
+            {
+                Assert.AreEqual(Lights.Parts, Lights.Family(light).Length);
+                foreach (int rgb in Lights.Family(light)) Assert.IsTrue(palette.Contains(Hex(rgb)), "light " + light + " has #" + rgb.ToString("x6") + ", which is not in the palette");
+            }
+            Assert.AreEqual(Lights.Parts, Lights.Drawn.Distinct().Count(), "the colours a building is drawn in must all differ, or they cannot be swapped apart");
+        }
+
+        [Test]
+        public void EveryBuildingIsDrawnInTheFirstLightSoTheGameCanSwapIt()
+        {
+            // Violet is the review hall's no longer: a building's light is its sector's choice. Only the fountain is violet as drawn.
+            var violet = new[] { Hex(0xa070ff), Hex(0xd9c8ff), Hex(0x4b4696), Hex(0x6657b8) };
+            var drawn = Lights.Drawn.Select(Hex).ToList();
+            foreach (var name in ArtNames.Structures.Where(n => n.StartsWith("b-")))
+            {
+                var px = Load(name).texture.GetPixels32();
+                Assert.AreEqual(0, px.Count(c => violet.Contains(c)), name + " has violet in it");
+                Assert.Greater(px.Count(c => c.Equals(drawn[0])), 20, name + " has no bright line");
+                Assert.Greater(px.Count(c => c.Equals(drawn[3])), 20, name + " has no glow at its foot");
+            }
+        }
+
+        [Test]
+        public void ABuildingIsNoTallerThanTheLayoutTakesItToBe()
+        {
+            // Layout.Wall is what the "no bot is hidden" test reckons with. A building redrawn taller must not slip past it.
+            // A picture's body ends where its width has narrowed to a mast or a stack: under 24 pixels across.
+            foreach (Structure s in Enum.GetValues(typeof(Structure)))
+            {
+                string name = ArtNames.Structures[(int)s];
+                var t = Load(name).texture;
+                var f = Layout.Of(0).Footprint(s);
+                int ground = Find(name).groundY, back = (f.width + f.height) * Iso.TileH / 4;   // the back corner stands this far above the ground point
+                int body = 0;
+                for (int y = ground; y < t.height; y++)
+                    if (Enumerable.Range(0, t.width).Count(x => t.GetPixel(x, y).a > 0) >= 24) body = y - ground;
+                Assert.LessOrEqual(body - back, Layout.Wall(s) + 4, name + " stands " + (body - back) + " above its back corner");
+            }
         }
 
         [Test]

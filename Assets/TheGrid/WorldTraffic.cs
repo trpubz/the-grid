@@ -31,7 +31,8 @@ namespace TheGrid
             this.stage = stage;
         }
 
-        public void Add(Delivery d, float now)
+        // Returns how long the courier is on the road: the pulse starts when it arrives.
+        public float Add(Delivery d, float now)
         {
             var trip = new Trip { d = d, started = now };
             foreach (var corner in Iso.Route(d.fromCell, d.toCell)) trip.route.Add(Iso.Point(corner.x, corner.y));
@@ -41,6 +42,7 @@ namespace TheGrid
             // The recipient holds a hand to its helmet until the pulse is over; the sender only as the courier leaves.
             stage.Signal(d.toBot, now + trip.rides + PulseSteps * PulseStep);
             stage.Signal(d.fromBot, now + SenderSignals);
+            return trip.rides;
         }
 
         // Moves couriers and pulses on. Returns true while there is anything to move: the map has to be drawn again.

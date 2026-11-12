@@ -37,7 +37,9 @@ namespace TheGrid
         BotCard card;
         Deliveries deliveries;      // made when the world is first opened: only what arrives after that is shown
         PileSnapshot deliveredFrom; // the pile snapshot last looked through for deliveries
-        string lastRecipient = "";
+        string lastRecipient = "";  // picture mode: the recipient of the longest ride, how long that ride is and when it ends
+        float longestRide = -1f, rideEnds;
+        bool showArrivals;          // picture mode with -messages: there are deliveries to take pictures of
         bool leftWorld;             // the world has been closed since it was last drawn
         Plots plots;
         string plotsPath, selected = "", shotsDir;
@@ -74,6 +76,7 @@ namespace TheGrid
                 {
                     pileDrawn = JsonUtility.FromJson<PileSnapshot>(File.ReadAllText(Arg("-messages")));
                     deliveries = new Deliveries(0);
+                    showArrivals = true;
                 }
                 shotsDir = Arg("-shots");
                 if (shotsDir != "") StartCoroutine(Shots());
@@ -106,12 +109,13 @@ namespace TheGrid
             Directory.CreateDirectory(shotsDir);
             for (int i = 0; i < 5; i++) yield return null;   // let the window open and the first layout run
             world.LookAtAll();
-            if (deliveries != null)
+            if (showArrivals)
             {
-                // A courier is on the road for at least a second and a half; then its recipient pulses for nine tenths.
+                // The courier is caught part of the way; its recipient pulses for nine tenths of a second once it arrives.
+                world.LookAt(lastRecipient);   // close enough to make out the bike
+                yield return new WaitForSecondsRealtime(Mathf.Max(0f, rideEnds - longestRide * .2f - Time.unscaledTime));
                 yield return Shot("courier.png");
-                world.LookAt(lastRecipient);
-                yield return new WaitForSecondsRealtime(1.65f);   // the fixture's courier arrives 1.75 seconds in; then the rings widen
+                yield return new WaitForSecondsRealtime(Mathf.Max(0f, rideEnds + .2f - Time.unscaledTime));   // a picture takes two more frames
                 yield return Shot("pulse.png");
                 world.LookAtAll();
             }
@@ -262,7 +266,10 @@ namespace TheGrid
                     deliveredFrom = pileDrawn;
                     foreach (var d in deliveries.New(pileDrawn, worldDrawn))
                     {
-                        world.Deliver(d);
+                        float ride = world.Deliver(d);
+                        if (ride <= longestRide) continue;
+                        longestRide = ride;
+                        rideEnds = Time.unscaledTime + ride;
                         lastRecipient = d.toBot;
                     }
                 }

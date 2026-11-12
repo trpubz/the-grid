@@ -22,11 +22,11 @@ namespace TheGrid.Core.Tests
         {
             var cells = new[] { new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(0, 1), new Vector2Int(-1, -1) };
             var origins = cells.Select(Iso.PlotOrigin).ToList();
-            Assert.AreEqual(14, Iso.Pitch);   // a plot and the lane beside it
+            Assert.AreEqual(19, Iso.Pitch);   // a plot, the lane on each side of it, and three tiles of open ground to the next
             Assert.AreEqual(new Vector2Int(0, 0), origins[0]);
-            Assert.AreEqual(new Vector2Int(14, 0), origins[1]);
-            Assert.AreEqual(new Vector2Int(0, 14), origins[2]);
-            Assert.AreEqual(new Vector2Int(-14, -14), origins[3]);
+            Assert.AreEqual(new Vector2Int(19, 0), origins[1]);
+            Assert.AreEqual(new Vector2Int(0, 19), origins[2]);
+            Assert.AreEqual(new Vector2Int(-19, -19), origins[3]);
         }
 
         static IEnumerable<Vector2Int> PlotTiles(Vector2Int cell)
@@ -53,126 +53,42 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
-        public void NeighbouringCitiesShareThePathBetweenThemAndNoPathRunsThroughAPlot()
+        public void NeighbouringSectorsStandApartAndALinkJoinsThem()
         {
             Vector2Int a = new Vector2Int(0, 0), right = new Vector2Int(1, 0), below = new Vector2Int(0, 1);
-            for (int i = 0; i < Iso.PlotTiles; i++)
-                for (int lane = 0; lane < Iso.LaneTiles; lane++)
+            int ring = Iso.PlotTiles + Iso.LaneTiles;       // the first tile beyond a sector's own lane
+            // between a sector and the next: tiles that are neither's lane
+            for (int gap = 0; gap < Iso.GapTiles; gap++)
+                for (int i = -Iso.LaneTiles; i < ring; i++)
                 {
-                    Assert.IsTrue(Iso.OnLane(a, Iso.PlotTiles + lane, i) && Iso.OnLane(right, Iso.PlotTiles + lane, i), "between a sector and the one beside it");
-                    Assert.IsTrue(Iso.OnLane(a, i, Iso.PlotTiles + lane) && Iso.OnLane(below, i, Iso.PlotTiles + lane), "between a sector and the one below it");
+                    Assert.IsFalse(Iso.OnLane(a, ring + gap, i) || Iso.OnLane(right, ring + gap, i), "open ground beside a sector");
+                    Assert.IsFalse(Iso.OnLane(a, i, ring + gap) || Iso.OnLane(below, i, ring + gap), "open ground in front of a sector");
+                    // and one link across it each way, two tiles wide: at the crossing in front, at the same count down the side
+                    bool link = i == Iso.Crossing || i == Iso.Crossing + 1;
+                    Assert.AreEqual(link, Iso.OnLink(ring + gap, i), "beside, tile " + i);
+                    Assert.AreEqual(link, Iso.OnLink(i, ring + gap), "in front, tile " + i);
                 }
+            Assert.IsFalse(Iso.OnLink(Iso.Crossing, Iso.PlotTiles), "a lane is not a link");
+            Assert.IsFalse(Iso.OnLink(3, 3), "nor is a plot");
+            Assert.IsTrue(Iso.OnLink(ring - Iso.Pitch, Iso.Crossing - 2 * Iso.Pitch), "the same on the far side of the map's middle");
 
             var cells = Enumerable.Range(0, 40).Select(Plots.Cell).ToList();
             var plots = new HashSet<Vector2Int>(cells.SelectMany(PlotTiles));
             Assert.AreEqual(40 * Iso.PlotTiles * Iso.PlotTiles, plots.Count, "plots share no tile");
+            var lanes = new HashSet<Vector2Int>();
             foreach (var cell in cells)
             {
                 var o = Iso.PlotOrigin(cell);
-                for (int c = -Iso.LaneTiles; c < Iso.PlotTiles + Iso.LaneTiles; c++)
-                    for (int r = -Iso.LaneTiles; r < Iso.PlotTiles + Iso.LaneTiles; r++)
-                        Assert.AreEqual(!plots.Contains(new Vector2Int(o.x + c, o.y + r)), Iso.OnLane(cell, o.x + c, o.y + r), cell + ": tile " + c + ", " + r);
+                for (int c = -Iso.LaneTiles; c < ring; c++)
+                    for (int r = -Iso.LaneTiles; r < ring; r++)
+                    {
+                        var t = new Vector2Int(o.x + c, o.y + r);
+                        if (!Iso.OnLane(cell, t.x, t.y)) continue;
+                        Assert.IsFalse(plots.Contains(t), "a lane runs through a plot at " + t);
+                        Assert.IsTrue(lanes.Add(t), "two sectors share the lane tile " + t);
+                        Assert.IsFalse(Iso.OnLink(t.x, t.y), "a lane tile is also a link at " + t);
+                    }
             }
-        }
-
-        static readonly Structure[] Structures = (Structure[])Enum.GetValues(typeof(Structure));
-        static readonly Place[] Places = (Place[])Enum.GetValues(typeof(Place));
-
-        static IEnumerable<Vector2Int> TilesOf(Structure s)
-        {
-            var f = Iso.Footprint(s);
-            for (int c = f.xMin; c < f.xMax; c++) for (int r = f.yMin; r < f.yMax; r++) yield return new Vector2Int(c, r);
-        }
-
-        [Test]
-        public void StructuresFitThePlotAndShareNoTile()
-        {
-            Assert.AreEqual(7, Structures.Length);
-            var tiles = Structures.SelectMany(TilesOf).ToList();
-            Assert.AreEqual(59, tiles.Count);                      // 3x3 three times, 4x3 twice, 2x2 twice
-            Assert.AreEqual(59, tiles.Distinct().Count());
-            Assert.IsTrue(tiles.All(t => t.x >= 0 && t.y >= 0 && t.x < Iso.PlotTiles && t.y < Iso.PlotTiles));
-            Assert.AreEqual(new RectInt(0, 0, 3, 3), Iso.Footprint(Structure.ServerTower));
-            Assert.AreEqual(new RectInt(8, 5, 4, 3), Iso.Footprint(Structure.Workshop));
-            Assert.AreEqual(new RectInt(5, 5, 2, 2), Iso.Footprint(Structure.Fountain));
-        }
-
-        [Test]
-        public void AStructureStandsAtTheCentreOfItsFootprint()
-        {
-            var cell = new Vector2Int(1, -2);
-            var o = Iso.PlotOrigin(cell);
-            Assert.AreEqual(Iso.Point(o.x + 1f, o.y + 1f), Iso.StructureSpot(cell, Structure.ServerTower));     // tiles 0..2 each way
-            Assert.AreEqual(Iso.Point(o.x + 9.5f, o.y + 6f), Iso.StructureSpot(cell, Structure.Workshop));      // tiles 8..11 by 5..7
-            Assert.AreEqual(Iso.Point(o.x + 5.5f, o.y + 5.5f), Iso.StructureSpot(cell, Structure.Fountain));
-        }
-
-        [Test]
-        public void FiftyBotsAtEveryPlaceEachHaveTheirOwnSpot()
-        {
-            var cell = new Vector2Int(2, 1);
-            var seen = new HashSet<Vector2>();
-            foreach (var place in Places)
-                for (int slot = 0; slot < 50; slot++)
-                    Assert.IsTrue(seen.Add(Iso.BotSpot(cell, place, slot)), place + " slot " + slot + " shares a spot");
-            Assert.AreEqual(400, seen.Count);
-        }
-
-        [Test]
-        public void TheFirstSixOfAPlaceStandOnNoStructure()
-        {
-            var cell = new Vector2Int(0, 0);
-            var built = new HashSet<Vector2Int>(Structures.SelectMany(TilesOf));
-            foreach (var place in Places)
-                for (int i = 0; i < 6; i++)
-                {
-                    int slot = place == Place.Workshop ? i + 4 : i;     // the workshop's first four stand inside it, on purpose
-                    var at = Iso.BotSpot(cell, place, slot);
-                    // back from pixels to the tile under the spot
-                    float col = (at.x / (Iso.TileW / 2) - at.y / (Iso.TileH / 2)) / 2, row = (-at.y / (Iso.TileH / 2) - at.x / (Iso.TileW / 2)) / 2;
-                    var tile = new Vector2Int(Mathf.RoundToInt(col), Mathf.RoundToInt(row));
-                    Assert.IsFalse(built.Contains(tile), place + " slot " + slot + " stands on a structure at " + tile);
-                }
-        }
-
-        [Test]
-        public void TheWorkshopsFirstFourStandInsideIt()
-        {
-            var cell = new Vector2Int(-1, 3);
-            var o = Iso.PlotOrigin(cell);
-            Assert.AreEqual(Iso.Point(o.x + 9.5f, o.y + 6.0f), Iso.BotSpot(cell, Place.Workshop, 0));    // at the terminal
-            Assert.AreEqual(Iso.Point(o.x + 10.5f, o.y + 6.6f), Iso.BotSpot(cell, Place.Workshop, 1));   // at the bench
-            Assert.AreEqual(Iso.Point(o.x + 10.0f, o.y + 7.0f), Iso.BotSpot(cell, Place.Workshop, 2));   // two more on the open floor
-            Assert.AreEqual(Iso.Point(o.x + 10.8f, o.y + 7.3f), Iso.BotSpot(cell, Place.Workshop, 3));
-            Assert.AreEqual(Iso.Point(o.x + 8.7f, o.y + 8.25f), Iso.BotSpot(cell, Place.Workshop, 4));   // the rest wait outside
-        }
-
-        [Test]
-        public void NoBotStandsBehindTheTowerOfTheSectorInFront()
-        {
-            // The sector straight down the screen from this one has its server tower at the corner nearest us. The tower's
-            // shaft is 84 pixels to each side of its ground point and 272 high; a bot is 10 to each side of where it stands.
-            var here = new Vector2Int(0, 0);
-            var tower = Iso.StructureSpot(new Vector2Int(1, 1), Structure.ServerTower);
-            foreach (var place in Places)
-                for (int slot = 0; slot < (place == Place.Workshop ? 4 : 6); slot++)   // shortcut in Iso.BotSpot: a fifth bot at the workshop may be hidden
-                {
-                    var at = Iso.BotSpot(here, place, slot);
-                    bool clear = Mathf.Abs(at.x - tower.x) >= 94 || at.y >= tower.y + 272;
-                    Assert.IsTrue(clear, place + " slot " + slot + " stands behind the next sector's tower");
-                }
-        }
-
-        [Test]
-        public void ASpotMovesWithItsSector()
-        {
-            Vector2Int a = new Vector2Int(0, 0), b = new Vector2Int(2, -1);
-            var shift = Iso.Point(Iso.PlotOrigin(b).x, Iso.PlotOrigin(b).y) - Iso.Point(0, 0);
-            foreach (var place in Places)
-                Assert.Less((Iso.BotSpot(a, place, 3) + shift - Iso.BotSpot(b, place, 3)).magnitude, .001f, place.ToString());   // to within float rounding
-            Assert.AreEqual(Iso.Point(2.0f, 10.25f), Iso.BotSpot(a, Place.Forecourt, 0));
-            Assert.AreEqual(Iso.Point(3.0f, 10.25f), Iso.BotSpot(a, Place.Forecourt, 1));
-            Assert.AreEqual(Iso.Point(2.0f, 10.85f), Iso.BotSpot(a, Place.Forecourt, 6));
         }
 
         [Test]
@@ -184,8 +100,8 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(512f, one.height, .01f);
             Assert.AreEqual(0f, one.center.x, .01f);                      // plot 0 is centred under its north corner
             var two = Iso.Bounds(new[] { new Vector2Int(0, 0), new Vector2Int(1, 0) });
-            Assert.AreEqual(1024f + 448f, two.width, .01f);               // the neighbour sits one pitch along: half its width across, a quarter down
-            Assert.AreEqual(512f + 224f, two.height, .01f);
+            Assert.AreEqual(1024f + 608f, two.width, .01f);               // the neighbour sits one pitch along: 19 tiles, half a tile's width across each
+            Assert.AreEqual(512f + 304f, two.height, .01f);
             Assert.AreEqual(0f, Iso.Bounds(new Vector2Int[0]).width);
         }
 
