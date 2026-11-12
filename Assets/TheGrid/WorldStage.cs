@@ -13,7 +13,7 @@ namespace TheGrid
     {
         static readonly float WalkPixelsPerSecond = 4f * Iso.TileStep;   // four tiles a second
         const float StepSeconds = .2f;
-        const int OutlandRing = 3;   // plot-sized cells of city kept beyond the sectors, enough to reach the edge of the overview
+        const int OutlandRing = 3;   // plot-sized cells of city kept beyond the sectors of a small map; more for a wide one
         const int MaxSmall = 3;      // subagents drawn beside a bot; its name carries the full count
 
         // In the order of Structure.
@@ -405,9 +405,12 @@ namespace TheGrid
             var covered = new RectInt(x0, y0, x1 - x0, y1 - y0);
             if (covered.Equals(outlandsFor)) return;
             outlandsFor = covered;
-            // The squares of the ground's own grid that the sectors reach into, and OutlandRing more each way.
-            int cx0 = Mathf.FloorToInt((x0 - First) / (float)Iso.Pitch) - OutlandRing, cx1 = Mathf.FloorToInt((x1 - 1 - First) / (float)Iso.Pitch) + OutlandRing;
-            int cy0 = Mathf.FloorToInt((y0 - First) / (float)Iso.Pitch) - OutlandRing, cy1 = Mathf.FloorToInt((y1 - 1 - First) / (float)Iso.Pitch) + OutlandRing;
+            // The squares of the ground's own grid that the sectors reach into, and a ring more each way. The ring widens
+            // with the map: the sectors' rectangle is a diamond on screen, and the further out the view that shows all of
+            // it, the more land beyond its edges that view takes in.
+            int ring = OutlandRing + (covered.width + covered.height) / (4 * Iso.Pitch);
+            int cx0 = Mathf.FloorToInt((x0 - First) / (float)Iso.Pitch) - ring, cx1 = Mathf.FloorToInt((x1 - 1 - First) / (float)Iso.Pitch) + ring;
+            int cy0 = Mathf.FloorToInt((y0 - First) / (float)Iso.Pitch) - ring, cy1 = Mathf.FloorToInt((y1 - 1 - First) / (float)Iso.Pitch) + ring;
             for (int x = cx0; x <= cx1; x++)
                 for (int y = cy0; y <= cy1; y++)
                 {

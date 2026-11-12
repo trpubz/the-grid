@@ -11,7 +11,7 @@ namespace TheGrid.Core
         public string key = "", fromBot = "", toBot = "";
         public Vector2Int fromAt, toAt;   // the origins of the sender's sector and the recipient's
         public long receivedAt;
-        public List<Vector2Int> way = new List<Vector2Int>();   // the sectors its courier passes, first to last; empty when no road joins the two
+        public List<Vector2Int> way = new List<Vector2Int>();   // the sectors its courier passes, by their origins, first to last; one when both bots are in the same sector
     }
 
     // Picks out of the review pile the messages the world should show arriving. The Grid only shows deliveries: it

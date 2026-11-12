@@ -60,7 +60,7 @@ The shape of the data the window draws is described in [docs/roster-snapshot.md]
 
 Every sector has the same six buildings and a fountain, but no two beside each other look alike: the buildings stand in a different order. Sectors stand apart, with open ground between them and a short link of road joining each to its neighbours.
 
-Each workspace has a **region** of the map to itself. Its sectors stand together, and a wider stretch of open ground, at least one sector across, lies between one region and the next, with a road over it. A region has a light of its own: its lanes, the lines on its ground and most of its buildings carry it, and a few buildings in every sector carry one of two accent colours instead. The open ground between and beyond the regions is the same everywhere. With one workspace there is one region, and the map is one spiral of sectors.
+Each workspace has a **region** of the map to itself. Its sectors stand together, and a wider stretch of open ground lies between one region and the next: at least eight tiles from lane to lane, where two sectors of one region are three apart. A region has a light of its own: its lanes, the lines on its ground and most of its buildings carry it, and a few buildings in every sector carry one of two accent colours instead. The open ground between and beyond the regions is the same everywhere. With one workspace there is one region, and the map is one spiral of sectors.
 
 ![One sector, close up](docs/art/world-near.png)
 
@@ -88,11 +88,13 @@ Bots that need you stand in the open at the front of their sector, done ones by 
 
 ![Three workspaces, far out: a region each, in its own light](docs/art/world-far.png)
 
-A lane runs round every sector, links cross the open ground to the lanes of its neighbours, and a road joins every two regions that stand side by side, so the roads of the whole map join up. Past the last sector the city carries on to the edge of the window as dark blocks. Lanes, links, roads and blocks are scenery, worked out from where the sectors are; they say nothing about any agent.
+![The same map after its regions were moved: the roads follow](docs/art/world-moved.png)
+
+A lane runs round every sector, and roads cross the open ground so that every sector can be reached from every other: a short link between two sectors side by side in one region, a longer road between regions, which bends twice where the two sectors it joins do not face each other squarely. Past the last sector the city carries on to the edge of the window as dark blocks. Lanes, roads and blocks are scenery, worked out from where the sectors are; they say nothing about any agent.
 
 - **Move:** drag, or scroll with two fingers.
 - **Zoom:** the **−** and **+** buttons, the `-` and `+` keys, or scroll while holding Command. There are five levels, each double the last.
-- **Far out,** each sector shows its name, how many bots need you and how many are done, and with more than one workspace each region shows its workspace's name. Click a region's name to give it the next light; the choice is kept in `settings.json`. **Closer in,** buildings and bots are named; where the two would overlap, the bot's name wins. The colour of a bot's light (blue, white or orange) is its account: an account gets the next colour the first time it is seen, and keeps it. Small bots beside a bot are its subagents.
+- **Far out,** each sector shows its name, how many bots need you and how many are done, and with more than one workspace each region shows its workspace's name. Click a region's name to give it the next light; the choice is kept in `settings.json`. Drag a name to move what it names (below). **Closer in,** buildings and bots are named; where the two would overlap, the bot's name wins. The colour of a bot's light (blue, white or orange) is its account: an account gets the next colour the first time it is seen, and keeps it. Small bots beside a bot are its subagents.
 - **Click a bot** to see its card.
 
 Two panels lie over the map, down its right side:
@@ -102,13 +104,19 @@ Two panels lie over the map, down its right side:
 
 ![A narrow window: the list folded, the card across the bottom](docs/art/world-narrow.png)
 
-When a message from one agent reaches another, the world shows it arriving. Between two sectors a courier on a bike, in the sender's colours, rides the lanes, links and roads from the sender's crossing to the recipient's; then a ring of violet light pulses under the recipient. Within one sector there is only the pulse. While it lasts the recipient holds a hand to its helmet. A courier is drawn over buildings, so you can follow it the whole way.
+When a message from one agent reaches another, the world shows it arriving. Between two sectors a courier on a bike, in the sender's colours, rides the lanes and roads from the sender's crossing to the recipient's; then a ring of violet light pulses under the recipient. Within one sector there is only the pulse. While it lasts the recipient holds a hand to its helmet. A courier is drawn over buildings, so you can follow it the whole way.
 
 ![A courier coming off the road between two regions](docs/art/world-courier.png)
 
 The Grid only shows deliveries: it sends nothing and holds nothing back. A message is shown once, if it was received after you opened the world and both its sender and its recipient are bots on the map. The review pile has every message, shown or not.
 
-Which repo has which sector, where it stands in its region, and which account has which colour, is kept in `world.json` beside `settings.json`. A repo keeps its place in its region and an account its colour for good, also after their sessions are gone; delete the file to start the map again. Move a repo to another workspace and its sector moves to that region, to the first free place there; no other sector changes its place in its region. A whole region shifts only when one of the regions grows past the square it stood in. If its contents are damaged it is kept as `world.json.bad` and the map starts empty.
+Which repo has which sector, where every region and every sector stands, and which account has which colour, is kept in `world.json` beside `settings.json`. Nothing on the map moves unless you move it, also after its sessions are gone: a new region is put beside the map, a new sector on the nearest free place of its region. Delete the file to start the map again. Move a repo to another workspace and its sector goes to that region; no other sector moves.
+
+You arrange the map yourself by dragging names:
+
+- **A region:** far out, press on its name and drag. Dotted outlines show where its sectors would stand. Let go and it stays there.
+- **A sector:** press on its name and drag. It goes from place to place of its region's own grid, so it always lines up with the region's other sectors.
+- Where the outlines turn red the thing may not stand: on another sector, or nearer than the gap to another region. Let go there and it goes back.
 
 To look at the world without any agent sessions, start the app on a roster snapshot file. It then reads no agent data and writes nothing:
 
@@ -116,7 +124,7 @@ To look at the world without any agent sessions, start the app on a roster snaps
 Builds/TheGrid.app/Contents/MacOS/"The Grid" -snapshot "$PWD/fixtures/world/snapshot.json"
 ```
 
-Add `-shots <folder>` and it saves `far.png` and `near.png` there and quits; `-select <account>|<session id>` selects that bot for `near.png`, and `-messages <pile snapshot file>` (try `fixtures/world/messages.json`) shows its messages arriving and saves `courier.png` and `pulse.png` too. With the editor closed, **The Grid > Render World Pictures** does much the same without a window, into `Logs/`, though without the names and badges:
+Add `-shots <folder>` and it saves `far.png` and `near.png` there and quits; `-select <account>|<session id>` selects that bot for `near.png`, and `-messages <pile snapshot file>` (try `fixtures/world/messages.json`) shows its messages arriving and saves `courier.png` and `pulse.png` too. `-moved <world file>` lays the map again from that `world.json` after `far.png` and saves `moved.png`: a picture of a map its owner has arranged. With the editor closed, **The Grid > Render World Pictures** does much the same without a window, into `Logs/`, though without the names and badges:
 
 ```bash
 /Applications/Unity/Hub/Editor/6000.4.3f1/Unity.app/Contents/MacOS/Unity -batchmode -projectPath "$PWD" -executeMethod TheGrid.EditorTools.GridMenu.WorldPictures -quit

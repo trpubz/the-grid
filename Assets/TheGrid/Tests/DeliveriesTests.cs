@@ -46,6 +46,10 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(1794000095000, between.receivedAt);
             var within = got.Single(d => d.key == "m-0002");
             Assert.AreEqual(within.fromAt, within.toAt);
+            // between two sectors a courier rides; within one there is nowhere to ride, only the pulse
+            Assert.Greater(Iso.Route(between.way).Count, 1);
+            CollectionAssert.AreEqual(new[] { within.fromAt }, within.way);
+            Assert.AreEqual(0, Iso.Route(within.way).Count);
         }
 
         [Test]

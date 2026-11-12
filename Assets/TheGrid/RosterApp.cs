@@ -70,6 +70,7 @@ namespace TheGrid
             {
                 fixedSnap = JsonUtility.FromJson<RosterSnapshot>(File.ReadAllText(snapshotFile));
                 plots = new Plots();   // never the owner's world.json
+                settings = new Settings();   // nor the owner's settings: lights picked and things moved last until the app closes
                 worldOpen = nextWorldOpen = true;
                 // A pile to show arriving, for pictures of couriers: everything in it counts as arriving as the world opens.
                 if (Arg("-messages") != "")
@@ -111,16 +112,27 @@ namespace TheGrid
             world.LookAtAll();
             if (showArrivals)
             {
-                // The courier is caught near the end of its way, where in the sample world it comes off the road onto the recipient's
-                // lane; its recipient pulses for nine tenths of a second once it arrives.
+                // The courier is caught three fifths of its way, where in the sample world it comes off the road between two
+                // regions onto the recipient's lane; its recipient pulses for nine tenths of a second once it arrives.
                 world.LookAt(lastRecipient);   // close enough to make out the bike
-                yield return new WaitForSecondsRealtime(Mathf.Max(0f, rideEnds - longestRide * .175f - Time.unscaledTime));
+                yield return new WaitForSecondsRealtime(Mathf.Max(0f, rideEnds - longestRide * .4f - Time.unscaledTime));
                 yield return Shot("courier.png");
                 yield return new WaitForSecondsRealtime(Mathf.Max(0f, rideEnds + .2f - Time.unscaledTime));   // a picture takes two more frames
                 yield return Shot("pulse.png");
                 world.LookAtAll();
             }
             yield return Shot("far.png");
+            // A picture of the same map after the owner has moved things: the world's file is swapped for one in which
+            // regions and sectors stand elsewhere, as a drop does, and the map is laid again.
+            if (Arg("-moved") != "")
+            {
+                plots = Plots.Load(Arg("-moved"));
+                worldFrom = null;
+                yield return null;
+                yield return null;
+                world.LookAtAll();
+                yield return Shot("moved.png");
+            }
             world.LookAtOpening();
             world.Select(Arg("-select"));   // a picture with a bot's card in it
             yield return Shot("near.png");
@@ -286,6 +298,11 @@ namespace TheGrid
             }
             if (panels.WorkspaceClicked && card != null && card.repoRoot != "") CycleWorkspace(card.repoRoot);
             if (world.RegionClicked >= 0 && world.RegionClicked < worldDrawn.regions.Count) CycleLight(worldDrawn.regions[world.RegionClicked]);
+            // The owner dragged a region or a sector to a new place: it is kept there. The view has seen that it may stand there.
+            if (world.MovedRegion >= 0 && world.MovedRegion < worldDrawn.regions.Count) plots.MoveRegion(worldDrawn.regions[world.MovedRegion].name, world.MovedBy);
+            var movedSector = world.MovedPlot < 0 ? null : worldDrawn.sectors.Find(s => s.plot == world.MovedPlot);
+            if (movedSector != null) plots.MoveSector(movedSector.plot, movedSector.cell + world.MovedBy);
+            if (world.MovedRegion >= 0 || movedSector != null) worldFrom = null;   // the same roster, laid out otherwise: build the world again
         }
 
         void DrawRoster(Rect area, RosterSnapshot snap, long now)
@@ -433,10 +450,10 @@ namespace TheGrid
         // A click on a region's name: the region takes the next light, and keeps it.
         void CycleLight(WorldRegion region)
         {
-            if (fixedSnap != null) return; // a picture of a snapshot changes nothing
-            settings.Reload(settingsPath);
+            // On a snapshot the light changes for as long as the app is open: there is no settings file to keep it in.
+            if (fixedSnap == null) settings.Reload(settingsPath);
             settings.CycleLight(region.name, region.look);
-            TrySave();
+            if (fixedSnap == null) TrySave();
             worldFrom = null;   // the same roster, lit otherwise: build the world again
         }
 
