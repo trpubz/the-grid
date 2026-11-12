@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace TheGrid.Core
@@ -108,13 +109,65 @@ namespace TheGrid.Core
         // How many bots work inside the server tower, the review hall or the works; the next waits at the door.
         public const int Inside = 6;
 
-        // Where those six stand, from the corner of the building's footprint: on the floor, clear of the racks along its
-        // two far walls. None stands in the far right of the room: the building next along the back row, a tile away,
-        // would hide it behind its corner.
-        static readonly Vector2[] InATall =
+        // A tall building has floors. An upper floor is a gallery along the back wall, reaching two floor squares out from
+        // it; the rest of the building is open from the ground up, so that every floor is seen. One storey is 1.5 tiles
+        // high, which is this many pixels up the screen. The art script draws them so (tools/art/buildings.py), and a test
+        // holds the two together.
+        public const float StoreyPixels = 59f;
+        // How far an upper floor reaches from the back row of the building's footprint, in tiles: its open edge.
+        public const float FloorReach = .73f;
+
+        public static int Floors(Structure s) => s == Structure.ServerTower ? 3 : s == Structure.ReviewHall ? 2 : 1;
+
+        // Where the six stand in each tall building, from the corner of its footprint: column, row and floor. In the order
+        // of the slots, which spreads them over the floors. On the ground they are clear of the racks along the far
+        // walls; on a gallery they stand near its open edge, where the floor above does not hide them. None stands in the
+        // far right of a floor: the building next along the back row, a tile away, would hide it behind its corner.
+        static readonly Vector3[][] InATall =
         {
-            new Vector2(1.25f, .85f), new Vector2(.6f, 1.45f), new Vector2(1.9f, 1.45f), new Vector2(.6f, .85f), new Vector2(1.25f, 2f), new Vector2(1.9f, 2f),
+            // the server tower: two to a floor
+            new[] { new Vector3(1.25f, .9f, 0), new Vector3(.55f, .45f, 1), new Vector3(.4f, .45f, 2), new Vector3(.9f, 1.7f, 0), new Vector3(1.1f, .45f, 1), new Vector3(.95f, .45f, 2) },
+            // the review hall: three to a floor
+            new[] { new Vector3(1f, 1.2f, 0), new Vector3(.25f, .45f, 1), new Vector3(.55f, 1.65f, 0), new Vector3(.7f, .45f, 1), new Vector3(1.6f, 1.7f, 0), new Vector3(1.12f, .45f, 1) },
+            // the works: one floor
+            new[] { new Vector3(1.25f, .85f, 0), new Vector3(.6f, 1.45f, 0), new Vector3(1.9f, 1.45f, 0), new Vector3(.6f, .85f, 0), new Vector3(1.25f, 2f, 0), new Vector3(1.9f, 2f, 0) },
         };
+
+        // The way in and up, the same in every tall building, from the corner of its footprint: the door in the middle of
+        // the front; a stair up the left wall to the first gallery; and from the far end of that gallery a stair along
+        // the back wall to the second.
+        static readonly Vector2 Door = new Vector2(1.25f, 2.9f);
+        static readonly Vector2 FirstStairFoot = new Vector2(.13f, 1.85f), FirstStairTop = new Vector2(.13f, .6f);
+        static readonly Vector2 SecondStairApproach = new Vector2(1.95f, .45f), SecondStairFoot = new Vector2(1.95f, .13f), SecondStairTop = new Vector2(1.05f, .13f);
+
+        static int Tall(Place place) => place == Place.ServerTower ? 0 : place == Place.ReviewHall ? 1 : place == Place.Works ? 2 : -1;
+
+        // Which floor a bot stands on: 0 for the ground, and for everyone not inside a tall building.
+        public int Floor(Place place, int slot) => Tall(place) >= 0 && slot < Inside ? (int)InATall[Tall(place)][slot].z : 0;
+
+        // The way a bot takes to its place, in tiles from the plot's first tile, with the floor as the third number: from
+        // the door of a tall building across the ground floor, up a stair for each floor, and along the gallery. A stair
+        // is the one leg on which the floor changes. For a bot that stands in the open, or waits at a door, or works in
+        // the workshop, it is the place alone.
+        public List<Vector3> Way(Place place, int slot)
+        {
+            var way = new List<Vector3>();
+            int which = Tall(place);
+            if (which < 0 || slot >= Inside)
+            {
+                var only = Spot(place, slot);
+                way.Add(new Vector3(only.x, only.y, 0));
+                return way;
+            }
+            var corner = template.tall[order[which]];
+            void Add(Vector2 at, int floor) => way.Add(new Vector3(corner.x + at.x, corner.y + at.y, floor));
+            var spot = InATall[which][slot];
+            Add(Door, 0);
+            if (spot.z >= 1) { Add(FirstStairFoot, 0); Add(FirstStairTop, 1); }
+            if (spot.z >= 2) { Add(SecondStairApproach, 1); Add(SecondStairFoot, 1); Add(SecondStairTop, 2); }
+            Add(spot, (int)spot.z);
+            return way;
+        }
 
         // True for a bot that stands inside its building: the first six at a tall one, the first four in the workshop.
         public bool IsInside(Place place, int slot)
@@ -129,8 +182,12 @@ namespace TheGrid.Core
             }
         }
 
-        Vector2 AtATall(int which, int slot) =>
-            slot < Inside ? (Vector2)template.tall[order[which]] + InATall[slot] : template.tallDoor[order[which]].Spot(slot - Inside);
+        Vector2 AtATall(int which, int slot)
+        {
+            if (slot >= Inside) return template.tallDoor[order[which]].Spot(slot - Inside);
+            var corner = template.tall[order[which]];
+            return new Vector2(corner.x + InATall[which][slot].x, corner.y + InATall[which][slot].y);
+        }
         public const int Crates = 9;
 
         // Where a crate stands, in tiles from the plot's first tile: in rows in front of the depot's door.

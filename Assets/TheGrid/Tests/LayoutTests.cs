@@ -110,7 +110,8 @@ namespace TheGrid.Core.Tests
                 foreach (var place in Places)
                     for (int slot = 0; slot < 6; slot++)
                     {
-                        var t = Tile(Iso.BotSpot(Iso.PlotOrigin(cell), l, place, slot));
+                        // the tile it stands over: a bot on an upper floor is drawn a storey up for each floor
+                        var t = Tile(Iso.BotSpot(Iso.PlotOrigin(cell), l, place, slot) - new Vector2(0, l.Floor(place, slot) * Layout.StoreyPixels));
                         var tile = new Vector2Int(Mathf.RoundToInt(t.x), Mathf.RoundToInt(t.y));
                         string who = "arrangement " + a + ": " + place + " slot " + slot + " at " + t;
                         Assert.IsTrue(t.x >= -.5f && t.y >= -.5f && t.x <= Iso.PlotTiles - .5f && t.y <= Iso.PlotTiles - .5f, who + " is off the plot");
@@ -202,6 +203,92 @@ namespace TheGrid.Core.Tests
             }
         }
 
+        static readonly Place[] Tall = { Place.ServerTower, Place.ReviewHall, Place.Works };
+
+        [Test]
+        public void TheSixInsideATallBuildingAreSpreadOverItsFloors()
+        {
+            Assert.AreEqual(3, Layout.Floors(Structure.ServerTower));
+            Assert.AreEqual(2, Layout.Floors(Structure.ReviewHall));
+            foreach (var low in new[] { Structure.Works, Structure.Workshop, Structure.Depot, Structure.Relay, Structure.Fountain }) Assert.AreEqual(1, Layout.Floors(low), low.ToString());
+            foreach (int a in All)
+            {
+                var l = Layout.Of(a);
+                foreach (var place in Tall)
+                {
+                    int floors = Layout.Floors(World.StructureOf(place).Value);
+                    var on = Enumerable.Range(0, Layout.Inside).Select(slot => l.Floor(place, slot)).ToList();
+                    for (int floor = 0; floor < floors; floor++)
+                        Assert.AreEqual(Layout.Inside / floors, on.Count(f => f == floor), "arrangement " + a + ": " + place + " floor " + floor);
+                    Assert.AreEqual(0, l.Floor(place, Layout.Inside), "the one waiting at the door stands on the ground");
+                    var f0 = l.Footprint(World.StructureOf(place).Value);
+                    for (int slot = 0; slot < Layout.Inside; slot++)
+                    {
+                        var origin = new Vector2Int(7, -30);
+                        var t = l.Spot(place, slot);
+                        // a floor up is so many pixels up the screen, whatever the floor
+                        Assert.AreEqual(Iso.Point(origin.x + t.x, origin.y + t.y).y + l.Floor(place, slot) * Layout.StoreyPixels, Iso.BotSpot(origin, l, place, slot).y, .01f);
+                        // an upper floor reaches two floor squares out from the back wall: who stands on it stands within them
+                        if (l.Floor(place, slot) > 0)
+                            Assert.IsTrue(t.y - f0.yMin > -.1f && t.y - f0.yMin < Layout.FloorReach - .1f, "arrangement " + a + ": " + place + " slot " + slot + " at " + t + " is off its floor");
+                    }
+                }
+                foreach (var place in Places.Except(Tall))
+                    for (int slot = 0; slot < 8; slot++) Assert.AreEqual(0, l.Floor(place, slot), place.ToString());
+            }
+        }
+
+        [Test]
+        public void ABotGoesToItsPlaceInATallBuildingByTheDoorAndTheStairs()
+        {
+            foreach (int a in All)
+            {
+                var l = Layout.Of(a);
+                foreach (var place in Tall)
+                {
+                    var f = l.Footprint(World.StructureOf(place).Value);
+                    bool Within(Vector3 p) => p.x > f.xMin - .5f && p.x < f.xMax - .5f && p.y > f.yMin - .5f && p.y < f.yMax - .5f;
+                    for (int slot = 0; slot < Layout.Inside; slot++)
+                    {
+                        string who = "arrangement " + a + ": " + place + " slot " + slot;
+                        var way = l.Way(place, slot);
+                        var spot = l.Spot(place, slot);
+                        Assert.AreEqual(new Vector3(spot.x, spot.y, l.Floor(place, slot)), way[way.Count - 1], who + " ends where it stands");
+                        Assert.IsFalse(Within(way[0]), who + " starts outside");
+                        Assert.Greater(way[0].y, f.yMax - .5f, who + " starts in front of the building");
+                        Assert.AreEqual(0f, way[0].z, who);
+                        int stairs = 0;
+                        for (int i = 1; i < way.Count; i++)
+                        {
+                            Vector3 p = way[i - 1], q = way[i];
+                            Assert.AreNotEqual(p, q, who + ": a leg of no length");
+                            if (i > 1) Assert.IsTrue(Within(p) && Within(q), who + ": leg " + i + " leaves the building");
+                            if (p.z == q.z)
+                            {
+                                // along a floor; an upper floor is only so deep
+                                if (p.z > 0) Assert.IsTrue(p.y - f.yMin < Layout.FloorReach - .1f && q.y - f.yMin < Layout.FloorReach - .1f, who + ": leg " + i + " walks off the edge of floor " + p.z);
+                                continue;
+                            }
+                            // a stair: one floor up, along a wall, long enough to be a stair
+                            stairs++;
+                            Assert.AreEqual(1f, q.z - p.z, who + ": leg " + i);
+                            Assert.IsTrue(p.x == q.x || p.y == q.y, who + ": stair " + stairs + " runs askew");
+                            Assert.GreaterOrEqual(Mathf.Abs(q.x - p.x) + Mathf.Abs(q.y - p.y), .8f, who + ": stair " + stairs + " is a ladder");
+                        }
+                        Assert.AreEqual(l.Floor(place, slot), stairs, who + " takes one stair for each floor up");
+                    }
+                    // the one who waits at the door, and everyone in the open, is simply there
+                    Assert.AreEqual(1, l.Way(place, Layout.Inside).Count);
+                }
+                foreach (var place in Places.Except(Tall)) Assert.AreEqual(1, l.Way(place, 0).Count, place.ToString());
+                // in art pixels, with the floors' heights: what the stage walks a bot along
+                var origin = new Vector2Int(-12, 5);
+                var points = Iso.Way(origin, l, Place.ServerTower, 2);
+                Assert.AreEqual(l.Way(Place.ServerTower, 2).Count, points.Count);
+                Assert.AreEqual(Iso.BotSpot(origin, l, Place.ServerTower, 2), points[points.Count - 1]);
+            }
+        }
+
         [Test]
         public void SixWorkInsideABuildingAndTheSeventhWaitsAtItsDoor()
         {
@@ -226,8 +313,9 @@ namespace TheGrid.Core.Tests
         }
 
         // How many pixels of a bot's height a sector's structures cover, where the bot stands at `at` (art pixels).
-        // A structure covers a bot only when it is drawn after it: when its own ground point is lower on the screen.
-        static float Covered(Vector2 at, Layout l, Vector2Int cell, bool own)
+        // A structure covers a bot only when it is drawn after it: when its own ground point is lower on the screen than
+        // the bot is drawn as if it stood (`depth`: Iso.BotDepth for a bot inside a building, else where it stands).
+        static float Covered(Vector2 at, Layout l, Vector2Int cell, bool own, Structure? inside = null, float? depth = null)
         {
             const float botHalf = 9, botHigh = 34;
             float worst = 0;
@@ -236,8 +324,8 @@ namespace TheGrid.Core.Tests
             foreach (var s in Structures)
             {
                 var f = l.Footprint(s);
-                if (own && local.x > f.xMin - .5f && local.x < f.xMax - .5f && local.y > f.yMin - .5f && local.y < f.yMax - .5f) continue;   // standing inside it: it is opened
-                if (!(at.y > Iso.StructureSpot(Iso.PlotOrigin(cell), l, s).y)) continue;
+                if (own && s == inside) continue;   // standing inside it: it is opened
+                if (!((depth ?? at.y) > Iso.StructureSpot(Iso.PlotOrigin(cell), l, s).y)) continue;
                 Vector2 back = Iso.Point(o.x + f.xMin - .5f, o.y + f.yMin - .5f), left = Iso.Point(o.x + f.xMin - .5f, o.y + f.yMax - .5f),
                         right = Iso.Point(o.x + f.xMax - .5f, o.y + f.yMin - .5f), front = Iso.Point(o.x + f.xMax - .5f, o.y + f.yMax - .5f);
                 foreach (float x in new[] { at.x - botHalf, at.x, at.x + botHalf })
@@ -270,10 +358,12 @@ namespace TheGrid.Core.Tests
                     {
                         var at = Iso.BotSpot(Iso.PlotOrigin(here), l, place, slot);
                         string who = "arrangement " + a + ": " + place + " slot " + slot;
-                        Assert.LessOrEqual(Covered(at, l, here, true), allowed, who + " is behind a building of its own sector");
+                        Structure? inside = l.IsInside(place, slot) ? World.StructureOf(place) : null;
+                        float depth = Iso.BotDepth(Iso.PlotOrigin(here), l, place, slot);
+                        Assert.LessOrEqual(Covered(at, l, here, true, inside, depth), allowed, who + " is behind a building of its own sector");
                         foreach (int b in All)
                             foreach (var cell in inFront)
-                                Assert.LessOrEqual(Covered(at, Layout.Of(b), cell, false), allowed, who + " is behind arrangement " + b + " at " + cell);
+                                Assert.LessOrEqual(Covered(at, Layout.Of(b), cell, false, null, depth), allowed, who + " is behind arrangement " + b + " at " + cell);
                     }
                 }
             }

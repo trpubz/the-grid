@@ -75,7 +75,8 @@ namespace TheGrid.Core
         {
             var o = origin;
             var at = layout.Spot(place, slot);
-            return Point(o.x + at.x, o.y + at.y);
+            // A bot on an upper floor is drawn a storey up the screen for each floor.
+            return Point(o.x + at.x, o.y + at.y) + new Vector2(0, layout.Floor(place, slot) * Layout.StoreyPixels);
         }
 
         // True for a point of the map, in art pixels, that is on a sector's depot or on one of the crates shown in front
@@ -92,6 +93,14 @@ namespace TheGrid.Core
                 if (Mathf.Abs(c.x) < 20 && c.y > -10 && c.y < 26) return true;
             }
             return false;
+        }
+
+        // The way a bot walks to its place (Layout.Way), in art pixels: each floor up is a storey up the screen.
+        public static List<Vector2> Way(Vector2Int origin, Layout layout, Place place, int slot)
+        {
+            var points = new List<Vector2>();
+            foreach (var p in layout.Way(place, slot)) points.Add(Point(origin.x + p.x, origin.y + p.y) + new Vector2(0, p.z * Layout.StoreyPixels));
+            return points;
         }
 
         // How far down the screen a bot is drawn as if it stood, in art pixels: what is lower is drawn later, over what is
