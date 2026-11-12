@@ -74,7 +74,13 @@ namespace TheGrid
                         if (badge != null) GUI.DrawTexture(new Rect(8, row.y + 9, 16, 20), badge);
                         GUI.Label(new Rect(32, row.y + 1, w - 36, 20), rows[i].what, text);
                         Faint(new Rect(32, row.y + 17, w - 36, 20), rows[i].name + " · " + rows[i].sector, text);
-                        if (GUI.Button(row, GUIContent.none, GUIStyle.none)) clicked = rows[i].key;
+                        if (GUI.Button(row, GUIContent.none, GUIStyle.none))
+                        {
+                            clicked = rows[i].key;
+                            // The view goes to that bot, at its middle. In a narrow map the open list lies over the middle,
+                            // so it folds, or the bot would be behind it.
+                            if (map.width < 520) folded = true;
+                        }
                     }
                     GUI.EndScrollView();
                 }
