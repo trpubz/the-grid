@@ -391,6 +391,10 @@ namespace TheGrid
             return true;
         }
 
+        // How much further down the screen a bot is drawn as if it stood: more than nothing for a bot inside a building.
+        // What lies under its feet has to come that far forward with it, or the room is drawn over it.
+        public float Sink(string key) => bots.TryGetValue(key, out var b) ? b.sink : 0f;
+
         // The bot under a point of the map, or "".
         public string Pick(Vector2 world)
         {
