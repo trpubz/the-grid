@@ -124,8 +124,8 @@ Those for you stand nearest the door. The depot's name says how many are open, a
 
 A lane runs round every sector, and roads cross the open ground so that every sector can be reached from every other: a short link between two sectors side by side in one region, a longer road between regions, which bends twice where the two sectors it joins do not face each other squarely. Past the last sector the city carries on to the edge of the window as dark blocks. Lanes, roads and blocks are scenery, worked out from where the sectors are; they say nothing about any agent.
 
-- **Move:** drag, or scroll with two fingers.
-- **Zoom:** the **−** and **+** buttons, the `-` and `+` keys, or scroll while holding Command. There are five levels, each double the last.
+- **Move:** drag the map, or rest the pointer at an edge of it: the map moves that way for as long as the pointer stays there. Not over a panel, and not while the window is behind another.
+- **Zoom:** the wheel, or two fingers on a trackpad: a level at a time, and what is under the pointer stays under it. Also the **−** and **+** buttons and the `-` and `+` keys. There are five levels, each double the last.
 - **Far out,** each sector shows its name, how many bots need you and how many are done, and with more than one workspace each region shows its workspace's name. Click a region's name to give it the next light; the choice is kept in `settings.json`. Click a sector's name to give its repo another workspace, from the same list as in the lists: this works for a repo with no session too, which has no row and no bot. A workspace with a repo in it has a region, so a new workspace gets a region and the next light the moment a repo is put in it, and the sector moves there. Drag a name to move what it names (below). **Closer in,** buildings and bots are named; where the two would overlap, the bot's name wins. The colour of a bot's light (blue, white or orange) is its account: an account gets the next colour the first time it is seen, and keeps it. Small bots beside a bot are its subagents.
 - **Click a bot** to see its card.
 

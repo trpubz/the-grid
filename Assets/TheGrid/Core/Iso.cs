@@ -350,6 +350,37 @@ namespace TheGrid.Core
 
         public static int ClampLevel(int level) => Mathf.Clamp(level, 0, Zoom.Length - 1);
 
+        // Which way the map moves for a pointer resting within `edge` of an edge of the map: -1, 0 or 1 across, and the
+        // same up, where up is toward the top of the window. Nothing while the pointer is off the map. view and pointer
+        // are in the window's points, y running down.
+        public static Vector2 EdgePan(Rect view, Vector2 pointer, float edge)
+        {
+            if (!view.Contains(pointer)) return Vector2.zero;
+            return new Vector2(pointer.x < view.xMin + edge ? -1 : pointer.x > view.xMax - edge ? 1 : 0, pointer.y < view.yMin + edge ? 1 : pointer.y > view.yMax - edge ? -1 : 0);
+        }
+
+        // After a level of zoom the wheel rests for so many seconds.
+        public const float WheelRest = .15f;
+
+        // How many levels to zoom for a turn of the wheel: 1 in, -1 out, or 0. A mouse's wheel sends a notch at a time and
+        // two fingers on a trackpad many small turns, which are added up in `pending` until they make a notch. However
+        // hard it is turned it is one level, and then the wheel rests (`since`: seconds since the last level), or one
+        // swipe would run through every level there is.
+        public static int WheelStep(ref float pending, float delta, float since)
+        {
+            if (since < WheelRest)
+            {
+                pending = 0;
+                return 0;
+            }
+            if (pending * delta < 0) pending = 0;   // turned back: start afresh
+            pending += delta;
+            if (Mathf.Abs(pending) < 1f) return 0;
+            int step = pending < 0 ? 1 : -1;
+            pending = 0;
+            return step;
+        }
+
         // The closest level at which the content fits the view; the farthest when none does; actual size when there is nothing to fit.
         public static int FitLevel(float viewW, float viewH, Rect content)
         {
