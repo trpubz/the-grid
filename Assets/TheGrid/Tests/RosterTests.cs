@@ -64,6 +64,12 @@ namespace TheGrid.Core.Tests
             var b = snap.agents.Find(x => x.sessionId == "s-2");
             Assert.AreEqual("cd /work/beta && CLAUDE_CONFIG_DIR=/cfg/.claude-two claude attach bg000002", b.enter);
             Assert.AreEqual(0, b.pid, "a background session has no process to ask");
+
+            // an owner with more than one account: the default account's command says it is the default one
+            settings.configDirs = new List<string> { "/cfg/.claude", "/cfg/.claude-two" };
+            snap = new RosterBuilder(settings, "/cfg").Build(new[] { open, hidden }, None, Now);
+            Assert.AreEqual("cd /work/alpha && env -u CLAUDE_CONFIG_DIR claude --resume s-1", snap.agents.Find(x => x.sessionId == "s-1").enter);
+            Assert.AreEqual("cd /work/beta && CLAUDE_CONFIG_DIR=/cfg/.claude-two claude attach bg000002", snap.agents.Find(x => x.sessionId == "s-2").enter);
         }
 
         static LiveSession Idle(string id, string name, string cwd = "/work/none") =>

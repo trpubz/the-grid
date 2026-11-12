@@ -33,6 +33,13 @@ namespace TheGrid.Core.Tests
         [TestCase("background", "", "0000-4", "/work/beta", "/home/me/.claude", "")]
         [TestCase("interactive", "", "", "/work/alpha", "/home/me/.claude", "")]
         public void TheCommandThatOpensAConversation(string kind, string id, string sessionId, string cwd, string configDir, string expected) =>
-            Assert.AreEqual(expected, RosterFormat.Enter(kind, id, sessionId, cwd, configDir, "/home/me"));
+            Assert.AreEqual(expected, RosterFormat.Enter(kind, id, sessionId, cwd, configDir, "/home/me", false));
+
+        // With more than one account, the terminal the command is pasted into may have another account's folder set: the
+        // default account, which is the one with none set, then says so.
+        [TestCase("/home/me/.claude", "cd /work/alpha && env -u CLAUDE_CONFIG_DIR claude --resume 0000-4")]
+        [TestCase("/home/me/.claude-two", "cd /work/alpha && CLAUDE_CONFIG_DIR=/home/me/.claude-two claude --resume 0000-4")]
+        public void WithSeveralAccountsTheCommandNamesTheDefaultOneToo(string configDir, string expected) =>
+            Assert.AreEqual(expected, RosterFormat.Enter("interactive", "", "0000-4", "/work/alpha", configDir, "/home/me", true));
     }
 }

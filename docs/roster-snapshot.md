@@ -31,7 +31,7 @@ The exact JSON is pinned by a test against [`fixtures/roster/snapshot.json`](../
 | `workspace` | Workspace the repo is assigned to; `Personal` when unassigned | Settings |
 | `stateSince` | When the agent entered `state`, in milliseconds since 1970 UTC | Per-process session file, else the first time the roster saw that state |
 | `subagents` | Helpers the agent started that are still working | Files beside the transcript |
-| `enter` | The command that opens the conversation in a terminal: `cd <folder> && claude attach <id>` for a background session, `cd <folder> && claude --resume <session id>` for any other, with `CLAUDE_CONFIG_DIR=<folder>` before `claude` for an account other than the default. Empty when there is nothing to open it by | Live session list |
+| `enter` | The command that opens the conversation in a terminal: `cd <folder> && claude attach <id>` for a background session, `cd <folder> && claude --resume <session id>` for any other, with `CLAUDE_CONFIG_DIR=<folder>` before `claude` for an account other than the default. With more than one account, the default account's command has `env -u CLAUDE_CONFIG_DIR` there instead, so that it opens the right account from a terminal set up for another. Empty when there is nothing to open it by | Live session list |
 | `pid` | The session's process; `0` for a background session, which has none. The world asks this process where the session lives (its zellij session and tab) when its card is opened; that answer is not in the snapshot | Live session list |
 
 A subagent has `agentId`, `description` (what it was asked to do) and `agentType`.

@@ -40,15 +40,17 @@ namespace TheGrid.Core
     {
         // The command that opens a session's conversation in a terminal: a background session is attached to by its short
         // id, any other is resumed by its session id, in the folder it was started in, and for an account other than the
-        // default one with that account's folder named. "" when there is nothing to open it by. It is meant for the owner's
-        // shell, so whatever a shell would not read as one plain word is quoted.
-        public static string Enter(string kind, string id, string sessionId, string cwd, string configDir, string home)
+        // default one with that account's folder named. The default account is the one with no folder named; `several` says
+        // the owner has more than one account, so that the terminal the command is pasted into may have another's folder
+        // set, and then the command unsets it. "" when there is nothing to open it by. It is meant for the owner's shell, so
+        // whatever a shell would not read as one plain word is quoted.
+        public static string Enter(string kind, string id, string sessionId, string cwd, string configDir, string home, bool several)
         {
             bool background = kind == "background";
             string by = background ? id : sessionId;
             if (string.IsNullOrEmpty(by)) return "";
             bool usual = string.IsNullOrEmpty(configDir) || configDir.TrimEnd('/') == Path.Combine(home ?? "", ".claude");
-            return (string.IsNullOrEmpty(cwd) ? "" : "cd " + Word(cwd) + " && ") + (usual ? "" : "CLAUDE_CONFIG_DIR=" + Word(configDir) + " ")
+            return (string.IsNullOrEmpty(cwd) ? "" : "cd " + Word(cwd) + " && ") + (!usual ? "CLAUDE_CONFIG_DIR=" + Word(configDir) + " " : several ? "env -u CLAUDE_CONFIG_DIR " : "")
                 + (background ? "claude attach " : "claude --resume ") + Word(by);
         }
 
@@ -89,6 +91,7 @@ namespace TheGrid.Core
         readonly Dictionary<string, Memory> memory = new Dictionary<string, Memory>();
 
         readonly string home;
+        bool several;   // the owner has more than one account: asked once for each roster
 
         // home: the folder whose .claude is the default account, which a command need not name.
         public RosterBuilder(Settings settings, string home = null)
@@ -105,6 +108,7 @@ namespace TheGrid.Core
 
         public RosterSnapshot Build(IReadOnlyList<LiveSession> live, IReadOnlyList<string> errors, long nowMs)
         {
+            several = settings.EffectiveConfigDirs(home).Count > 1;
             var liveKeys = new HashSet<string>();
             foreach (var s in live)
             {
@@ -160,7 +164,7 @@ namespace TheGrid.Core
             row.account = AccountLabel(s.ConfigDir);
             row.state = state.ToString();
             row.rawStatus = LiveSessions.RawStatus(s);
-            row.enter = RosterFormat.Enter(s.Kind, s.Id, s.SessionId, s.Cwd, s.ConfigDir, home);
+            row.enter = RosterFormat.Enter(s.Kind, s.Id, s.SessionId, s.Cwd, s.ConfigDir, home, several);
             row.pid = s.Pid;
 
             var repo = RepoResolver.Resolve(s.Cwd);
