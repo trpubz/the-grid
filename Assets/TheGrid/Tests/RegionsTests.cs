@@ -32,31 +32,42 @@ namespace TheGrid.Core.Tests
         }
 
         static WorldSector Sector(WorldModel w, string repo) => w.sectors.Single(s => s.repoRoot == "/" + repo);
+        static WorldSector Sector(WorldModel w, Vector2Int origin) => w.sectors.Single(s => s.origin == origin);
 
         static readonly string[] Three = { "home/a", "firm/a", "home/b", "work/a", "home/c", "work/b", "firm/b", "home/d", "home/e" };
 
+        // How far apart two sectors stand: the larger of the two distances between their origins, in tiles.
+        static int Apart(WorldSector a, WorldSector b) => Mathf.Max(Mathf.Abs(a.origin.x - b.origin.x), Mathf.Abs(a.origin.y - b.origin.y));
+        const int Beside = Iso.PlotTiles + 2 * Iso.LaneTiles + Iso.RegionGap;   // origin to origin, with the gap between two regions' lanes
+
+        static void AssertRegionsStandApart(WorldModel w)
+        {
+            Assert.AreEqual(w.sectors.Count, w.sectors.Select(s => s.origin).Distinct().Count(), "two sectors in one place");
+            foreach (var a in w.sectors)
+                foreach (var b in w.sectors)
+                {
+                    if (a == b) continue;
+                    if (a.region != b.region) Assert.GreaterOrEqual(Apart(a, b), Beside, a.repoRoot + " and " + b.repoRoot + " are nearer than the gap");
+                    else
+                    {
+                        // one region, one grid: a whole number of sectors apart each way
+                        var d = a.origin - b.origin;
+                        Assert.IsTrue(d.x % Iso.Pitch == 0 && d.y % Iso.Pitch == 0, a.repoRoot + " and " + b.repoRoot);
+                        Assert.AreEqual(Iso.PlotOrigin(a.cell - b.cell), d);
+                    }
+                }
+        }
+
         [Test]
-        public void TheSectorsOfAWorkspaceStandTogetherWithOpenGroundRoundThem()
+        public void TheSectorsOfAWorkspaceStandTogetherAndARegionStandsTheGapFromTheNext()
         {
             var w = World.Build(Of(Three), new Plots());
             CollectionAssert.AreEqual(new[] { "home", "firm", "work" }, w.regions.Select(r => r.name).ToArray());
             foreach (var s in w.sectors) Assert.AreEqual(s.repoRoot.Split('/')[1], w.regions[s.region].name, s.repoRoot);
-            Assert.AreEqual(w.sectors.Count, w.sectors.Select(s => s.cell).Distinct().Count(), "two sectors on one cell");
-            foreach (var a in w.sectors)
-                foreach (var b in w.sectors)
-                {
-                    if (a.region == b.region) continue;
-                    var d = a.cell - b.cell;
-                    // not side by side and not corner to corner: a whole cell of open ground lies between
-                    Assert.GreaterOrEqual(Mathf.Max(Mathf.Abs(d.x), Mathf.Abs(d.y)), 2, a.repoRoot + " and " + b.repoRoot);
-                }
-            // a region is one block: no sector of it is further from its first than the block is wide
-            foreach (var r in Enumerable.Range(0, w.regions.Count))
-            {
-                var cells = w.sectors.Where(s => s.region == r).Select(s => s.cell).ToList();
-                Assert.LessOrEqual(cells.Max(c => c.x) - cells.Min(c => c.x), 2, w.regions[r].name);
-                Assert.LessOrEqual(cells.Max(c => c.y) - cells.Min(c => c.y), 2, w.regions[r].name);
-            }
+            AssertRegionsStandApart(w);
+            // and no further than the gap: every region has a sector exactly that far from a sector of another
+            for (int r = 0; r < w.regions.Count; r++)
+                Assert.AreEqual(Beside, w.sectors.Where(s => s.region == r).Min(a => w.sectors.Where(s => s.region != r).Min(b => Apart(a, b))), w.regions[r].name);
         }
 
         [Test]
@@ -65,7 +76,23 @@ namespace TheGrid.Core.Tests
             var repos = Enumerable.Range(0, 12).Select(i => "home/r" + i).ToArray();
             var w = World.Build(Of(repos), new Plots());
             Assert.AreEqual(1, w.regions.Count);
-            CollectionAssert.AreEqual(Enumerable.Range(0, 12).Select(Plots.Cell).ToArray(), w.sectors.Select(s => s.cell).ToArray());
+            CollectionAssert.AreEqual(Enumerable.Range(0, 12).Select(i => Iso.PlotOrigin(Plots.Cell(i))).ToArray(), w.sectors.Select(s => s.origin).ToArray());
+        }
+
+        [Test]
+        public void NothingMovesWhenTheMapGrows()
+        {
+            var plots = new Plots();
+            var before = World.Build(Of(Three), plots);
+            var more = Three.Concat(new[] { "home/f", "firm/c", "home/g", "side/a", "work/c", "home/h", "firm/d", "firm/e", "side/b", "home/i", "work/d", "work/e", "work/f" }).ToArray();
+            var after = World.Build(Of(more), plots);
+            foreach (var s in before.sectors) Assert.AreEqual(s.origin, Sector(after, s.repoRoot.Substring(1)).origin, s.repoRoot + " moved");
+            Assert.AreEqual(4, after.regions.Count);
+            AssertRegionsStandApart(after);
+            // and the same again from the world's file
+            var file = Path.Combine(tmp, "world.json");
+            plots.SaveIfGrown(file);
+            CollectionAssert.AreEqual(after.sectors.Select(s => s.origin).ToArray(), World.Build(Of(more), Plots.Load(file)).sectors.Select(s => s.origin).ToArray());
         }
 
         [Test]
@@ -78,21 +105,68 @@ namespace TheGrid.Core.Tests
             snap.agents[1].workspace = "work";
             var after = World.Build(snap, plots);
             foreach (var repo in new[] { "home/a", "home/c", "work/a" })
-                Assert.AreEqual(Sector(before, repo).cell, Sector(after, repo).cell, repo + " moved");
+                Assert.AreEqual(Sector(before, repo).origin, Sector(after, repo).origin, repo + " moved");
             Assert.AreEqual(Sector(after, "work/a").region, Sector(after, "home/b").region);
             Assert.AreEqual(Sector(before, "home/b").plot, Sector(after, "home/b").plot);
-            Assert.AreNotEqual(Sector(before, "home/b").cell, Sector(after, "home/b").cell);
+            Assert.AreNotEqual(Sector(before, "home/b").origin, Sector(after, "home/b").origin);
+            AssertRegionsStandApart(after);
 
             // the place it left is the next one given out in that region
             var grown = Of("home/a", "home/b", "home/c", "work/a", "home/d");
             grown.agents[1].workspace = "work";
-            Assert.AreEqual(Sector(before, "home/b").cell, Sector(World.Build(grown, plots), "home/d").cell);
+            Assert.AreEqual(Sector(before, "home/b").origin, Sector(World.Build(grown, plots), "home/d").origin);
+        }
 
-            // and all of it is in the world's file
+        [Test]
+        public void TheOwnerMovesARegionAndItStaysWhereItWasPut()
+        {
+            var plots = new Plots();
+            var before = World.Build(Of(Three), plots);
+            int work = before.regions.FindIndex(r => r.name == "work");
+            var by = new Vector2Int(-200, 131);   // anywhere: not a whole number of sectors
+            Assert.IsTrue(World.CanMoveRegion(before, work, by));
+            plots.MoveRegion("work", by);
+            var after = World.Build(Of(Three), plots);
+            foreach (var s in before.sectors)
+                Assert.AreEqual(s.origin + (s.region == work ? by : Vector2Int.zero), Sector(after, s.repoRoot.Substring(1)).origin, s.repoRoot);
+            AssertRegionsStandApart(after);
+
             var file = Path.Combine(tmp, "world.json");
             plots.SaveIfGrown(file);
-            var again = World.Build(grown, Plots.Load(file));
-            CollectionAssert.AreEqual(World.Build(grown, plots).sectors.Select(s => s.cell).ToArray(), again.sectors.Select(s => s.cell).ToArray());
+            CollectionAssert.AreEqual(after.sectors.Select(s => s.origin).ToArray(), World.Build(Of(Three), Plots.Load(file)).sectors.Select(s => s.origin).ToArray());
+
+            // not onto another region, nor nearer to it than the gap
+            var home = after.sectors.First(s => after.regions[s.region].name == "home");
+            var mine = after.sectors.First(s => s.region == work);
+            Assert.IsFalse(World.CanMoveRegion(after, work, home.origin - mine.origin));
+            Assert.IsFalse(World.CanMoveRegion(after, work, home.origin - mine.origin + new Vector2Int(Beside - 1, 0)));
+            Assert.IsTrue(World.CanMoveRegion(after, work, Vector2Int.zero));
+        }
+
+        [Test]
+        public void TheOwnerMovesASectorToAnotherPlaceOfItsRegionsGrid()
+        {
+            var plots = new Plots();
+            var before = World.Build(Of(Three), plots);
+            var e = Sector(before, "home/e");
+            var first = Sector(before, "home/a");
+            // three places behind the region's first sector: free, and far from every other region
+            var to = first.cell + new Vector2Int(0, -3);
+            Assert.IsTrue(World.CanMoveSector(before, e, to));
+            plots.MoveSector(e.plot, to);
+            var after = World.Build(Of(Three), plots);
+            Assert.AreEqual(first.origin + Iso.PlotOrigin(new Vector2Int(0, -3)), Sector(after, "home/e").origin);
+            foreach (var s in before.sectors.Where(s => s != e)) Assert.AreEqual(s.origin, Sector(after, s.repoRoot.Substring(1)).origin, s.repoRoot);
+            // a new repo is not put on top of it; it takes the place that was left
+            var grown = World.Build(Of(Three.Concat(new[] { "home/f" }).ToArray()), plots);
+            Assert.AreEqual(e.origin, Sector(grown, "home/f").origin);
+            Assert.AreEqual(Sector(after, "home/e").origin, Sector(grown, "home/e").origin);
+
+            // not onto another sector, nor nearer to another region than the gap
+            Assert.IsFalse(World.CanMoveSector(after, Sector(after, "home/e"), first.cell));
+            var firm = after.sectors.First(s => after.regions[s.region].name == "firm");
+            Assert.IsFalse(World.CanMoveSector(after, Sector(after, "home/e"), first.cell + new Vector2Int(Mathf.RoundToInt((firm.origin.x - first.origin.x) / (float)Iso.Pitch), Mathf.RoundToInt((firm.origin.y - first.origin.y) / (float)Iso.Pitch))));
+            Assert.IsTrue(World.CanMoveSector(after, Sector(after, "home/e"), Sector(after, "home/e").cell), "where it stands");
         }
 
         [Test]
@@ -155,45 +229,19 @@ namespace TheGrid.Core.Tests
             Assert.Greater(Enumerable.Range(0, 8).Select(p => string.Join(",", buildings.Select(Layout.For(p, Plots.Cell(p), 1).Light))).Distinct().Count(), 3);
         }
 
-        // Every tile a road between two regions lies on: straight from one sector's lane to the other's, two tiles wide,
-        // where a link would leave.
+        // Every tile of every road on the map.
         static HashSet<Vector2Int> RoadTiles(WorldModel w)
         {
             var tiles = new HashSet<Vector2Int>();
-            foreach (var (from, to) in Roads.Between(w))
-            {
-                Vector2Int a = from, b = to;
-                Assert.IsTrue((from.y == to.y && from.x < to.x) || (from.x == to.x && from.y < to.y), "a road runs straight, from the nearer sector: " + from + " to " + to);
-                for (int k = 0; k < 2; k++)
-                    if (from.y == to.y) for (int c = a.x + Iso.PlotTiles + Iso.LaneTiles; c < b.x - Iso.LaneTiles; c++) tiles.Add(new Vector2Int(c, a.y + Iso.Crossing + k));
-                    else for (int r = a.y + Iso.PlotTiles + Iso.LaneTiles; r < b.y - Iso.LaneTiles; r++) tiles.Add(new Vector2Int(a.x + Iso.Crossing + k, r));
-            }
+            foreach (var (from, to) in Roads.All(w)) tiles.UnionWith(Iso.RoadTiles(from, to));
             return tiles;
         }
 
-        [Test]
-        public void ARoadCrossesTheOpenGroundBetweenRegionsThatStandSideBySide()
+        static void AssertEverySectorIsReachedByRoad(WorldModel w)
         {
-            var w = World.Build(Of(Three), new Plots());
-            var roads = Roads.Between(w);
-            Assert.AreEqual(2, roads.Count);   // home to firm, firm to work: the regions stand on a spiral of their own
-            var cells = new HashSet<Vector2Int>(w.sectors.Select(s => s.cell));
-            foreach (var (from, to) in roads)
-            {
-                Assert.AreNotEqual(Sector(w, from).region, Sector(w, to).region);
-                var step = from.y == to.y ? Vector2Int.right : Vector2Int.up;
-                for (var c = from + step * Iso.Pitch; c != to; c += step * Iso.Pitch) Assert.IsFalse(w.sectors.Any(s => s.origin == c), "a road runs through the sector at " + c);
-            }
-        }
-
-        static WorldSector Sector(WorldModel w, Vector2Int origin) => w.sectors.Single(s => s.origin == origin);
-
-        [Test]
-        public void ACourierBetweenAnyTwoSectorsKeepsToLanesLinksAndRoads()
-        {
-            var w = World.Build(Of(Three), new Plots());
-            var cells = new HashSet<Vector2Int>(w.sectors.Select(s => s.cell));
             var roads = RoadTiles(w);
+            foreach (var t in roads)
+                foreach (var s in w.sectors) Assert.IsFalse(Iso.Within(s.origin, t.x, t.y), "a road runs through " + s.repoRoot + " at " + t);
             foreach (var a in w.sectors)
                 foreach (var b in w.sectors)
                 {
@@ -202,11 +250,9 @@ namespace TheGrid.Core.Tests
                     Assert.IsNotNull(hops, "no way from " + a.repoRoot + " to " + b.repoRoot);
                     Assert.AreEqual(a.origin, hops[0]);
                     Assert.AreEqual(b.origin, hops[hops.Count - 1]);
-                    Assert.IsTrue(hops.All(h => w.sectors.Any(s => s.origin == h)), "a hop where no sector stands");
                     var route = Iso.Route(hops);
-                    Vector2Int oa = Iso.PlotOrigin(a.cell), ob = Iso.PlotOrigin(b.cell);
-                    Assert.AreEqual(new Vector2(oa.x + Iso.Crossing, oa.y + Iso.PlotTiles), route[0]);
-                    Assert.AreEqual(new Vector2(ob.x + Iso.Crossing, ob.y + Iso.PlotTiles), route[route.Count - 1]);
+                    Assert.AreEqual(new Vector2(a.origin.x + Iso.Crossing, a.origin.y + Iso.PlotTiles), route[0]);
+                    Assert.AreEqual(new Vector2(b.origin.x + Iso.Crossing, b.origin.y + Iso.PlotTiles), route[route.Count - 1]);
                     for (int i = 1; i < route.Count; i++)
                     {
                         Vector2 p = route[i - 1], q = route[i];
@@ -215,26 +261,48 @@ namespace TheGrid.Core.Tests
                         for (int k = 0; k <= steps; k++)
                         {
                             int col = (int)(p.x + Math.Sign(q.x - p.x) * k), row = (int)(p.y + Math.Sign(q.y - p.y) * k);
-                            var cell = new Vector2Int(Mathf.FloorToInt((col + Iso.LaneTiles) / (float)Iso.Pitch), Mathf.FloorToInt((row + Iso.LaneTiles) / (float)Iso.Pitch));
-                            bool lane = cells.Contains(cell) && Iso.OnLane(Iso.PlotOrigin(cell), col, row);
-                            // a link is laid only between two sectors that stand side by side
-                            bool link = cells.Contains(cell) && Iso.OnLink(col, row) && Linked(cells, cell, col, row);
-                            Assert.IsTrue(lane || link || roads.Contains(new Vector2Int(col, row)), a.repoRoot + " to " + b.repoRoot + ": tile " + col + ", " + row + " is no lane, link or road");
+                            Assert.IsTrue(roads.Contains(new Vector2Int(col, row)) || w.sectors.Any(s => Iso.OnLane(s.origin, col, row)), a.repoRoot + " to " + b.repoRoot + ": tile " + col + ", " + row + " is no lane, link or road");
                         }
                     }
                 }
         }
 
-        // True for a link tile in `cell`'s square of the map when the sector it leads to is there.
-        static bool Linked(HashSet<Vector2Int> cells, Vector2Int cell, int col, int row)
+        [Test]
+        public void EverySectorIsReachedByLanesLinksAndRoads()
         {
-            var o = Iso.PlotOrigin(cell);
-            bool beside = col - o.x >= Iso.PlotTiles + Iso.LaneTiles;   // in the open ground to the right; otherwise in front
-            return cells.Contains(cell + (beside ? Vector2Int.right : Vector2Int.up));
+            var w = World.Build(Of(Three), new Plots());
+            var all = Roads.All(w);
+            // two sectors of one region that stand side by side are joined by a link
+            foreach (var a in w.sectors)
+                foreach (var b in w.sectors)
+                    if (a.region == b.region && (b.cell - a.cell == Vector2Int.right || b.cell - a.cell == Vector2Int.up))
+                        CollectionAssert.Contains(all, (a.origin, b.origin));
+            // and there are no more roads than it takes to join everything up
+            Assert.LessOrEqual(all.Count(r => Sector(w, r.from).region != Sector(w, r.to).region), w.regions.Count - 1);
+            foreach (var (from, to) in all)
+            {
+                var d = to - from;
+                Assert.IsTrue(Mathf.Abs(d.x) >= Mathf.Abs(d.y) ? d.x > 0 : d.y > 0, "a road is told from the sector to the left or behind: " + from + " to " + to);
+            }
+            AssertEverySectorIsReachedByRoad(w);
         }
 
         [Test]
-        public void WhereNoRoadJoinsTwoSectorsThereIsNoWay()
+        public void AfterTheOwnerMovesThingsEverySectorIsStillReachedByRoad()
+        {
+            var plots = new Plots();
+            var w = World.Build(Of(Three), plots);
+            plots.MoveRegion("work", new Vector2Int(-200, 131));
+            plots.MoveRegion("firm", new Vector2Int(107, -245));
+            var e = Sector(w, "home/e");
+            plots.MoveSector(e.plot, Sector(w, "home/a").cell + new Vector2Int(0, -3));   // off on its own, no neighbour beside it
+            w = World.Build(Of(Three), plots);
+            AssertRegionsStandApart(w);
+            AssertEverySectorIsReachedByRoad(w);
+        }
+
+        [Test]
+        public void WhereNoSectorStandsThereIsNoWay()
         {
             var w = World.Build(Of("home/a"), new Plots());
             Assert.IsNull(Roads.Hops(w, Vector2Int.zero, new Vector2Int(95, 95)));

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
@@ -127,42 +128,32 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(0, new Deliveries(Opened).New(pile, new WorldModel()).Count);
         }
 
-        [Test]
-        public void ARouteWithinOneSectorIsEmpty() => Assert.AreEqual(0, Iso.Route(new Vector2Int(3, -2), new Vector2Int(3, -2)).Count);
-
-        static void Along(Vector2 a, Vector2 b, Action<int, int> tile)
-        {
-            Assert.IsTrue(a.x == b.x || a.y == b.y, "a leg runs along columns or along rows, never both: " + a + " to " + b);
-            int steps = (int)Mathf.Max(Mathf.Abs(b.x - a.x), Mathf.Abs(b.y - a.y));
-            for (int i = 0; i <= steps; i++) tile((int)(a.x + Math.Sign(b.x - a.x) * i), (int)(a.y + Math.Sign(b.y - a.y) * i));
-        }
-
-        [TestCase(0, 0, 2, 1)]
-        [TestCase(2, 1, 0, 0)]
-        [TestCase(0, 0, 1, 0)]     // side by side: one straight run
-        [TestCase(0, 0, 0, 1)]
-        [TestCase(-1, 2, 3, -2)]
-        public void ARouteRunsAlongLanesFromOneSectorsCrossingToTheOthers(int ax, int ay, int bx, int by)
+        [TestCase(0, 0, 19, 0)]      // side by side: one straight run over the link
+        [TestCase(19, 0, 0, 0)]
+        [TestCase(0, 0, 0, 19)]
+        [TestCase(0, 19, 0, 0)]
+        [TestCase(0, 0, 43, 0)]      // across the open ground between two regions
+        [TestCase(-30, 50, 9, 20)]   // and where the two do not face each other squarely
+        public void ARouteRunsAlongLanesAndARoadFromOneSectorsCrossingToTheOthers(int ax, int ay, int bx, int by)
         {
             Vector2Int a = new Vector2Int(ax, ay), b = new Vector2Int(bx, by);
-            var route = Iso.Route(a, b);
+            var route = Iso.Route(new[] { a, b });
             Assert.GreaterOrEqual(route.Count, 2);
             // at a sector's crossing: on the lane along its front, where no building of its own stands in the way
-            Vector2Int oa = Iso.PlotOrigin(a), ob = Iso.PlotOrigin(b);
-            Assert.AreEqual(new Vector2(oa.x + Iso.Crossing, oa.y + Iso.PlotTiles), route[0]);
-            Assert.AreEqual(new Vector2(ob.x + Iso.Crossing, ob.y + Iso.PlotTiles), route[route.Count - 1]);
+            Assert.AreEqual(new Vector2(a.x + Iso.Crossing, a.y + Iso.PlotTiles), route[0]);
+            Assert.AreEqual(new Vector2(b.x + Iso.Crossing, b.y + Iso.PlotTiles), route[route.Count - 1]);
+            var road = new HashSet<Vector2Int>(Iso.RoadTiles(a, b));
             for (int i = 1; i < route.Count; i++)
             {
-                Assert.AreNotEqual(route[i - 1], route[i], "a leg of no length");
-                Along(route[i - 1], route[i], (col, row) =>
+                Vector2 p = route[i - 1], q = route[i];
+                Assert.AreNotEqual(p, q, "a leg of no length");
+                Assert.IsTrue(p.x == q.x || p.y == q.y, "a leg runs along columns or along rows, never both: " + p + " to " + q);
+                int steps = (int)Mathf.Max(Mathf.Abs(q.x - p.x), Mathf.Abs(q.y - p.y));
+                for (int k = 0; k <= steps; k++)
                 {
-                    // on the lane round some sector, or on a link between two
-                    bool road = Iso.OnLink(col, row);
-                    for (int cx = Mathf.FloorToInt((float)col / Iso.Pitch) - 1; cx <= Mathf.FloorToInt((float)col / Iso.Pitch) + 1; cx++)
-                        for (int cy = Mathf.FloorToInt((float)row / Iso.Pitch) - 1; cy <= Mathf.FloorToInt((float)row / Iso.Pitch) + 1; cy++)
-                            road |= Iso.OnLane(Iso.PlotOrigin(new Vector2Int(cx, cy)), col, row);
-                    Assert.IsTrue(road, "tile " + col + ", " + row + " is neither lane nor link");
-                });
+                    int col = (int)(p.x + Math.Sign(q.x - p.x) * k), row = (int)(p.y + Math.Sign(q.y - p.y) * k);
+                    Assert.IsTrue(Iso.OnLane(a, col, row) || Iso.OnLane(b, col, row) || road.Contains(new Vector2Int(col, row)), "tile " + col + ", " + row + " is neither lane nor road");
+                }
             }
         }
     }

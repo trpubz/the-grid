@@ -136,8 +136,10 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(snap.generatedAt, w.generatedAt);
             CollectionAssert.AreEqual(new[] { "alpha", "beta", "No project" }, w.sectors.Select(c => c.name).ToArray());
             CollectionAssert.AreEqual(new[] { 0, 1, 2 }, w.sectors.Select(c => c.plot).ToArray());
-            // alpha and the sessions with no repo are Personal; beta is Work, so it stands apart, in the second region
-            CollectionAssert.AreEqual(new[] { new Vector2Int(0, 0), new Vector2Int(3, 0), new Vector2Int(1, 0) }, w.sectors.Select(c => c.cell).ToArray());
+            // alpha and the sessions with no repo are Personal; beta is Work, so it stands apart, in a region of its own to the
+            // right of alpha, eight tiles from its lane. The third sector takes the nearest place of Personal's grid that keeps
+            // that distance from beta: in front of alpha.
+            CollectionAssert.AreEqual(new[] { new Vector2Int(0, 0), new Vector2Int(24, 0), new Vector2Int(0, 19) }, w.sectors.Select(c => c.origin).ToArray());
             CollectionAssert.AreEqual(new[] { "Personal", "Work" }, w.regions.Select(r => r.name).ToArray());
             Assert.AreEqual(snap.agents.Count, w.sectors.Sum(c => c.bots.Count));
             foreach (var a in snap.agents)
