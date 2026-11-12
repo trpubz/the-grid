@@ -71,14 +71,15 @@ namespace TheGrid.Core
         readonly Template template;
         readonly int[] order;      // which tall position the server tower, the review hall and the works stand in
         readonly int swap;         // 0: the assembly bay in the first low position and the workshop in the second; 1: the other way round
-        readonly int plot;
+        readonly int plot, look;
 
         public int Arrangement { get; }
 
-        Layout(int arrangement, int plot)
+        Layout(int arrangement, int plot, int look)
         {
             Arrangement = arrangement;
             this.plot = plot;
+            this.look = look;
             template = Templates[arrangement % 2];
             order = Orders[arrangement / 2 % 6];
             swap = arrangement / 12 % 2;
@@ -87,21 +88,20 @@ namespace TheGrid.Core
         static Layout[] Make()
         {
             var all = new Layout[Count];
-            for (int a = 0; a < Count; a++) all[a] = new Layout(a, 0);
+            for (int a = 0; a < Count; a++) all[a] = new Layout(a, 0, 0);
             return all;
         }
 
         // One of the arrangements, by number.
         public static Layout Of(int arrangement) => All[((arrangement % Count) + Count) % Count];
 
-        // The arrangement and lights of the sector on a plot. The arrangement goes by where the plot is on the map: five
-        // steps for each column and seven for each row, so a sector differs from all eight round it however large the map,
-        // and the two templates alternate like the squares of a chessboard.
-        public static Layout For(int plot)
-        {
-            var cell = Plots.Cell(plot);
-            return new Layout(((cell.x * 5 + cell.y * 7) % Count + Count) % Count, plot);
-        }
+        // The arrangement and lights of the sector on a plot, standing on a cell of the map in a region of that look. The
+        // arrangement goes by where the sector is: five steps for each column and seven for each row, so a sector differs
+        // from all eight round it however large the map, and the two templates alternate like the squares of a chessboard.
+        public static Layout For(int plot, Vector2Int cell, int look) => new Layout(((cell.x * 5 + cell.y * 7) % Count + Count) % Count, plot, look);
+
+        // The same for a map of one region in the first look, where a plot's cell is its place on the one spiral.
+        public static Layout For(int plot) => For(plot, Plots.Cell(plot), 0);
 
         static int Tall(Structure s) => s == Structure.ServerTower ? 0 : s == Structure.ReviewHall ? 1 : 2;
 
@@ -137,10 +137,18 @@ namespace TheGrid.Core
             }
         }
 
-        // Which of Lights' families a building carries here; -1 for the fountain, which is violet everywhere. Three steps
-        // for each plot and two for each kind of building: neighbours in the plot order never match, and neither do the
-        // buildings of one sector.
-        public int Light(Structure s) => s == Structure.Fountain ? -1 : (plot * 3 + (int)s * 2) % Lights.Count;
+        // The look of the region this sector stands in.
+        public int Look => look;
+
+        // Which of Lights' families a building carries here; -1 for the fountain, which is violet everywhere. Most carry
+        // the primary light of the sector's region; one or two carry each of its accents. Three steps for each plot and
+        // two for each kind of building, so which buildings carry an accent changes from sector to sector.
+        public int Light(Structure s)
+        {
+            if (s == Structure.Fountain) return -1;
+            int v = (plot * 3 + (int)s * 2) % 5;
+            return v < 3 ? Lights.Primary(look) : Lights.Accent(look, v - 3);
+        }
 
         // How high a structure's body stands above its ground, in art pixels: what can hide a bot behind it. Masts, stacks
         // and the fountain's column are too thin to hide one and are left out. ArtTests holds these against the pictures.

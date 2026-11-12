@@ -35,7 +35,8 @@ namespace TheGrid
         public float Add(Delivery d, float now)
         {
             var trip = new Trip { d = d, started = now };
-            foreach (var corner in Iso.Route(d.fromCell, d.toCell)) trip.route.Add(Iso.Point(corner.x, corner.y));
+            // Along the roads, through the sectors the delivery says. Within one sector there is no way to ride: only the pulse.
+            foreach (var corner in Iso.Route(d.way)) trip.route.Add(Iso.Point(corner.x, corner.y));
             for (int i = 1; i < trip.route.Count; i++) trip.length += (trip.route[i] - trip.route[i - 1]).magnitude;
             if (trip.route.Count > 1) trip.rides = Mathf.Max(LeastRide, trip.length / (TilesPerSecond * Iso.TileStep));
             trips.Add(trip);

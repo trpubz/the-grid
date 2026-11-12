@@ -13,7 +13,7 @@ namespace TheGrid
     {
         static readonly float WalkPixelsPerSecond = 4f * Iso.TileStep;   // four tiles a second
         const float StepSeconds = .2f;
-        const int OutlandRing = 3;   // plot-sized cells of city kept beyond the sectors, enough to reach the edge of the overview
+        const int OutlandRing = 3;   // plot-sized cells of city kept beyond the sectors of a small map; more for a wide one
         const int MaxSmall = 3;      // subagents drawn beside a bot; its name carries the full count
 
         // In the order of Structure.
@@ -44,17 +44,21 @@ namespace TheGrid
         }
 
         readonly Transform root;
-        readonly Tilemap ground, lines;
+        Transform built;   // the buildings of every sector: all of them go when the map is laid out again
+        readonly Tilemap ground, lines, roadLinesA, roadLinesB;
         static readonly Dictionary<string, Sprite> plain = new Dictionary<string, Sprite>();   // pictures as drawn, by name
         readonly Dictionary<string, Sprite> sprites = new Dictionary<string, Sprite>();          // pictures in an account's colours
         readonly Dictionary<string, Tile> tiles = new Dictionary<string, Tile>();
         readonly Dictionary<string, Bot> bots = new Dictionary<string, Bot>();
-        readonly HashSet<int> painted = new HashSet<int>();
-        readonly HashSet<(Vector2Int, Vector2Int)> linked = new HashSet<(Vector2Int, Vector2Int)>();
+        // What has been laid: each sector by its plot, with where it stood and how it was arranged and lit; the roads,
+        // links among them; and the squares of the map whose open ground is down.
+        readonly Dictionary<int, (Vector2Int origin, int arrangement, int look)> painted = new Dictionary<int, (Vector2Int, int, int)>();
+        readonly HashSet<(Vector2Int, Vector2Int)> roads = new HashSet<(Vector2Int, Vector2Int)>();
+        readonly HashSet<Vector2Int> opened = new HashSet<Vector2Int>();
         readonly Dictionary<Vector2Int, GameObject> outlands = new Dictionary<Vector2Int, GameObject>();
         readonly Dictionary<string, float> signals = new Dictionary<string, float>();   // bot key: signalling until this time
         readonly float[] tops = new float[ArtNames.Structures.Length];
-        int outlandsFor = -1;
+        RectInt outlandsFor;   // the tiles the sectors covered when the land beyond was last laid
 
         // True while any bot is walking: the window draws faster while it lasts.
         public bool Walking { get; private set; }
@@ -70,7 +74,19 @@ namespace TheGrid
             grid.transform.localPosition = new Vector3(0, -Iso.TileH / 2, 0);   // so a cell's centre is Iso.TileCentre
             ground = Layer(grid, "Tiles", -10);
             lines = Layer(grid, "Light", -9);   // lines of light lie over the ground, never in it
+            // A road's lines have layers of their own, one for each way a line can run: where a road meets a lane, or turns,
+            // one tile needs a line of the lane's and one or two of the road's.
+            roadLinesA = Layer(grid, "Road light a", -9);
+            roadLinesB = Layer(grid, "Road light b", -9);
             for (int i = 0; i < tops.Length; i++) tops[i] = Top(Art(ArtNames.Structures[i]));
+            built = Holder("Buildings");
+        }
+
+        Transform Holder(string name)
+        {
+            var t = new GameObject(name).transform;
+            t.SetParent(root, false);
+            return t;
         }
 
         static Tilemap Layer(Grid grid, string name, int order)
@@ -106,18 +122,21 @@ namespace TheGrid
             return plain[name] = s;
         }
 
-        Tile T(string name)
+        // A ground tile or a line of light, in one of the lights: as drawn for the first.
+        Tile T(string name, int light = 0)
         {
-            if (tiles.TryGetValue(name, out var t)) return t;
+            string key = light <= 0 ? name : name + "@" + light;
+            if (tiles.TryGetValue(key, out var t)) return t;
             t = ScriptableObject.CreateInstance<Tile>();
-            t.sprite = Art(name);
-            return tiles[name] = t;
+            t.sprite = InLight(name, light);
+            return tiles[key] = t;
         }
 
         // A bot's picture with its light turned to the account's colourway. The suit stays as drawn: only the light is the account's.
         Sprite Lit(string name, int account) => Recoloured(name + "#" + account, name, Markers, Colourways[account % Colourways.Length]);
 
-        // A building's picture in one of the lights: its lines, its windows and the glow at its foot. As drawn for the first.
+        // A picture in one of the lights: a building's lines, its windows and the glow at its foot; a line on the ground
+        // and its glow; a lane's chevrons. As drawn for the first.
         Sprite InLight(string name, int light)
         {
             if (light <= 0) return Art(name);
@@ -161,25 +180,42 @@ namespace TheGrid
         // Lays out whatever changed in the model. Returns true: the picture has to be drawn again.
         public bool Sync(WorldModel model)
         {
-            var cells = new List<Vector2Int>();
+            // A sector that stands somewhere else than it did, or is lit otherwise, or a road that is no longer one of the
+            // map's roads: the owner moved something or picked another light, a repo changed workspace, or a new sector
+            // made another road the shorter. That is rare, and then the whole map is laid again rather than mended.
+            var all = Roads.All(model);
+            bool again = false;
+            foreach (var sector in model.sectors)
+                again |= painted.TryGetValue(sector.plot, out var was) && was != (sector.origin, sector.layout.Arrangement, sector.layout.Look);
+            foreach (var road in roads) again |= !all.Contains(road);
+            if (again) Clear();
+
+            // The ground first, then what stands on it: open ground laid later would cover a sector.
+            var origins = new List<Vector2Int>();
+            var at = new Dictionary<Vector2Int, WorldSector>();
             foreach (var sector in model.sectors)
             {
-                cells.Add(sector.cell);
-                if (painted.Add(sector.plot)) Paint(sector);   // a new sector is drawn once; the others are not touched
+                origins.Add(sector.origin);
+                at[sector.origin] = sector;
             }
-            // A link joins two sectors that stand side by side. It is laid when the second of them turns up.
-            var there = new HashSet<Vector2Int>(cells);
-            foreach (var cell in cells)
-                foreach (var toward in new[] { Vector2Int.right, Vector2Int.up })
-                    if (there.Contains(cell + toward) && linked.Add((cell, toward))) Link(cell, toward == Vector2Int.right);
-            LayOutlands(cells);
+            LayOutlands(origins);
+            foreach (var sector in model.sectors)
+            {
+                if (painted.ContainsKey(sector.plot)) continue;   // a new sector is drawn once; the others are not touched
+                painted[sector.plot] = (sector.origin, sector.layout.Arrangement, sector.layout.Look);
+                Paint(sector);
+            }
+            // A road within a region, a link above all, is in the region's light. A road between two regions is in no
+            // region's: the light the ground is drawn in.
+            foreach (var road in all)
+                if (roads.Add(road)) Road(road.from, road.to, at[road.from].region == at[road.to].region ? Lights.Primary(at[road.from].layout.Look) : 0);
 
             var seen = new HashSet<string>();
             foreach (var sector in model.sectors)
                 foreach (var b in sector.bots)
                 {
                     seen.Add(b.key);
-                    PutBot(b, Iso.BotSpot(sector.cell, sector.layout, b.place, b.slot));
+                    PutBot(b, Iso.BotSpot(sector.origin, sector.layout, b.place, b.slot));
                 }
             var gone = new List<string>();
             foreach (var kv in bots) if (!seen.Contains(kv.Key)) gone.Add(kv.Key);
@@ -189,6 +225,25 @@ namespace TheGrid
                 bots.Remove(key);
             }
             return true;
+        }
+
+        // Takes everything off the map, bots too: they are put back where they now stand, not walked there.
+        void Clear()
+        {
+            ground.ClearAllTiles();
+            lines.ClearAllTiles();
+            roadLinesA.ClearAllTiles();
+            roadLinesB.ClearAllTiles();
+            Kill(built.gameObject);
+            built = Holder("Buildings");
+            foreach (var blocks in outlands.Values) Kill(blocks);
+            foreach (var b in bots.Values) Kill(b.at.gameObject);
+            outlands.Clear();
+            bots.Clear();
+            painted.Clear();
+            roads.Clear();
+            opened.Clear();
+            outlandsFor = default;
         }
 
         // Walks. Returns true when the picture has to be drawn again.
@@ -259,11 +314,14 @@ namespace TheGrid
         // Where a tile of the map is in Unity's isometric grid, whose axes run the other way.
         static Vector3Int At(int col, int row) => new Vector3Int(-row, -col, 0);
 
-        // The square of the map that is one sector's: its plot, its lane, and the open ground out to the next square.
+        // A sector's plot and lane run from First to Ring. The map's open ground is laid in squares of a grid of its own,
+        // a sector's pitch across, each from First to Edge of its place on that grid; sectors stand anywhere on it.
         const int First = -Iso.LaneTiles, Ring = Iso.PlotTiles + Iso.LaneTiles, Edge = Ring + Iso.GapTiles;
 
-        void OpenGround(Vector2Int origin)
+        void OpenGround(Vector2Int cell)
         {
+            if (!opened.Add(cell)) return;   // laid once: sectors and roads have been laid over it since
+            var origin = Iso.PlotOrigin(cell);
             for (int col = First; col < Edge; col++)
                 for (int row = First; row < Edge; row++)
                     ground.SetTile(At(origin.x + col, origin.y + row), T(ArtNames.Void));
@@ -271,46 +329,48 @@ namespace TheGrid
 
         void Paint(WorldSector sector)
         {
-            var o = Iso.PlotOrigin(sector.cell);
-            OpenGround(o);
+            var o = sector.origin;
+            int light = Lights.Primary(sector.layout.Look);   // the lane's chevrons and every line on the ground are the region's primary light
             // The sector's paving, and its own lane round it. Beyond the lane the ground stays open: a sector stands apart.
             for (int col = First; col < Ring; col++)
                 for (int row = First; row < Ring; row++)
-                    ground.SetTile(At(o.x + col, o.y + row), T(Iso.OnLane(sector.cell, o.x + col, o.y + row) ? Lane(col, row) : Paving(col, row)));
+                    ground.SetTile(At(o.x + col, o.y + row), Iso.OnLane(o, o.x + col, o.y + row) ? T(Lane(col, row), light) : T(Paving(col, row)));
 
             // A line of light down each edge of the lane. line-a runs along a tile's far edge one way, line-b the other; the
             // lane's outer edge is the far edge of the tile beyond it.
             for (int i = First; i < Ring; i++)
             {
                 bool inner = i >= 0 && i < Iso.PlotTiles;
-                lines.SetTile(At(o.x + i, o.y + First), T(ArtNames.LineA));
-                lines.SetTile(At(o.x + i, o.y + Ring), T(ArtNames.LineA));
-                lines.SetTile(At(o.x + First - 1, o.y + i), T(ArtNames.LineB));
-                lines.SetTile(At(o.x + Ring - 1, o.y + i), T(ArtNames.LineB));
+                lines.SetTile(At(o.x + i, o.y + First), T(ArtNames.LineA, light));
+                lines.SetTile(At(o.x + i, o.y + Ring), T(ArtNames.LineA, light));
+                lines.SetTile(At(o.x + First - 1, o.y + i), T(ArtNames.LineB, light));
+                lines.SetTile(At(o.x + Ring - 1, o.y + i), T(ArtNames.LineB, light));
                 if (!inner) continue;
-                lines.SetTile(At(o.x + i, o.y), T(ArtNames.LineA));
-                lines.SetTile(At(o.x + i, o.y + Iso.PlotTiles), T(ArtNames.LineA));
-                lines.SetTile(At(o.x - 1, o.y + i), T(ArtNames.LineB));
-                lines.SetTile(At(o.x + Iso.PlotTiles - 1, o.y + i), T(ArtNames.LineB));
+                lines.SetTile(At(o.x + i, o.y), T(ArtNames.LineA, light));
+                lines.SetTile(At(o.x + i, o.y + Iso.PlotTiles), T(ArtNames.LineA, light));
+                lines.SetTile(At(o.x - 1, o.y + i), T(ArtNames.LineB, light));
+                lines.SetTile(At(o.x + Iso.PlotTiles - 1, o.y + i), T(ArtNames.LineB, light));
             }
 
             // Every sector has the same buildings; where each stands and how it is lit is the sector's own.
             foreach (Structure s in Enum.GetValues(typeof(Structure)))
-                NewSprite(ArtNames.Structures[(int)s], InLight(ArtNames.Structures[(int)s], sector.layout.Light(s)), root).transform.localPosition = Iso.StructureSpot(sector.cell, sector.layout, s);
+                NewSprite(ArtNames.Structures[(int)s], InLight(ArtNames.Structures[(int)s], sector.layout.Light(s)), built).transform.localPosition = Iso.StructureSpot(sector.origin, sector.layout, s);
         }
 
-        // The road across the open ground from one sector's lane to the next's: to the sector on its right, or to the one
-        // in front. Two tiles wide, a line of light down each side.
-        void Link(Vector2Int cell, bool right)
+        // The road across the open ground from one sector's lane to another's: lane tiles where Iso.RoadTiles says, and a
+        // line of light along every edge of it that is not the lane it runs into. line-a lies along the far edge of a tile's
+        // row, line-b along the near edge of its column.
+        void Road(Vector2Int from, Vector2Int to, int light)
         {
-            var o = Iso.PlotOrigin(cell);
-            for (int along = Ring; along < Edge; along++)
+            var tiles = new HashSet<Vector2Int>(Iso.RoadTiles(from, to));
+            bool Open(int col, int row) => tiles.Contains(new Vector2Int(col, row)) || Iso.OnLane(from, col, row) || Iso.OnLane(to, col, row);
+            foreach (var t in tiles)
             {
-                for (int across = Iso.Crossing; across <= Iso.Crossing + 1; across++)
-                    ground.SetTile(right ? At(o.x + along, o.y + across) : At(o.x + across, o.y + along), T(ArtNames.Lane));
-                foreach (int side in new[] { Iso.Crossing, Iso.Crossing + 2 })
-                    if (right) lines.SetTile(At(o.x + along, o.y + side), T(ArtNames.LineA));
-                    else lines.SetTile(At(o.x + side - 1, o.y + along), T(ArtNames.LineB));
+                ground.SetTile(At(t.x, t.y), T(ArtNames.Lane));
+                if (!Open(t.x, t.y - 1)) roadLinesA.SetTile(At(t.x, t.y), T(ArtNames.LineA, light));
+                if (!Open(t.x, t.y + 1)) roadLinesA.SetTile(At(t.x, t.y + 1), T(ArtNames.LineA, light));
+                if (!Open(t.x - 1, t.y)) roadLinesB.SetTile(At(t.x - 1, t.y), T(ArtNames.LineB, light));
+                if (!Open(t.x + 1, t.y)) roadLinesB.SetTile(At(t.x, t.y), T(ArtNames.LineB, light));
             }
         }
 
@@ -330,29 +390,38 @@ namespace TheGrid
             return (col == -1 || col == Iso.PlotTiles) && row % 4 == 1 ? ArtNames.ChevronB : ArtNames.Lane;
         }
 
-        // Beyond the sectors the city goes on: dark blocks on dark ground, out to the edge of the view. It is scenery: it says
-        // nothing about any agent, it never moves, and it is the same every time the app opens.
-        void LayOutlands(List<Vector2Int> cells)
+        // Open ground under the whole map and for some way round it, and beyond the sectors the city going on: dark blocks
+        // on dark ground, out to the edge of the view. It is scenery: it says nothing about any agent, it never moves, and
+        // it is the same every time the app opens. Blocks stand only clear of the rectangle the sectors cover: the open
+        // ground among the sectors has nothing on it, and that is the gap that sets one region apart from the next.
+        void LayOutlands(List<Vector2Int> origins)
         {
-            if (cells.Count == outlandsFor || cells.Count == 0) return;
-            outlandsFor = cells.Count;
-            var taken = new HashSet<Vector2Int>(cells);
+            if (origins.Count == 0) return;
             int x0 = int.MaxValue, x1 = int.MinValue, y0 = int.MaxValue, y1 = int.MinValue;
-            foreach (var c in cells)
+            foreach (var o in origins)
             {
-                x0 = Mathf.Min(x0, c.x); x1 = Mathf.Max(x1, c.x); y0 = Mathf.Min(y0, c.y); y1 = Mathf.Max(y1, c.y);
+                x0 = Mathf.Min(x0, o.x + First); x1 = Mathf.Max(x1, o.x + Ring); y0 = Mathf.Min(y0, o.y + First); y1 = Mathf.Max(y1, o.y + Ring);
             }
-            for (int x = x0 - OutlandRing; x <= x1 + OutlandRing; x++)
-                for (int y = y0 - OutlandRing; y <= y1 + OutlandRing; y++)
+            var covered = new RectInt(x0, y0, x1 - x0, y1 - y0);
+            if (covered.Equals(outlandsFor)) return;
+            outlandsFor = covered;
+            // The squares of the ground's own grid that the sectors reach into, and a ring more each way. The ring widens
+            // with the map: the sectors' rectangle is a diamond on screen, and the further out the view that shows all of
+            // it, the more land beyond its edges that view takes in.
+            int ring = OutlandRing + (covered.width + covered.height) / (4 * Iso.Pitch);
+            int cx0 = Mathf.FloorToInt((x0 - First) / (float)Iso.Pitch) - ring, cx1 = Mathf.FloorToInt((x1 - 1 - First) / (float)Iso.Pitch) + ring;
+            int cy0 = Mathf.FloorToInt((y0 - First) / (float)Iso.Pitch) - ring, cy1 = Mathf.FloorToInt((y1 - 1 - First) / (float)Iso.Pitch) + ring;
+            for (int x = cx0; x <= cx1; x++)
+                for (int y = cy0; y <= cy1; y++)
                 {
                     var cell = new Vector2Int(x, y);
-                    if (!taken.Contains(cell))
+                    OpenGround(cell);
+                    var o = Iso.PlotOrigin(cell);
+                    bool beyond = !covered.Overlaps(new RectInt(o.x + First, o.y + First, Iso.Pitch, Iso.Pitch));
+                    if (beyond && !outlands.ContainsKey(cell)) outlands[cell] = Blocks(cell);
+                    if (!beyond && outlands.TryGetValue(cell, out var old))
                     {
-                        if (!outlands.ContainsKey(cell)) outlands[cell] = Blocks(cell);
-                    }
-                    else if (outlands.TryGetValue(cell, out var old))
-                    {
-                        // A new repo was given this cell: its sector has already been painted over the ground, so only the blocks go.
+                        // The map grew over this square: its blocks go.
                         Kill(old);
                         outlands.Remove(cell);
                     }
@@ -364,7 +433,6 @@ namespace TheGrid
             var holder = new GameObject("City " + cell.x + " " + cell.y).transform;
             holder.SetParent(root, false);
             var o = Iso.PlotOrigin(cell);
-            OpenGround(o);
             var rng = new System.Random(cell.x * 73856093 ^ cell.y * 19349663);
             for (int i = 0; i < 7; i++)
             {

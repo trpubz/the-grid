@@ -22,6 +22,8 @@ namespace TheGrid.Core.Tests
             "#8791c4", "#e4ecff", "#ff7a1e", "#ffc27a", "#a8501a",   // what a white and an orange bot's light becomes
             "#a9c8ff", "#4d8dff", "#2a55b0", "#2f4a96", "#3a62c0", "#5b8be6",   // a building lit blue: line, dim line, window, glow far to near
             "#b6ffe6", "#3ef2b0", "#1a9c78", "#2f6f7a", "#3a9c8c", "#5cd6b0",   // and mint
+            "#ffd0e6", "#ff6fb0", "#b0447c", "#6a4690", "#9a5aa4", "#d07ab8",   // and rose
+            "#6a4660", "#96584e", "#c87840",                                    // the glow of an ember light; its lines are the orange bot's colours
         };
 
         // A bot's light is drawn in three marker colours, which the game swaps for its colourway.
@@ -124,7 +126,7 @@ namespace TheGrid.Core.Tests
         public void ThePaletteIsTheOneTheArtDirectionPlanLists()
         {
             var t = Load("palette").texture;
-            Assert.AreEqual(48, t.width);
+            Assert.AreEqual(57, t.width);
             Assert.AreEqual(1, t.height);
             var got = t.GetPixels32().Select(c => "#" + c.r.ToString("x2") + c.g.ToString("x2") + c.b.ToString("x2")).ToArray();
             CollectionAssert.AreEqual(Palette2, got);

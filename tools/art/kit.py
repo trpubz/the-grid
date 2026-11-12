@@ -42,10 +42,13 @@ PALETTE = {
     "white": "#ffffff",                                                      # a bot's light, as drawn: the game swaps it
     "w0": "#8791c4", "w1": "#e4ecff",                                        # what a white bot's dim light and light become
     "orange": "#ff7a1e", "orangew": "#ffc27a", "oranged": "#a8501a",         # an orange bot's light, highlight and dim light
-    # What the game turns a building's light into in other sectors: bright line, dimmer line, lit window, glow far to near.
+    # What the game turns a light into in other regions and on accent buildings: bright line, dimmer line, lit window,
+    # glow far to near. A white light is made of colours already above.
     # No picture is drawn in these; they are here so that the palette is the whole truth. See Core/Lights.cs.
     "bluew": "#a9c8ff", "blue": "#4d8dff", "blued": "#2a55b0", "bg0": "#2f4a96", "bg1": "#3a62c0", "bg2": "#5b8be6",
     "mintw": "#b6ffe6", "mint": "#3ef2b0", "mintd": "#1a9c78", "mg0": "#2f6f7a", "mg1": "#3a9c8c", "mg2": "#5cd6b0",
+    "rosew": "#ffd0e6", "rose": "#ff6fb0", "rosed": "#b0447c", "rg0": "#6a4690", "rg1": "#9a5aa4", "rg2": "#d07ab8",
+    "eg0": "#6a4660", "eg1": "#96584e", "eg2": "#c87840",                    # the glow of an ember light; its lines are the orange bot's colours
 }
 RAMP = ["k1", "g0", "g1", "g2", "g3", "g4", "g5", "c0", "c1", "c2"]         # graphite and concrete, dark to light
 PAVING = ["pv0", "pv1", "pv2"]

@@ -33,8 +33,12 @@ The Grid is a virtual city where each repository occupies a sector and each codi
 7. **A bot carries a ring of light on its back.** The bot that inspects holds that disc in its hand, and its back is bare.
 8. **A bot's light comes in blue, white and orange.** In the picture it is three marker colours (the light, its highlight, its dim partner), and the game swaps them. Orange is redder than the amber of a badge, so a badge is still the only amber thing on a bot.
 9. **Sectors stand apart.** Each has its own lane round it. Between one sector's lane and the next's lies open, dark ground that belongs to neither, crossed by one short link of road on each side. Seen from far out, every sector can be told from its neighbours at a glance.
-10. **Sectors differ.** Every sector has the same six buildings and the fountain. Where they stand differs from sector to sector, and so does the light each building carries: white, cyan, blue, mint or violet. The fountain is violet everywhere. A sector's arrangement and lights follow from its place on the map, so it looks the same every time, and unlike every sector round it.
+10. **Sectors differ.** Every sector has the same six buildings and the fountain. Where they stand differs from sector to sector, and so does which of its buildings carry an accent light (rule 12). The fountain is violet everywhere. A sector's arrangement follows from its place on the map, so it looks the same every time, and unlike every sector round it.
 11. **In every arrangement no bot is hidden.** Tall buildings stand along the back; the two low ones stand far enough forward that a bot at a back door is seen over their roofs; bots that need the owner stand in the open at the front, seen whole. `LayoutTests` proves it for every arrangement and every neighbour.
+
+12. **A region has a light of its own.** The sectors of one workspace stand together as a region. Each region has a look: a primary light, carried by its lanes, the lines on its ground and at least half the buildings of every sector, and two accent lights, each carried by one or two buildings of a sector. All the lights on one building are still one colour. The looks are cyan, white, rose, mint, violet, blue and ember, in the order workspaces take them; the owner can give a region another. No look is amber or red: amber means a bot needs the owner, red a fault. `Lights.cs` has the colours.
+13. **Only a sector gives off its region's colour.** Open ground, the dashes on it, the dark blocks beyond the map and the roads between regions look the same everywhere, in the light the ground is drawn in. Between the lanes of two regions lie at least eight tiles of open ground with nothing standing on it; between two sectors of one region, three.
+14. **The owner arranges the map.** A region stands where it was put and a sector where it was put in its region; the app only chooses a place for what is new, and never moves what is there. Roads are worked out from where things stand, so they follow.
 
 ## What stays from before
 
@@ -44,4 +48,4 @@ The Grid is a virtual city where each repository occupies a sector and each codi
 
 ## Words
 
-In code and in the window: a repo's area is a **sector**, a session's figure is a **bot**, the road round a sector is the **lane**, the vehicle is a **bike**.
+In code and in the window: a repo's area is a **sector**, a workspace's group of sectors is a **region**, a session's figure is a **bot**, the road round a sector is the **lane**, the vehicle is a **bike**.

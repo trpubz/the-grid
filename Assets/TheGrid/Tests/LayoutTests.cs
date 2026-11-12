@@ -68,27 +68,6 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
-        public void TheSameKindOfBuildingIsLitDifferentlyFromSectorToSector()
-        {
-            Assert.GreaterOrEqual(Lights.Count, 4);
-            foreach (var s in Structures)
-            {
-                if (s == Structure.Fountain)
-                {
-                    Assert.AreEqual(-1, Layout.For(3).Light(s), "the fountain keeps its own violet everywhere");
-                    continue;
-                }
-                var first8 = Enumerable.Range(0, 8).Select(p => Layout.For(p).Light(s)).ToList();
-                Assert.IsTrue(first8.All(x => x >= 0 && x < Lights.Count), s.ToString());
-                Assert.GreaterOrEqual(first8.Distinct().Count(), 3, s + " across eight sectors");
-                for (int p = 0; p < 40; p++) Assert.AreNotEqual(Layout.For(p).Light(s), Layout.For(p + 1).Light(s), s + " in plots " + p + " and the next");
-            }
-            // within one sector the buildings are not all one colour either
-            for (int p = 0; p < 8; p++)
-                Assert.GreaterOrEqual(Structures.Where(s => s != Structure.Fountain).Select(s => Layout.For(p).Light(s)).Distinct().Count(), 3, "plot " + p);
-        }
-
-        [Test]
         public void AStructureStandsAtTheCentreOfItsFootprint()
         {
             var cell = new Vector2Int(1, -2);
@@ -99,7 +78,7 @@ namespace TheGrid.Core.Tests
                 foreach (var s in Structures)
                 {
                     var f = l.Footprint(s);
-                    Assert.AreEqual(Iso.Point(o.x + f.x + (f.width - 1) / 2f, o.y + f.y + (f.height - 1) / 2f), Iso.StructureSpot(cell, l, s));
+                    Assert.AreEqual(Iso.Point(o.x + f.x + (f.width - 1) / 2f, o.y + f.y + (f.height - 1) / 2f), Iso.StructureSpot(Iso.PlotOrigin(cell), l, s));
                 }
             }
         }
@@ -115,7 +94,7 @@ namespace TheGrid.Core.Tests
                 var seen = new HashSet<Vector2>();
                 foreach (var place in Places)
                     for (int slot = 0; slot < 40; slot++)
-                        Assert.IsTrue(seen.Add(Iso.BotSpot(cell, Layout.Of(a), place, slot)), "arrangement " + a + ": " + place + " slot " + slot + " shares a spot");
+                        Assert.IsTrue(seen.Add(Iso.BotSpot(Iso.PlotOrigin(cell), Layout.Of(a), place, slot)), "arrangement " + a + ": " + place + " slot " + slot + " shares a spot");
             }
         }
 
@@ -131,7 +110,7 @@ namespace TheGrid.Core.Tests
                 foreach (var place in Places)
                     for (int slot = 0; slot < 6; slot++)
                     {
-                        var t = Tile(Iso.BotSpot(cell, l, place, slot));
+                        var t = Tile(Iso.BotSpot(Iso.PlotOrigin(cell), l, place, slot));
                         var tile = new Vector2Int(Mathf.RoundToInt(t.x), Mathf.RoundToInt(t.y));
                         string who = "arrangement " + a + ": " + place + " slot " + slot + " at " + t;
                         Assert.IsTrue(t.x >= -.5f && t.y >= -.5f && t.x <= Iso.PlotTiles - .5f && t.y <= Iso.PlotTiles - .5f, who + " is off the plot");
@@ -154,7 +133,7 @@ namespace TheGrid.Core.Tests
             {
                 var f = l.Footprint(s);
                 if (own && s == Structure.Workshop && local.x > f.xMin - .5f && local.x < f.xMax - .5f && local.y > f.yMin - .5f && local.y < f.yMax - .5f) continue;   // standing inside it
-                if (!(at.y > Iso.StructureSpot(cell, l, s).y)) continue;
+                if (!(at.y > Iso.StructureSpot(Iso.PlotOrigin(cell), l, s).y)) continue;
                 Vector2 back = Iso.Point(o.x + f.xMin - .5f, o.y + f.yMin - .5f), left = Iso.Point(o.x + f.xMin - .5f, o.y + f.yMax - .5f),
                         right = Iso.Point(o.x + f.xMax - .5f, o.y + f.yMin - .5f), front = Iso.Point(o.x + f.xMax - .5f, o.y + f.yMax - .5f);
                 foreach (float x in new[] { at.x - botHalf, at.x, at.x + botHalf })
@@ -185,7 +164,7 @@ namespace TheGrid.Core.Tests
                     float allowed = place == Place.Forecourt ? 0 : 6;
                     for (int slot = 0; slot < slots; slot++)
                     {
-                        var at = Iso.BotSpot(here, l, place, slot);
+                        var at = Iso.BotSpot(Iso.PlotOrigin(here), l, place, slot);
                         string who = "arrangement " + a + ": " + place + " slot " + slot;
                         Assert.LessOrEqual(Covered(at, l, here, true), allowed, who + " is behind a building of its own sector");
                         foreach (int b in All)
@@ -212,7 +191,7 @@ namespace TheGrid.Core.Tests
                     for (int slot = 0; slot < 3; slot++)
                         for (int f = 0; f < 7; f++)
                         {
-                            Vector2 other = Iso.BotSpot(cell, l, place, slot), bot = Iso.BotSpot(cell, l, Place.Forecourt, f);
+                            Vector2 other = Iso.BotSpot(Iso.PlotOrigin(cell), l, place, slot), bot = Iso.BotSpot(Iso.PlotOrigin(cell), l, Place.Forecourt, f);
                             bool beside = Mathf.Abs(other.x - bot.x) > nameHalf + botHalf;
                             bool clear = bot.y >= other.y - nameDrop || bot.y + botHigh <= other.y - nameDrop - nameHigh;
                             Assert.IsTrue(beside || clear, "arrangement " + a + ": the name of " + place + " slot " + slot + " lies over forecourt slot " + f);
@@ -228,7 +207,7 @@ namespace TheGrid.Core.Tests
             var shift = Iso.Point(Iso.PlotOrigin(b).x, Iso.PlotOrigin(b).y) - Iso.Point(0, 0);
             var l = Layout.Of(5);
             foreach (var place in Places)
-                Assert.Less((Iso.BotSpot(a, l, place, 3) + shift - Iso.BotSpot(b, l, place, 3)).magnitude, .001f, place.ToString());   // to within float rounding
+                Assert.Less((Iso.BotSpot(Iso.PlotOrigin(a), l, place, 3) + shift - Iso.BotSpot(Iso.PlotOrigin(b), l, place, 3)).magnitude, .001f, place.ToString());   // to within float rounding
         }
     }
 }
