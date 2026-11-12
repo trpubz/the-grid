@@ -329,6 +329,91 @@ namespace TheGrid.Core.Tests
             }
         }
 
+        [Test]
+        public void ABotChangingPlacesGoesByTheStairsAndNoFurtherThanItMust()
+        {
+            foreach (int a in All)
+            {
+                var l = Layout.Of(a);
+                int On(Place place, int floor, int nth) => Enumerable.Range(0, Layout.Inside).Where(slot => l.Floor(place, slot) == floor).ElementAt(nth);
+                var f = l.Footprint(Structure.ServerTower);
+                bool Within(Vector3 p) => p.x > f.xMin - .5f && p.x < f.xMax - .5f && p.y > f.yMin - .5f && p.y < f.yMax - .5f;
+                int top = On(Place.ServerTower, 2, 0);
+                var plaza = l.Spot(Place.Plaza, 0);
+
+                // from the open to the top of the tower: from where it stood, then the way there
+                var up = l.Walk(Place.Plaza, 0, Place.ServerTower, top);
+                Assert.AreEqual(new Vector3(plaza.x, plaza.y, 0), up[0]);
+                CollectionAssert.AreEqual(l.Way(Place.ServerTower, top), up.Skip(1).ToList(), "arrangement " + a);
+                // and back the same way: down the stairs before it crosses the sector
+                var down = l.Walk(Place.ServerTower, top, Place.Plaza, 0);
+                CollectionAssert.AreEqual(Enumerable.Reverse(up).ToList(), down, "arrangement " + a);
+
+                // between two places on one floor: straight there
+                for (int floor = 0; floor < 3; floor++)
+                    Assert.AreEqual(2, l.Walk(Place.ServerTower, On(Place.ServerTower, floor, 0), Place.ServerTower, On(Place.ServerTower, floor, 1)).Count, "arrangement " + a + ": along floor " + floor);
+
+                // from one floor to another: by the stairs between them, and never out by the door
+                foreach (var (from, to) in new[] { (0, 1), (1, 2), (2, 0), (2, 1) })
+                {
+                    var between = l.Walk(Place.ServerTower, On(Place.ServerTower, from, 0), Place.ServerTower, On(Place.ServerTower, to, 1));
+                    string who = "arrangement " + a + ": floor " + from + " to floor " + to;
+                    Assert.IsTrue(between.All(Within), who + " leaves the building");
+                    int stairs = 0;
+                    for (int i = 1; i < between.Count; i++)
+                    {
+                        Vector3 p = between[i - 1], q = between[i];
+                        if (p.z != q.z) stairs++;
+                        else if (p.z > 0) Assert.IsTrue(p.x == q.x || p.y == q.y, who + ": leg " + i + " cuts a corner on floor " + p.z);
+                    }
+                    Assert.AreEqual(Mathf.Abs(to - from), stairs, who);
+                }
+
+                // from one building to another: out by its door, in by the other's
+                var across = l.Walk(Place.ServerTower, top, Place.ReviewHall, On(Place.ReviewHall, 1, 0));
+                CollectionAssert.AreEqual(Enumerable.Reverse(l.Way(Place.ServerTower, top)).Concat(l.Way(Place.ReviewHall, On(Place.ReviewHall, 1, 0))).ToList(), across, "arrangement " + a);
+
+                // staying put
+                Assert.AreEqual(1, l.Walk(Place.Works, 2, Place.Works, 2).Count);
+            }
+        }
+
+        [Test]
+        public void AWalkIsInArtPixelsWithHowFarDownEachPointIsDrawn()
+        {
+            var o = new Vector2Int(-12, 5);
+            foreach (int a in All)
+            {
+                var l = Layout.Of(a);
+                // a point of the plot is in a room when it is inside a building a bot works in
+                foreach (var place in Places)
+                    for (int slot = 0; slot < 12; slot++)
+                    {
+                        string who = "arrangement " + a + ": " + place + " slot " + slot;
+                        Assert.AreEqual(l.IsInside(place, slot) ? World.StructureOf(place) : null, l.Room(l.Spot(place, slot)), who);
+                        // a walk ends where the bot will stand, drawn as it will be drawn standing there
+                        var walk = Iso.Walk(o, l, Place.Plaza, 0, place, slot);
+                        var end = walk[walk.Count - 1];
+                        var spot = Iso.BotSpot(o, l, place, slot);
+                        Assert.AreEqual(spot.x, end.x, .01f, who);
+                        Assert.AreEqual(spot.y, end.y, .01f, who);
+                        Assert.AreEqual(spot.y - Iso.BotDepth(o, l, place, slot), end.z, .01f, who);
+                        Assert.AreEqual(l.Walk(Place.Plaza, 0, place, slot).Count, walk.Count, who);
+                    }
+                // on the stairs and on every floor a bot is drawn over its building: after the building, whose place in the
+                // order is the point it is drawn from
+                foreach (var place in Tall)
+                    for (int slot = 0; slot < Layout.Inside; slot++)
+                    {
+                        var walk = Iso.Walk(o, l, Place.Plaza, 0, place, slot);
+                        float building = Iso.StructureSpot(o, l, World.StructureOf(place).Value).y;
+                        for (int i = 2; i < walk.Count; i++)
+                            Assert.Less(walk[i].y - walk[i].z, building, "arrangement " + a + ": " + place + " slot " + slot + " point " + i + " is drawn under its building");
+                        Assert.AreEqual(0f, walk[0].z, "in the open a bot is drawn where it stands");
+                    }
+            }
+        }
+
         // How many pixels of a bot's height a sector's structures cover, where the bot stands at `at` (art pixels).
         // A structure covers a bot only when it is drawn after it: when its own ground point is lower on the screen than
         // the bot is drawn as if it stood (`depth`: Iso.BotDepth for a bot inside a building, else where it stands).

@@ -98,14 +98,17 @@ namespace TheGrid
 
         // The world as a picture, without a window: what the camera sees, no text. far shows every sector; otherwise the view the world opens on.
         // at: the moment to show, in seconds, for what changes with time (the pulse of a busy building's lights); now, if left out.
-        public Texture2D Picture(WorldModel world, int width, int height, bool far, float at = -1f)
+        // walked: how far along its walk to show every bot that this world sets walking, from 0 to 1; where it starts, if left out.
+        public Texture2D Picture(WorldModel world, int width, int height, bool far, float at = -1f, float walked = 0f)
         {
             pointScale = 2f;   // as on the screens the window is drawn for, where a point is two pixels
             opened = false;
             Lay(world, width, height);
             if (far) LookAtAll();
             Lay(world, width, height);   // again: far or near may have changed with the level
-            stage.Tick(at >= 0 ? at : Time.unscaledTime);
+            float now = at >= 0 ? at : Time.unscaledTime;
+            stage.Hurry(walked, now);
+            stage.Tick(now);
             stale = true;
             Draw();
             var old = RenderTexture.active;
@@ -116,6 +119,9 @@ namespace TheGrid
             RenderTexture.active = old;
             return copy;
         }
+
+        // Puts every bot that is walking so far along its walk, from 0 to 1: for a picture of bots on their way.
+        public void Hurry(float along) => stage?.Hurry(along, Time.unscaledTime);
 
         // Every sector in view, at the closest level that fits them.
         public void LookAtAll() => Fit(bounds);

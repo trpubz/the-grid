@@ -107,14 +107,31 @@ namespace TheGrid.Core
             return points;
         }
 
+        // The walk from one place to another (Layout.Walk), in art pixels, and with each point how much further down the
+        // screen a bot there is drawn as if it stood: a bot in a room, on any floor or on a stair, is drawn over the room.
+        public static List<Vector3> Walk(Vector2Int origin, Layout layout, Place from, int fromSlot, Place to, int toSlot)
+        {
+            var points = new List<Vector3>();
+            foreach (var p in layout.Walk(from, fromSlot, to, toSlot))
+            {
+                var at = Point(origin.x + p.x, origin.y + p.y);
+                var room = layout.Room(new Vector2(p.x, p.y));
+                if (room is Structure tall && tall != Structure.Workshop) at.y += Layout.FloorPixels + p.z * Layout.StoreyPixels;
+                points.Add(new Vector3(at.x, at.y, at.y - Depth(origin, layout, room, at.y)));
+            }
+            return points;
+        }
+
         // How far down the screen a bot is drawn as if it stood, in art pixels: what is lower is drawn later, over what is
         // higher. In the open that is where it stands. Inside a building it is never higher than just below the point the
         // building is drawn from, or a bot at the back of a room would be drawn first and the room over it. Two bots in one
         // room keep their order.
-        public static float BotDepth(Vector2Int origin, Layout layout, Place place, int slot)
+        public static float BotDepth(Vector2Int origin, Layout layout, Place place, int slot) =>
+            Depth(origin, layout, layout.IsInside(place, slot) ? World.StructureOf(place) : null, BotSpot(origin, layout, place, slot).y);
+
+        static float Depth(Vector2Int origin, Layout layout, Structure? room, float stands)
         {
-            float stands = BotSpot(origin, layout, place, slot).y;
-            if (!layout.IsInside(place, slot) || !(World.StructureOf(place) is Structure building)) return stands;
+            if (!(room is Structure building)) return stands;
             float front = StructureSpot(origin, layout, building).y - 1;
             return stands <= front ? stands : front + (stands - front) * .001f;
         }

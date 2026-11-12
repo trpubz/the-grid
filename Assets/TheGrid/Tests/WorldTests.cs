@@ -213,7 +213,7 @@ namespace TheGrid.Core.Tests
             var alpha = w.sectors[0];
             Assert.AreEqual(2, alpha.needOwner); // one blocked on a question, one waiting for permission
             Assert.AreEqual(1, alpha.done);
-            Assert.AreEqual(6, alpha.running);
+            Assert.AreEqual(7, alpha.running);
             Assert.AreEqual("Work", w.sectors[1].workspace);
             foreach (var c in w.sectors)
             {
