@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -9,8 +11,9 @@ namespace TheGrid.EditorTools
     public sealed class ArtImport : AssetPostprocessor
     {
         const string Folder = "Assets/TheGrid/Resources/Art/";
+        const string ManifestPath = Folder + "sprites.json";
 
-        public override uint GetVersion() => 3;
+        public override uint GetVersion() => 4;
 
         void OnPreprocessTexture()
         {
@@ -35,14 +38,23 @@ namespace TheGrid.EditorTools
             importer.SetTextureSettings(settings);
         }
 
-        // Where the ground point is in each picture, as tools/art/README.md lists it.
-        static Vector2 Pivot(string name)
+        [Serializable] sealed class Manifest { public List<Entry> sprites = new List<Entry>(); }
+        [Serializable] sealed class Entry { public string name = ""; public int width, height, groundX, groundY; }
+
+        // Where the ground point is in each picture: sprites.json, written by the script beside the pictures, says.
+        Vector2 Pivot(string name)
         {
-            if (name.StartsWith("b-") || name.StartsWith("o-")) return new Vector2(.5f, 32f / 192f);
-            if (name == "rider-small") return new Vector2(.5f, 9f / 32f);
-            if (name.StartsWith("rider-")) return new Vector2(.5f, 18f / 64f);
-            if (name == "marker") return new Vector2(.5f, 0f);
-            return new Vector2(.5f, .5f);
+            var centre = new Vector2(.5f, .5f);
+            if (name == "palette") return centre;
+            context.DependsOnSourceAsset(ManifestPath);   // a changed manifest imports the pictures again
+            Entry e = null;
+            if (File.Exists(ManifestPath)) e = JsonUtility.FromJson<Manifest>(File.ReadAllText(ManifestPath)).sprites.Find(s => s.name == name);
+            if (e == null)
+            {
+                Debug.LogWarning("[art] " + name + " is not in " + ManifestPath + "; run tools/art/make_sprites.py. Imported with its ground point at the centre.");
+                return centre;
+            }
+            return new Vector2((float)e.groundX / e.width, (float)e.groundY / e.height);
         }
     }
 }

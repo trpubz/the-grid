@@ -30,6 +30,7 @@ namespace TheGrid.Core
     {
         public string key = "", from = "", fromRepoName = "", to = "", toRepoName = "", account = "", summary = "", firstLine = "", fromWorkspace = "", toWorkspace = "";
         public long at;              // when it was sent, or when it was received if the sent record was not found
+        public long receivedAt;      // when the recipient got it; 0 until its received record is found
         public bool ticked, crossWorkspace;
     }
 
@@ -389,7 +390,7 @@ namespace TheGrid.Core
                     key = m.key, from = m.from, to = m.to, account = m.account, summary = m.summary, firstLine = m.firstLine, ticked = m.ticked,
                     fromRepoName = RepoName(m.fromRepo), toRepoName = RepoName(m.toRepo),
                     fromWorkspace = settings.WorkspaceFor(m.fromRepo), toWorkspace = settings.WorkspaceFor(m.toRepo),
-                    at = m.sentAt > 0 ? m.sentAt : m.receivedAt,
+                    at = m.sentAt > 0 ? m.sentAt : m.receivedAt, receivedAt = m.receivedAt,
                 });
                 var row = snap.rows[snap.rows.Count - 1];
                 // Flagged only when both records were found: until then one of the two repos is a guess.

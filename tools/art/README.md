@@ -1,6 +1,8 @@
 # Art
 
-Every sprite in The Grid is made by one script, `make_sprites.py`. It builds each thing from boxes in Blender, renders it as isometric pixel art, and writes PNGs into `Assets/TheGrid/Resources/Art/`. The PNGs are committed, so building the app does not need Blender. You only need Blender to change the art.
+Every sprite in The Grid is made by one command. It builds each thing from simple solids in Blender, renders it as isometric pixel art, and writes PNGs into `Assets/TheGrid/Resources/Art/`. The PNGs are committed, so building the app does not need Blender. You only need Blender to change the art.
+
+What the art should look like is in [docs/art-direction.md](../../docs/art-direction.md). Read that first.
 
 ## Render everything
 
@@ -10,46 +12,64 @@ From the repo root (Blender 5.1 or later):
 /Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python tools/art/make_sprites.py
 ```
 
-This rewrites every PNG and `docs/art/contact-sheet.png`, a picture of the whole set. Look at the contact sheet after every change. To see the sprites standing in a city, run **The Grid > Render World Pictures** in Unity and look at `Logs/world-near.png`.
+This rewrites every PNG, `sprites.json` beside them, and `docs/art/contact-sheet.png`, a picture of the whole set. Look at the contact sheet after every change. Rendering the same script twice on one machine gives the same files, byte for byte. The shadow pass uses Blender's EEVEE engine, which needs a graphics card; on another machine a shadow's edge may fall a pixel differently.
 
-## How it works
+## The files
+
+| File | What is in it |
+|---|---|
+| `kit.py` | The camera, the palette, the building blocks (`box`, `light`, `disc`, `ball`, `limb`, `glow`), and `render`, which also gives what stands its depth |
+| `ground.py` | Paving, the lane, the void, lines of light, the fountain, city blocks |
+| `buildings.py` | The six buildings |
+| `bots.py` | Bots in every pose and facing, the courier's bike, badges, the pulse |
+| `make_sprites.py` | The entry point |
+
+## How it stays pixel art
 
 - **Flat colour.** Blender's Workbench engine with flat lighting gives every face one colour and no gradients. Smoothing is off, so each pixel is either fully on or fully off.
-- **The camera** looks down at 30 degrees, turned 45 degrees, with no perspective. A 1 by 1 square of ground becomes a diamond 64 pixels wide and 32 high: one tile.
-- **Three shades per block.** With flat lighting nothing is shaded for you, so `box(...)` takes a colour for the top, the left face and the right face. Light on top, darker to the left, darkest to the right.
-- **One palette.** `PALETTE` at the top of the script lists every colour. After rendering, each pixel is moved to its nearest palette colour. `palette.png` is that list as a picture, and a test checks every sprite against it.
-- **Glow** is just a thin box in a bright colour. On the ground it follows the buildings, not the tiles: `tile-kerb` and `tile-road-kerb` carry a strip along one edge for the two sides of a street, and `tile-alley` a strip along the other for the gap between two buildings. A strip on every tile makes a grid, and a grid reads as a car park.
-- **Buildings are stretched** to one and a half times their modelled height (`TALL`), so they tower over the riders. Write heights as if they were not.
-- **Outlands** (`o-*`, `tile-water`) are what lies beyond the plots. Keep them dark and dim: nothing out there may draw the eye from a city.
-- **Riders** are drawn in grey with a pure white glow line. The game tints them per account, so the white becomes that account's colour.
+- **The camera** looks down at 30 degrees, turned 45 degrees, with no perspective. A 1 by 1 square of ground becomes a diamond 64 pixels wide and 32 high: one tile. That grain is fixed. Detail comes from what you build at it, never from more pixels.
+- **Three shades per block.** Nothing is shaded for you, so `box(...)` takes a colour for the top, the left face and the right face. Light on top, darker to the left, darkest to the right.
+- **One palette.** `PALETTE` in `kit.py` names every colour, and sprites use the names. After rendering, each pixel is moved to its nearest palette colour. `palette.png` is that list as a picture.
+- **Light** is a thin solid in a bright colour: `light(...)`. Where it lies on the ground it is flat bands, `glow(...)`, never a fade.
+- **A bot's light is three marker colours.** White is the light itself, cyan-white (`cyanw`) its highlight, teal its dim partner. The game swaps the three for the bot's colourway: blue, white or orange. A bot that is off shows none of them.
 
-## What is where in a picture
+## How it gets depth
 
-| Sprite | Size | The ground point is |
-|---|---|---|
-| `tile-*` | 64×32 | the centre |
-| `b-*` (buildings) | 128×192 | the centre of the 2 by 2 tile footprint, 32 pixels above the bottom edge |
-| `o-*` (outlands: stones, outcrop, spire) | 128×192 | as a building |
-| `rider-se`, `-ne`, `-nw`, `-sw` | 64×64 | under the bike, 18 pixels above the bottom edge |
-| `rider-small` | 32×32 | 9 pixels above the bottom edge |
-| `marker` | 12×16 | the bottom edge |
+Ground tiles and the lines of light laid on them are flat, edge to edge. Everything that stands (buildings, the fountain, blocks, bots, bikes) gets four more things, all inside the palette:
 
-Unity's import settings for these files are set by `Assets/TheGrid/Editor/ArtImport.cs`. Nobody sets them by hand.
+- **Soft shadows.** `render` takes the picture three times. The flat render says what each pixel is. The same wide sun, rendered with and without shadows, says how much light each pixel lost. In half shadow a pixel moves one tone down its own ramp (`RAMP` for graphite and concrete, `PAVING` for floors); in full shadow, two. A face the sun never reaches gets no cast shadow.
+- **Lights cast no shadow and take none.** A colour listed in `LIGHTS` keeps its colour everywhere. The walls of a room we look into cast none either: set `kit.SHADOWLESS = True` while you build them, as `test_workshop` does.
+- **Panels.** `box` puts a seam, one tone down, between panels and at every storey of any large face, the roof included.
+- **Edges.** A light line where a face sits over a clearly darker one, and the darkest colour round the silhouette.
+
+To build something flat, set `kit.DEPTH = False` first and back to `True` after, as `ground.make` does for tiles.
+
+## The manifest
+
+`sprites.json` says what every sprite is: its size, and its ground point, the pixel that sits on the spot the sprite stands at, counted from the bottom left. `render(name, width, height, ground_y)` writes the entry; the ground point is always at the horizontal centre.
+
+Unity's import settings are set by `Assets/TheGrid/Editor/ArtImport.cs`, which takes each ground point from the manifest. The tests in `Assets/TheGrid/Tests/ArtTests.cs` take what they expect from it too: every picture is in the manifest, is the size it says, uses only palette colours, has no half-transparent pixel, and is not cut off at the edge of its picture. So adding a sprite needs no change in either file.
 
 ## Add or change a building
 
-1. Write a function like the others, starting with `slab()` for the ground:
+1. In `buildings.py`, write a function like the others. Start from `footing`, which gives the strip of light and its glow, then `shaft` for each block, `roof` for the top:
 
    ```python
-   def b_tower():
-       slab()
-       box(0, 0, .04, 1.0, 1.0, 1.8, *BODY)       # centre x, centre y, base height, width, depth, height, colours
-       trim(0, 0, 1.84, 1.0, 1.0, CYAN)           # a glow line round the roof
-       windows_front(0, -.5, .6, 3, AMBER)
+   def depot():
+       """Told by: ..."""
+       w, h, lit = 2.4, 2.0, "cyan"
+       z = footing(w, w, lit)                 # returns where the walls start
+       shaft(0, 0, w, w, z, h - z, lit)       # centre x, centre y, width, depth, base, height, light
+       roof(0, 0, w, w, h, lit)
+       entrance(.4, -w / 2, lit)
+       render("b-depot", 256, 256, 80)
    ```
 
-2. Add it to `BUILDINGS`.
-3. Render and look at the contact sheet.
-4. Add its name to the list in `Assets/TheGrid/Tests/ArtTests.cs`.
+2. Call it from `make()`.
+3. Render and look at the contact sheet. A building carries one light: pick `"cyanw"`, `"cyan"` or `"violet"` and use nothing else on it, lit windows included. Keep windows clear of the lines `shaft` draws up a wall.
 
-Keep a building inside 2 by 2 units of ground and under about 2.2 units tall, or it will be cut off.
+Keep the building, and the glow round it, inside its picture. The tests fail if a pixel touches the edge.
+
+## Add a pose
+
+In `bots.py`, add the name to `POSES` and handle it in `bot()`, which is modelled facing +x. Every pose is rendered in four facings by turning the model, so say which arm acts with `near`, the side the camera sees, or the pose will be hidden from behind. The tests fail if two pictures of a bot come out the same.

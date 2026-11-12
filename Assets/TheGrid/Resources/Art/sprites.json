@@ -1,0 +1,431 @@
+{
+ "sprites": [
+  {
+   "name": "tile-paving",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16
+  },
+  {
+   "name": "tile-paving-joint-a",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16
+  },
+  {
+   "name": "tile-paving-joint-b",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16
+  },
+  {
+   "name": "tile-lane",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16
+  },
+  {
+   "name": "tile-lane-chevron-a",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16
+  },
+  {
+   "name": "tile-lane-chevron-b",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16
+  },
+  {
+   "name": "tile-crossing-a",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16
+  },
+  {
+   "name": "tile-crossing-b",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16
+  },
+  {
+   "name": "tile-void",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16
+  },
+  {
+   "name": "line-a",
+   "width": 96,
+   "height": 48,
+   "groundX": 48,
+   "groundY": 24
+  },
+  {
+   "name": "line-b",
+   "width": 96,
+   "height": 48,
+   "groundX": 48,
+   "groundY": 24
+  },
+  {
+   "name": "fountain",
+   "width": 192,
+   "height": 160,
+   "groundX": 96,
+   "groundY": 64
+  },
+  {
+   "name": "block-a",
+   "width": 128,
+   "height": 160,
+   "groundX": 64,
+   "groundY": 32
+  },
+  {
+   "name": "block-b",
+   "width": 128,
+   "height": 160,
+   "groundX": 64,
+   "groundY": 32
+  },
+  {
+   "name": "block-c",
+   "width": 128,
+   "height": 160,
+   "groundX": 64,
+   "groundY": 32
+  },
+  {
+   "name": "b-server-tower",
+   "width": 256,
+   "height": 352,
+   "groundX": 128,
+   "groundY": 80
+  },
+  {
+   "name": "b-review-hall",
+   "width": 256,
+   "height": 288,
+   "groundX": 128,
+   "groundY": 80
+  },
+  {
+   "name": "b-works",
+   "width": 256,
+   "height": 224,
+   "groundX": 128,
+   "groundY": 80
+  },
+  {
+   "name": "b-relay",
+   "width": 192,
+   "height": 256,
+   "groundX": 96,
+   "groundY": 64
+  },
+  {
+   "name": "b-assembly-bay",
+   "width": 288,
+   "height": 224,
+   "groundX": 144,
+   "groundY": 88
+  },
+  {
+   "name": "b-test-workshop",
+   "width": 288,
+   "height": 224,
+   "groundX": 144,
+   "groundY": 88
+  },
+  {
+   "name": "bot-stand-se",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-stand-ne",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-stand-nw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-stand-sw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-walk-a-se",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-walk-a-ne",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-walk-a-nw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-walk-a-sw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-walk-b-se",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-walk-b-ne",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-walk-b-nw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-walk-b-sw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-type-se",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-type-ne",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-type-nw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-type-sw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-inspect-se",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-inspect-ne",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-inspect-nw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-inspect-sw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-signal-se",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-signal-ne",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-signal-nw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-signal-sw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-off-se",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-off-ne",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-off-nw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-off-sw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-small",
+   "width": 24,
+   "height": 32,
+   "groundX": 12,
+   "groundY": 5
+  },
+  {
+   "name": "bike-se",
+   "width": 72,
+   "height": 56,
+   "groundX": 36,
+   "groundY": 14
+  },
+  {
+   "name": "bike-ne",
+   "width": 72,
+   "height": 56,
+   "groundX": 36,
+   "groundY": 14
+  },
+  {
+   "name": "bike-nw",
+   "width": 72,
+   "height": 56,
+   "groundX": 36,
+   "groundY": 14
+  },
+  {
+   "name": "bike-sw",
+   "width": 72,
+   "height": 56,
+   "groundX": 36,
+   "groundY": 14
+  },
+  {
+   "name": "badge-question",
+   "width": 16,
+   "height": 20,
+   "groundX": 8,
+   "groundY": 2
+  },
+  {
+   "name": "badge-approve",
+   "width": 16,
+   "height": 20,
+   "groundX": 8,
+   "groundY": 2
+  },
+  {
+   "name": "badge-done",
+   "width": 16,
+   "height": 20,
+   "groundX": 8,
+   "groundY": 2
+  },
+  {
+   "name": "badge-fault",
+   "width": 16,
+   "height": 20,
+   "groundX": 8,
+   "groundY": 2
+  },
+  {
+   "name": "pulse-0",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16
+  },
+  {
+   "name": "pulse-1",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16
+  },
+  {
+   "name": "pulse-2",
+   "width": 64,
+   "height": 32,
+   "groundX": 32,
+   "groundY": 16
+  }
+ ]
+}
