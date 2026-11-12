@@ -43,6 +43,14 @@ namespace TheGrid.Core
         // The colours a picture is drawn in.
         public static int[] Drawn => Families[0];
 
+        // A family a step down, for the dim half of a pulse: the bright line in the dimmer line's colour, the dimmer line
+        // in the window's, and all the glow on the paving in its farthest, faintest band. Every colour is the family's own.
+        public static int[] Dimmed(int light)
+        {
+            var f = Family(light);
+            return new[] { f[1], f[2], f[2], f[3], f[3], f[3] };
+        }
+
         public static int[] Family(int light) => Families[((light % Count) + Count) % Count];
     }
 }

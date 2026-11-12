@@ -74,7 +74,9 @@ namespace TheGrid
                 }
                 if (t.pulse == null) t.pulse = New("pulse");
                 t.pulse.sprite = WorldStage.Art(ArtNames.Pulse(step));
-                t.pulse.transform.localPosition = new Vector3(at.x, at.y, -.5f);   // on the ground, under the bot's feet
+                // On the ground, under the bot's feet: over the floor and under the bot. A bot inside a building is drawn
+                // forward of where it stands, so that the room is not drawn over it, and its pulse comes forward with it.
+                t.pulse.transform.localPosition = new Vector3(at.x, at.y, -.5f - stage.Sink(t.d.toBot));
             }
             return true;
         }

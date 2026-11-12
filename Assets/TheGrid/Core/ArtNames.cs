@@ -8,6 +8,9 @@ namespace TheGrid.Core
     public static class ArtNames
     {
         public static readonly string[] Structures = { "b-server-tower", "b-review-hall", "b-relay", "b-works", "b-depot", "fountain", "b-test-workshop" };   // in the order of Structure
+        // A building a bot works in has a second picture: opened, its near walls cut away, as the workshop always is. In the
+        // order of Structure; "" where there is none.
+        public static readonly string[] Opened = { "b-server-tower-open", "b-review-hall-open", "", "b-works-open", "", "", "" };
         public static readonly string[] Badges = { "", "badge-question", "badge-approve", "badge-fault", "badge-done" };   // in the order of Badge; none for Badge.None
         public static readonly string[] Stances = { "stand", "type", "inspect", "off" };                                    // in the order of Stance
         public static readonly string[] Facings = { "se", "ne", "nw", "sw" };
@@ -27,6 +30,7 @@ namespace TheGrid.Core
         public static IEnumerable<string> All()
         {
             foreach (var s in Structures) yield return s;
+            foreach (var s in Opened) if (s != "") yield return s;
             foreach (var b in Badges) if (b != "") yield return b;
             foreach (var b in Blocks) yield return b;
             foreach (var c in Crates) yield return c;

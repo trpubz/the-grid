@@ -77,6 +77,16 @@ A building stands for a kind of work:
 
 The sixth building, the relay, is where offline bots wait. The fifth is the PR depot: no bot works there.
 
+A bot at work goes inside. While anyone works in a building it is drawn opened, the way the test workshop always is: its two far walls stand, its two near ones are cut down to a kerb, and you see the bot at the racks of the server tower, the screens of the review hall or the reactors of the works. Six fit inside; a seventh waits at the door. When the last one leaves, the building closes again.
+
+**A tall building has floors.** The server tower has three and the review hall two; the works, a low building, has one. An upper floor runs along the back wall only and reaches two floor squares out from it, so the middle of the building is open to the roof and you see every floor at once. The six inside are spread over the floors. A bot walks to its place: in at the door, across the ground floor, up the stair on the left wall, and in the tower up a second stair along the back wall. It comes down the same way before it crosses the sector, and the building stays opened until it is out.
+
+**The lights of a building someone is working in pulse**: its lines, windows and glow go a step dimmer and back, about once every second and a half. A sector where lights are pulsing has agents at work; one that is still has none. Nothing else on the map moves for it.
+
+![Bots at work inside the server tower, the review hall and the works](docs/art/world-working.png)
+
+![Bots on the stairs: two in the tower changing floors, one coming down in the hall](docs/art/world-stairs.png)
+
 Anything else is shown on the bot itself, wherever it stands:
 
 | On the bot | Its agent is |
@@ -145,7 +155,7 @@ To look at the world without any agent sessions, start the app on a roster snaps
 Builds/TheGrid.app/Contents/MacOS/"The Grid" -snapshot "$PWD/fixtures/world/snapshot.json"
 ```
 
-Add `-shots <folder>` and it saves `far.png` and `near.png` there and quits; `-select <account>|<session id>` selects that bot for `near.png`, and `-messages <pile snapshot file>` (try `fixtures/world/messages.json`) shows its messages arriving and saves `courier.png` and `pulse.png` too. `-pulls <file>` (try `fixtures/world/pulls.json`) puts those pull requests at the depots, since a snapshot never asks GitHub, and `-depot <sector name>` opens that depot's list in `near.png`. `-moved <world file>` lays the map again from that `world.json` after `far.png` and saves `moved.png`: a picture of a map its owner has arranged. With the editor closed, **The Grid > Render World Pictures** does much the same without a window, into `Logs/`, though without the names and badges:
+Add `-shots <folder>` and it saves `far.png` and `near.png` there and quits; `-select <account>|<session id>` selects that bot for `near.png`, and `-messages <pile snapshot file>` (try `fixtures/world/messages.json`) shows its messages arriving and saves `courier.png` and `pulse.png` too. `-pulls <file>` (try `fixtures/world/pulls.json`) puts those pull requests at the depots, since a snapshot never asks GitHub, and `-depot <sector name>` opens that depot's list in `near.png`. `-moved <world file>` lays the map again from that `world.json` after `far.png` and saves `moved.png`: a picture of a map its owner has arranged. `-then <snapshot file>` (try `fixtures/world/later.json`) swaps the snapshot for a later one after `near.png` and saves `stairs.png` with every bot that has somewhere new to go three fifths of its way there. With the editor closed, **The Grid > Render World Pictures** does much the same without a window, into `Logs/`, though without the names and badges:
 
 ```bash
 /Applications/Unity/Hub/Editor/6000.4.3f1/Unity.app/Contents/MacOS/Unity -batchmode -projectPath "$PWD" -executeMethod TheGrid.EditorTools.GridMenu.WorldPictures -quit

@@ -13,6 +13,7 @@ namespace TheGrid
     {
         static readonly float WalkPixelsPerSecond = 4f * Iso.TileStep;   // four tiles a second
         const float StepSeconds = .2f;
+        const float BeatSeconds = .7f;   // how long the lights of a building someone works in stay at each of their two levels
         const int OutlandRing = 3;   // plot-sized cells of city kept beyond the sectors of a small map; more for a wide one
         const int MaxSmall = 3;      // subagents drawn beside a bot; its name carries the full count
 
@@ -32,13 +33,28 @@ namespace TheGrid
 
         static Color32 Hex(int rgb) => new Color32((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb, 255);
 
+        // One building of one sector: its picture, which kind it is and which light it carries, and whether a bot is at
+        // work in it. While one is, it is drawn opened and its lights pulse.
+        sealed class Building
+        {
+            public SpriteRenderer picture;
+            public Structure kind;
+            public int light;
+            public bool busy;
+            public int held;   // how many bots that have left it for another place are still on their way out of it
+        }
+
         sealed class Bot
         {
             public Transform at;
             public SpriteRenderer body;
             public readonly List<SpriteRenderer> small = new List<SpriteRenderer>();
-            public Vector2 from, to;
+            // The walk it is on, or the one point it stands at: art pixels, and with each point how much further down the
+            // screen it is drawn as if it stood (a bot in a room is drawn over the room).
+            public List<Vector3> path = new List<Vector3>();
             public float started = -100f, seconds = 1f;
+            // The buildings it was in, or on its way into, each time it was sent somewhere new: kept opened until it has arrived.
+            public readonly List<Building> leaving = new List<Building>();
             public WorldBot data;
             public string shown = "";
         }
@@ -55,6 +71,8 @@ namespace TheGrid
         readonly Dictionary<int, (Vector2Int origin, int arrangement, int look)> painted = new Dictionary<int, (Vector2Int, int, int)>();
         readonly HashSet<(Vector2Int, Vector2Int)> roads = new HashSet<(Vector2Int, Vector2Int)>();
         readonly HashSet<Vector2Int> opened = new HashSet<Vector2Int>();
+        readonly Dictionary<(int plot, Structure kind), Building> buildings = new Dictionary<(int, Structure), Building>();
+        int beat;   // 0 or 1: which of the two levels the lights of busy buildings are at
         // The crates at each sector's depot, by its plot: what they show, and the object that holds them.
         readonly Dictionary<int, (string shown, GameObject holder)> crates = new Dictionary<int, (string, GameObject)>();
         readonly Dictionary<Vector2Int, GameObject> outlands = new Dictionary<Vector2Int, GameObject>();
@@ -152,6 +170,28 @@ namespace TheGrid
             return Recoloured(name + "@" + light, name, from, to);
         }
 
+        // The same picture with its light a step down: the dim half of a pulse.
+        Sprite Dimmed(string name, int light)
+        {
+            var from = new Color32[Lights.Parts];
+            var to = new Color32[Lights.Parts];
+            int[] dim = Lights.Dimmed(Mathf.Max(light, 0));
+            for (int i = 0; i < Lights.Parts; i++)
+            {
+                from[i] = Hex(Lights.Drawn[i]);
+                to[i] = Hex(dim[i]);
+            }
+            return Recoloured(name + "~" + light, name, from, to);
+        }
+
+        // A building's picture as it is to be seen now: opened if a bot works in it, or is still on its way out of it, and
+        // it has an opened picture; and at the dim level if its lights are in the dim half of their pulse.
+        Sprite Shown(Building b)
+        {
+            string name = (b.busy || b.held > 0) && ArtNames.Opened[(int)b.kind] != "" ? ArtNames.Opened[(int)b.kind] : ArtNames.Structures[(int)b.kind];
+            return b.busy && beat == 1 ? Dimmed(name, b.light) : InLight(name, b.light);
+        }
+
         // A copy of a picture with some colours swapped for others. Made once and kept.
         Sprite Recoloured(string key, string name, Color32[] from, Color32[] to)
         {
@@ -213,18 +253,29 @@ namespace TheGrid
                 if (roads.Add(road)) Road(road.from, road.to, at[road.from].region == at[road.to].region ? Lights.Primary(at[road.from].layout.Look) : 0);
 
             foreach (var sector in model.sectors) PutCrates(sector);
+            // A building a bot has come to work in is opened; one the last has left is closed again.
+            foreach (var sector in model.sectors)
+                foreach (Structure s in Enum.GetValues(typeof(Structure)))
+                {
+                    if (!buildings.TryGetValue((sector.plot, s), out var b)) continue;
+                    bool busy = World.Working(sector, s) > 0;
+                    if (busy == b.busy) continue;
+                    b.busy = busy;
+                    b.picture.sprite = Shown(b);
+                }
 
             var seen = new HashSet<string>();
             foreach (var sector in model.sectors)
                 foreach (var b in sector.bots)
                 {
                     seen.Add(b.key);
-                    PutBot(b, Iso.BotSpot(sector.origin, sector.layout, b.place, b.slot));
+                    PutBot(b, sector);
                 }
             var gone = new List<string>();
             foreach (var kv in bots) if (!seen.Contains(kv.Key)) gone.Add(kv.Key);
             foreach (var key in gone)
             {
+                Release(bots[key]);
                 Kill(bots[key].at.gameObject);
                 bots.Remove(key);
             }
@@ -268,6 +319,7 @@ namespace TheGrid
             foreach (var b in bots.Values) Kill(b.at.gameObject);
             foreach (var c in crates.Values) Kill(c.holder);
             crates.Clear();
+            buildings.Clear();
             outlands.Clear();
             bots.Clear();
             painted.Clear();
@@ -281,18 +333,35 @@ namespace TheGrid
         {
             bool stale = false;
             Walking = false;
+            // The lights of every building someone works in go a step down and back, together. Nothing else in the map
+            // moves for it: two pictures, swapped, and the map drawn again at each swap.
+            int now2 = (int)(now / BeatSeconds) % 2;
+            if (now2 != beat)
+            {
+                beat = now2;
+                foreach (var b in buildings.Values)
+                    if (b.busy)
+                    {
+                        b.picture.sprite = Shown(b);
+                        stale = true;
+                    }
+            }
             foreach (var b in bots.Values)
             {
                 float t = Mathf.Clamp01((now - b.started) / b.seconds);
-                var p = Vector2.Lerp(b.from, b.to, t);
+                var p = Along(b.path, t, out var d);
                 // A bot stands a little nearer the camera than the ground it is on, so that standing inside the workshop it is
                 // drawn over the workshop's floor and not under it.
-                var at = new Vector3(Mathf.Round(p.x), Mathf.Round(p.y), -1);
+                var at = new Vector3(Mathf.Round(p.x), Mathf.Round(p.y), -1 - p.z);
                 string pose, facing;
+                if (t >= 1f)
+                {
+                    if (b.path.Count > 1) b.path.RemoveRange(0, b.path.Count - 1);   // it has arrived: it stands at the one point
+                    if (Release(b)) stale = true;                                    // and the building it left can close
+                }
                 if (t < 1f)
                 {
                     Walking = true;
-                    var d = b.to - b.from;
                     pose = (int)((now - b.started) / StepSeconds) % 2 == 0 ? ArtNames.WalkA : ArtNames.WalkB;
                     facing = d.x >= 0 ? (d.y < 0 ? "se" : "ne") : (d.y >= 0 ? "nw" : "sw");
                 }
@@ -325,6 +394,63 @@ namespace TheGrid
             at = default;
             if (!bots.TryGetValue(key, out var b)) return false;
             at = b.at.localPosition;
+            return true;
+        }
+
+        // How much further down the screen a bot is drawn as if it stood: more than nothing for a bot inside a building.
+        // What lies under its feet has to come that far forward with it, or the room is drawn over it.
+        public float Sink(string key) => bots.TryGetValue(key, out var b) ? -1f - b.at.localPosition.z : 0f;
+
+        // Puts every bot that is walking so far along its walk, from 0 to 1: for a picture of a bot on its way.
+        public void Hurry(float along, float now)
+        {
+            foreach (var b in bots.Values)
+                if (b.path.Count > 1 && now < b.started + b.seconds) b.started = now - b.seconds * along;
+        }
+
+        static float Length(List<Vector3> path)
+        {
+            float length = 0;
+            for (int i = 1; i < path.Count; i++) length += ((Vector2)path[i] - (Vector2)path[i - 1]).magnitude;
+            return length;
+        }
+
+        // The point so far along a walk, from 0 to 1, and which way the bot is heading there. With `ahead`, what is left
+        // of the walk from that point on.
+        static Vector3 Along(List<Vector3> path, float t, out Vector2 heading, List<Vector3> ahead = null)
+        {
+            heading = Vector2.zero;
+            float left = Length(path) * t;
+            for (int i = 1; i < path.Count; i++)
+            {
+                heading = (Vector2)path[i] - (Vector2)path[i - 1];
+                float leg = heading.magnitude;
+                if (left < leg || i == path.Count - 1)
+                {
+                    var p = Vector3.Lerp(path[i - 1], path[i], leg > 0 ? Mathf.Clamp01(left / leg) : 1f);
+                    if (ahead != null)
+                    {
+                        ahead.Add(p);
+                        ahead.AddRange(path.GetRange(i, path.Count - i));
+                    }
+                    return p;
+                }
+                left -= leg;
+            }
+            ahead?.Add(path[0]);
+            return path[0];
+        }
+
+        // Lets go of the buildings a bot was leaving. True if it held any: their pictures may have changed.
+        bool Release(Bot b)
+        {
+            if (b.leaving.Count == 0) return false;
+            foreach (var room in b.leaving)
+            {
+                room.held--;
+                room.picture.sprite = Shown(room);
+            }
+            b.leaving.Clear();
             return true;
         }
 
@@ -384,7 +510,12 @@ namespace TheGrid
 
             // Every sector has the same buildings; where each stands and how it is lit is the sector's own.
             foreach (Structure s in Enum.GetValues(typeof(Structure)))
-                NewSprite(ArtNames.Structures[(int)s], InLight(ArtNames.Structures[(int)s], sector.layout.Light(s)), built).transform.localPosition = Iso.StructureSpot(sector.origin, sector.layout, s);
+            {
+                var b = new Building { kind = s, light = sector.layout.Light(s) };
+                b.picture = NewSprite(ArtNames.Structures[(int)s], Shown(b), built);
+                b.picture.transform.localPosition = Iso.StructureSpot(sector.origin, sector.layout, s);
+                buildings[(sector.plot, s)] = b;
+            }
         }
 
         // The road across the open ground from one sector's lane to another's: lane tiles where Iso.RoadTiles says, and a
@@ -484,21 +615,40 @@ namespace TheGrid
             return sr;
         }
 
-        void PutBot(WorldBot data, Vector2 spot)
+        void PutBot(WorldBot data, WorldSector sector)
         {
+            var spot = Iso.BotSpot(sector.origin, sector.layout, data.place, data.slot);
+            var stands = new Vector3(spot.x, spot.y, spot.y - Iso.BotDepth(sector.origin, sector.layout, data.place, data.slot));
             if (!bots.TryGetValue(data.key, out var b))
             {
-                bots[data.key] = b = new Bot { from = spot, to = spot };
+                bots[data.key] = b = new Bot();
+                b.path.Add(stands);
                 b.body = NewSprite(data.name, null, root);
                 b.at = b.body.transform;
-                b.at.localPosition = new Vector3(spot.x, spot.y, -1);   // first sight: it is simply there
+                b.at.localPosition = new Vector3(stands.x, stands.y, -1 - stands.z);   // first sight: it is simply there
             }
-            else if (spot != b.to)
+            else if ((stands - b.path[b.path.Count - 1]).sqrMagnitude > .01f)
             {
-                b.from = b.at.localPosition;
-                b.to = spot;
-                b.started = Time.unscaledTime;
-                b.seconds = Mathf.Max(.3f, (b.to - b.from).magnitude / WalkPixelsPerSecond);
+                // From where it is, on along what is left of the walk it is on, and then by the doors and the stairs from
+                // the place it was going to, to the new one.
+                float now = Time.unscaledTime;
+                var path = new List<Vector3>();
+                Along(b.path, Mathf.Clamp01((now - b.started) / b.seconds), out _, path);
+                var walk = Iso.Walk(sector.origin, sector.layout, b.data.place, b.data.slot, data.place, data.slot);
+                if ((walk[0] - path[path.Count - 1]).sqrMagnitude < 1f) path.AddRange(walk.GetRange(1, walk.Count - 1));
+                else path.Add(stands);   // it was not where this sector's arrangement has that place: straight there
+                // The building it is in, or was on its way into, stays opened until it has arrived, though nobody may be
+                // working there now: what is left of its walk still goes through it. Sent on twice, it holds both.
+                if (sector.layout.IsInside(b.data.place, b.data.slot) && World.StructureOf(b.data.place) is Structure kind
+                    && buildings.TryGetValue((sector.plot, kind), out var room) && !b.leaving.Contains(room))
+                {
+                    b.leaving.Add(room);
+                    room.held++;
+                    room.picture.sprite = Shown(room);
+                }
+                b.path = path;
+                b.started = now;
+                b.seconds = Mathf.Max(.3f, Length(path) / WalkPixelsPerSecond);
             }
             b.data = data;
 

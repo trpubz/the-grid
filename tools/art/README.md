@@ -20,7 +20,7 @@ This rewrites every PNG, `sprites.json` beside them, and `docs/art/contact-sheet
 |---|---|
 | `kit.py` | The camera, the palette, the building blocks (`box`, `light`, `disc`, `ball`, `limb`, `glow`), and `render`, which also gives what stands its depth |
 | `ground.py` | Paving, the lane, the void, lines of light, the fountain, city blocks |
-| `buildings.py` | The six buildings, and the crates that stand at the depot |
+| `buildings.py` | The six buildings, the opened pictures of the three a bot works in (with the floors and stairs of the two tall ones), and the crates that stand at the depot |
 | `bots.py` | Bots in every pose and facing, the courier's bike, badges, the pulse |
 | `make_sprites.py` | The entry point |
 
@@ -69,6 +69,8 @@ Unity's import settings are set by `Assets/TheGrid/Editor/ArtImport.cs`, which t
 3. Render and look at the contact sheet. Every building is drawn in the same light: `"cyanw"` lines, `"cyan"` dimmer lines, `"teal"` windows, cyan glow. The game swaps those six colours for another family's (`Assets/TheGrid/Core/Lights.cs`): the primary light of the sector's region, or one of its accents. It does the same to the lines of light on the ground and the chevrons on a lane. So use no other light colour on a building, or the swap will leave it behind. A new family's colours go in `PALETTE` in `kit.py` as well, though no picture is drawn in them. Keep windows clear of the lines `shaft` draws up a wall. If the building is taller than before, raise its number in `Layout.Wall`; a test tells you.
 
 Keep the building, and the glow round it, inside its picture. The tests fail if a pixel touches the edge.
+
+The game stands bots on the floors of an opened tall building and walks them up its stairs, from numbers of its own (`Layout.StoreyPixels`, `Layout.FloorReach` and the stairs' ends in `Assets/TheGrid/Core/Layout.cs`). If you move a floor or a stair (`STOREY`, `REACH`, `upper_floor`, `stair`), change those too; a test fails if a bot on an upper floor has no floor edge in front of it.
 
 ## Add a pose
 
