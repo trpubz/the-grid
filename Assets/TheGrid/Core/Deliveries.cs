@@ -18,7 +18,10 @@ namespace TheGrid.Core
     public sealed class Deliveries
     {
         readonly long openedAt;
-        readonly HashSet<string> settled = new HashSet<string>();   // rows shown, or found unfit to show: never looked at again
+        // Rows shown, or found unfit to show: never looked at again. A row is remembered twice: by its key, and by who it
+        // was between and when it arrived. The pile can fold a receipt into the row of its send, found later, and then the
+        // same message comes back under the send's key.
+        readonly HashSet<string> settled = new HashSet<string>();
 
         public Deliveries(long openedAtMs) => openedAt = openedAtMs;
 
@@ -31,7 +34,9 @@ namespace TheGrid.Core
             foreach (var row in pile.rows)
             {
                 if (row.receivedAt == 0) continue;            // not received yet, as far as the pile knows: look again next time
-                if (!settled.Add(row.key)) continue;
+                bool byKey = settled.Add("key " + row.key);
+                bool byArrival = settled.Add("at " + row.receivedAt + " " + row.account + "|" + row.from + "|" + row.to);
+                if (!byKey || !byArrival) continue;
                 if (row.receivedAt <= openedAt) continue;     // history, not news
                 if (!One(world, row.account, row.from, out var from, out var fromCell)) continue;
                 if (!One(world, row.account, row.to, out var to, out var toCell)) continue;

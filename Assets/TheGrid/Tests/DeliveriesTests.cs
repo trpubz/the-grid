@@ -57,6 +57,18 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
+        public void ARowThatChangesItsKeyWhenItsSendIsFoundIsStillTheSameDelivery()
+        {
+            // The pile pairs a receipt with its send by their text when the app gives no shared id, and keeps the send's row:
+            // the message that was shown as row 7 comes back as row 9, with the same people and the same moment of arrival.
+            var d = new Deliveries(Opened);
+            Assert.AreEqual(1, d.New(Only(Row("alpha-04", "beta-01", "two", Opened + 5, "7")), world).Count);
+            Assert.AreEqual(0, d.New(Only(Row("alpha-04", "beta-01", "two", Opened + 5, "9")), world).Count);
+            // a second message between the same two, a moment later, is its own delivery
+            Assert.AreEqual(1, d.New(Only(Row("alpha-04", "beta-01", "two", Opened + 6, "10")), world).Count);
+        }
+
+        [Test]
         public void WhatWasReceivedBeforeTheWorldOpenedIsNeverShown()
         {
             var d = new Deliveries(1794000095500);   // after the first was received, before the second
