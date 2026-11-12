@@ -92,6 +92,30 @@ namespace TheGrid.Core
             return Point(o.x + s.col + slot % s.perRow * s.along, o.y + s.row + slot / s.perRow * s.away);
         }
 
+        // The way a courier rides from one sector to another: corner points, in tiles (column, row), every leg along a lane.
+        // It leaves from the lane behind the sender's relay, keeps to that lane as far as the recipient's column of sectors,
+        // turns down the lane beside the recipient, and ends behind the recipient's relay. Empty within one sector.
+        // shortcut: a lane is drawn only round a sector that exists, so across a gap in the map a courier rides over open
+        // ground. Route round the gap if maps with holes in them turn out to be common.
+        public static List<Vector2> Route(Vector2Int fromCell, Vector2Int toCell)
+        {
+            var route = new List<Vector2>();
+            if (fromCell == toCell) return route;
+            int behind = Footprints[(int)Structure.Relay].xMax - 1;      // level with the relay, on the lane at the back
+            Vector2Int a = PlotOrigin(fromCell), b = PlotOrigin(toCell);
+            var start = new Vector2(a.x + behind, a.y - 1);
+            var end = new Vector2(b.x + behind, b.y - 1);
+            route.Add(start);
+            if (start.y != end.y)
+            {
+                float turn = b.x - 1;                                    // the lane down the recipient's left side
+                if (turn != start.x) route.Add(new Vector2(turn, start.y));
+                route.Add(new Vector2(turn, end.y));
+            }
+            route.Add(end);
+            return route;
+        }
+
         // The pixel rectangle that covers these plots' ground and the lanes round them.
         public static Rect Bounds(IEnumerable<Vector2Int> cells)
         {

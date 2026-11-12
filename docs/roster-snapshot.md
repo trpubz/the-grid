@@ -68,3 +68,12 @@ The world view is built from the same snapshot (`World.Build`), so the two never
 | `Offline` | | the dock | off, unlit | | |
 
 A bot is one agent, told apart by `account` and `sessionId` together. Its place among the other bots at the same spot follows that pair, not the roster's order, so bots do not shuffle when the roster re-sorts. `fixtures/world/snapshot.json` is a synthetic snapshot with every state and activity in it.
+
+### Messages arriving
+
+The world also shows a message arriving, read from the review pile (`Deliveries`). A pile row is shown once, when all of these hold:
+
+- it has a received time (`receivedAt`, 0 until the recipient's record of it is found), and that time is later than the moment the world was opened;
+- its sender and its recipient each match exactly one bot, by `account` and session name.
+
+Anything else is not shown: history from before the world opened, a session that has ended, two sessions with one name, a message between accounts. The Grid only shows deliveries; it sends nothing and holds nothing back. `fixtures/world/messages.json` is a synthetic pile with one message between two sectors and one within a sector.
