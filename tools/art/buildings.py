@@ -126,8 +126,8 @@ def works():
     disc(-.6, .6, top + .12, .13, .72, "g5", "g3"); disc(-.6, .6, top + .84, .16, .05, "c0", "g4")
     light(-.6, .6, top + .89, .1, .1, .04, "cyan")
     entrance(.5, -w / 2, lit)
-    for i in range(3):
-        light(w / 2 + .012, -.5 + i * .5, .7, .02, .28, .22, "amber")                 # someone is in: warm windows
+    for y in (-.75, -.3, .3, .75):                                                    # windows in the building's own light,
+        light(w / 2 + .012, y, .7, .02, .28, .22, lit)                                # clear of the line up the middle of the wall
     render("b-works", 256, 224, 80)
 
 
@@ -158,7 +158,7 @@ def assembly_bay():
         light(-.3, f - .016, z + .12 + i * .15, 1.9, .012, .03, "teal")
     box(-.3, f - .05, z + .82, 2.1, .1, .08, *TRIM)
     for i in range(4):
-        light(w / 2 + .012, -.75 + i * .5, .7, .02, .3, .24, "amber")
+        light(w / 2 + .012, -.75 + i * .5, .7, .02, .3, .24, lit)
     top = roof(0, 0, w, d, h, lit)
     for x in (-1.5, 1.5):                                                             # the gantry
         box(x, 0, top, .12, .12, .55, "g5", "g4", "g3")
