@@ -125,5 +125,35 @@ namespace TheGrid.Core.Tests
             Assert.IsNull(Panels.Card(snap, "", 1000));
             Assert.IsNull(Panels.Card(new RosterSnapshot(), "one|s", 1000));
         }
+
+        // The depot's list stands over the card, under the title of "Needs you": between a floor and a ceiling.
+        [Test]
+        public void AListOverTheCardIsAsHighAsItWantsWhereThereIsRoom()
+        {
+            var map = new Rect(0, 32, 900, 700);
+            var r = Panels.Above(map, floor: 568, ceiling: 75, wide: 330, wanted: 217, least: 47, margin: 8);
+            Assert.AreEqual(new Rect(900 - 8 - 330, 568 - 8 - 217, 330, 217), r);
+        }
+
+        [Test]
+        public void InAShortMapTheListTakesOnlyTheRoomThereIsAndItsTitleStaysInView()
+        {
+            // a map 300 high from 32 down, a card with four lines about subagents from 160 down, five pull requests
+            var map = new Rect(0, 32, 400, 300);
+            var r = Panels.Above(map, floor: 160, ceiling: 75, wide: 330, wanted: 217, least: 47, margin: 8);
+            Assert.AreEqual(75, r.y, "its title is under the title of Needs you, not above the window");
+            Assert.AreEqual(160 - 8, r.yMax, "and its foot is clear of the card");
+            Assert.AreEqual(330, r.width);
+            Assert.GreaterOrEqual(r.xMin, map.xMin);
+        }
+
+        [Test]
+        public void WhereNotEvenATitleAndPartOfARowFitThereIsNoList()
+        {
+            var map = new Rect(0, 32, 400, 200);
+            Assert.AreEqual(default(Rect), Panels.Above(map, floor: 110, ceiling: 75, wide: 330, wanted: 217, least: 47, margin: 8));
+            // and a list is never wider than the map has room for
+            Assert.AreEqual(184, Panels.Above(new Rect(0, 32, 200, 700), 600, 75, 330, 217, 47, 8).width);
+        }
     }
 }

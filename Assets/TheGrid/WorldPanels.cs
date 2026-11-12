@@ -56,11 +56,13 @@ namespace TheGrid
             }
             if (depotOf != null)
             {
-                float w = Mathf.Min(DepotWide, map.width - 2 * Margin);   // wide enough for the longest reason in full
                 int lines = Mathf.Clamp(depotOf.pulls.Count, 1, map.height < 300 ? RowsWhenShort : MostPulls);
                 bool stale = depotOf.pulls.Count > 0 && depotOf.pullsProblem != "";   // an old list, and a line saying why it is old
-                float h = TitleHigh + lines * RowHigh + (stale ? LineHigh + 4 : 0) + 1;
-                depot = new Rect(map.xMax - Margin - w, (hasCard ? card.y : map.yMax) - Margin - h, w, h);
+                float wanted = TitleHigh + lines * RowHigh + (stale ? LineHigh + 4 : 0) + 1;
+                // Over the card, under the title of "Needs you", and no higher than the room between them: in a short map
+                // with a tall card it shows fewer rows and scrolls, and its title, which closes it, stays in view.
+                float ceiling = map.y + Margin + (rows > 0 ? TitleHigh + 1 + Margin : 0);
+                depot = Panels.Above(map, hasCard ? card.y : map.yMax, ceiling, DepotWide, wanted, TitleHigh + RowHigh / 2 + 1, Margin);
             }
             if (rows > 0)
             {

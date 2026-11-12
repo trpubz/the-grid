@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace TheGrid.Core
 {
@@ -24,6 +25,18 @@ namespace TheGrid.Core
     // The words of the two panels drawn over the world. Like the world itself, made from the roster snapshot and nothing else.
     public static class Panels
     {
+        // Where a list goes that stands over something else on the map's right side: against the right edge, its foot
+        // `margin` above `floor`, as high as it `wanted` when there is that much room under `ceiling`, else as high as
+        // there is room for, and what does not fit is scrolled. Nothing, when not even `least` fits. Never wider than the
+        // map has room for.
+        public static Rect Above(Rect map, float floor, float ceiling, float wide, float wanted, float least, float margin)
+        {
+            float room = floor - margin - ceiling;
+            if (room < least) return default;
+            float w = Mathf.Min(wide, map.width - 2 * margin), h = Mathf.Min(wanted, room);
+            return new Rect(map.xMax - margin - w, floor - margin - h, w, h);
+        }
+
         // In the snapshot's own order, which is most urgent first.
         public static List<NeedsYouRow> NeedsYou(RosterSnapshot snap)
         {
