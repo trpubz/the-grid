@@ -354,6 +354,32 @@ namespace TheGrid.Core.Tests
                             Assert.IsTrue(front.y < Iso.PlotTiles - .5f, who + " is off the plot");
                         }
                         else Assert.AreEqual(spot, front, who + " stands in the open: there");
+                        // from there a courier rides to the aisle between the two low buildings, turning square corners,
+                        // through nothing
+                        var way = l.ToAisle(place, slot);
+                        Assert.AreEqual(front, way[0], who);
+                        Assert.AreEqual(Layout.Aisle, way[way.Count - 1].x, who + " does not come to the aisle");
+                        for (int i = 1; i < way.Count; i++)
+                        {
+                            Vector2 p = way[i - 1], q = way[i];
+                            Assert.IsTrue(p.x == q.x || p.y == q.y, who + ": " + p + " to " + q + " is askew");
+                            for (float k = 0; k <= (q - p).magnitude; k += .25f)
+                            {
+                                var at = Vector2.MoveTowards(p, q, k);
+                                foreach (var s in Structures)
+                                {
+                                    var f = l.Footprint(s);
+                                    Assert.IsFalse(at.x > f.xMin - .5f && at.x < f.xMax - .5f && at.y > f.yMin - .5f && at.y < f.yMax - .5f, who + ": the way to the aisle goes through the " + s + " at " + at);
+                                }
+                            }
+                        }
+                    }
+                // the aisle itself is clear from the street behind it to the lane in front
+                for (float row = Layout.Street; row <= Iso.PlotTiles; row += .25f)
+                    foreach (var s in Structures)
+                    {
+                        var f = l.Footprint(s);
+                        Assert.IsFalse(Layout.Aisle > f.xMin - .5f && Layout.Aisle < f.xMax - .5f && row > f.yMin - .5f && row < f.yMax - .5f, "arrangement " + a + ": the " + s + " stands in the aisle at row " + row);
                     }
             }
         }

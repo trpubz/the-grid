@@ -171,6 +171,30 @@ namespace TheGrid.Core
             return new Vector2(f.x + (f.width - 1) / 2f, f.yMax - .1f);
         }
 
+        // Two ways over every plot are always clear, however it is arranged: the street, a row before the fronts of the
+        // back row of buildings, and the aisle, a column between the two low buildings that runs from the street to the
+        // lane in front. A courier keeps to them.
+        public const float Street = 3.25f, Aisle = 4f;
+
+        // A courier's way from a bot's front (Front) to the aisle, in tiles from the plot's first tile, turning square
+        // corners: from behind the street, down to it and along it; from before it, straight along its own row.
+        public List<Vector2> ToAisle(Place place, int slot)
+        {
+            var front = Front(place, slot);
+            var way = new List<Vector2> { front };
+            void Put(Vector2 p)
+            {
+                if (way[way.Count - 1] != p) way.Add(p);
+            }
+            if (front.y < Street)
+            {
+                Put(new Vector2(front.x, Street));
+                Put(new Vector2(Aisle, Street));
+            }
+            else Put(new Vector2(Aisle, front.y));
+            return way;
+        }
+
         // The building a point of the plot is inside, if it is one a bot works inside.
         public Structure? Room(Vector2 at)
         {

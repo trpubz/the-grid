@@ -10,7 +10,7 @@ namespace TheGrid.Core
     {
         public string key = "", fromBot = "", toBot = "";
         public Vector2Int fromAt, toAt;   // the origins of the sender's sector and the recipient's
-        public Vector2 fromFront, toFront;   // where its courier starts and where it stops, in art pixels: the front of each bot's building, or where the bot stands in the open
+        public List<Vector2> ride = new List<Vector2>();   // the way its courier rides out, in art pixels (Iso.Ride)
         public long receivedAt;
         public List<Vector2Int> way = new List<Vector2Int>();   // the sectors its courier passes, by their origins, first to last; one when both bots are in the same sector
     }
@@ -54,26 +54,27 @@ namespace TheGrid.Core
                 if (!byKey || !byArrival) continue;
                 if (row.receivedAt <= openedAt) continue;     // history, not news
                 string who = row.from + " to " + row.to;
-                bool sender = One(world, row.account, row.from, out var from, out var fromAt, out var fromFront), recipient = One(world, row.account, row.to, out var to, out var toAt, out var toFront);
+                bool sender = One(world, row.account, row.from, out var from, out var fromIn), recipient = One(world, row.account, row.to, out var to, out var toIn);
                 if (!sender || !recipient)
                 {
                     said?.Add("no courier: " + who + ": the " + (sender ? "recipient" : "sender") + " is not one bot on the map");
                     continue;
                 }
+                Vector2Int fromAt = fromIn.origin, toAt = toIn.origin;
                 var way = Roads.Hops(world, fromAt, toAt) ?? new List<Vector2Int>();
                 said?.Add("courier: " + who + (way.Count > 1 ? ", through " + way.Count + " sectors" : fromAt == toAt ? ", within one sector" : ", across open ground"));
-                found.Add(new Delivery { key = row.key, fromBot = from, toBot = to, fromAt = fromAt, toAt = toAt, fromFront = fromFront, toFront = toFront, receivedAt = row.receivedAt, way = way });
+                found.Add(new Delivery { key = row.key, fromBot = from.key, toBot = to.key, fromAt = fromAt, toAt = toAt, receivedAt = row.receivedAt, way = way,
+                    ride = Iso.Ride(fromAt, fromIn.layout, from.place, from.slot, toAt, toIn.layout, to.place, to.slot, way) });
             }
             return found;
         }
 
         // The one bot of that name on that account. An ended session stays on the map for hours as an offline bot, and a
         // session restarted under the same name is a second bot called the same: among namesakes, only the live ones count.
-        static bool One(WorldModel world, string account, string name, out string key, out Vector2Int at, out Vector2 front)
+        static bool One(WorldModel world, string account, string name, out WorldBot bot, out WorldSector at)
         {
-            key = "";
-            at = default;
-            front = default;
+            bot = null;
+            at = null;
             if (account == "" || name == "") return false;
             int live = 0, ended = 0;
             foreach (var sector in world.sectors)
@@ -84,10 +85,8 @@ namespace TheGrid.Core
                     if (isLive) live++; else ended++;
                     if (isLive || live == 0)
                     {
-                        key = b.key;
-                        at = sector.origin;
-                        var before = sector.layout.Front(b.place, b.slot);
-                        front = Iso.Point(sector.origin.x + before.x, sector.origin.y + before.y);
+                        bot = b;
+                        at = sector;
                     }
                 }
             return live == 1 || (live == 0 && ended == 1);

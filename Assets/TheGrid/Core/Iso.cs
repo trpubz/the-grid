@@ -212,14 +212,37 @@ namespace TheGrid.Core
             return new List<Vector2Int>(tiles);
         }
 
-        // The whole of a courier's ride out, in art pixels: from the front of the sender's building, by the crossings, lanes
-        // and roads of the sectors on its way (Route), to the front of the recipient's. Within one sector, straight from
-        // the one to the other. It rides back the same way.
-        public static List<Vector2> Ride(Vector2 from, IReadOnlyList<Vector2Int> way, Vector2 to)
+        // The whole of a courier's ride out, in tiles (RideTiles) or in art pixels (Ride): from the front of the sender's
+        // building over its plot (Layout.ToAisle, then down the aisle) to its crossing, by the lanes and roads of the
+        // sectors on its way (Route), and over the recipient's plot to the front of its building. Within one sector, from
+        // the one front to the other by the aisle. Every leg runs along columns or along rows, through nothing that
+        // stands. It rides back the same way.
+        public static List<Vector2> RideTiles(Vector2Int fromOrigin, Layout fromLayout, Place fromPlace, int fromSlot, Vector2Int toOrigin, Layout toLayout, Place toPlace, int toSlot, IReadOnlyList<Vector2Int> way)
         {
-            var ride = new List<Vector2> { from };
-            foreach (var corner in Route(way)) ride.Add(Point(corner.x, corner.y));
-            ride.Add(to);
+            var ride = new List<Vector2>();
+            void Put(Vector2Int o, Vector2 p)
+            {
+                var at = new Vector2(o.x + p.x, o.y + p.y);
+                if (ride.Count == 0 || ride[ride.Count - 1] != at) ride.Add(at);
+            }
+            foreach (var p in fromLayout.ToAisle(fromPlace, fromSlot)) Put(fromOrigin, p);
+            var lanes = Route(way);
+            if (lanes.Count > 0)
+            {
+                // Down the aisle to the lane in front, along it to the crossing, and at the other end the same turned round.
+                Put(fromOrigin, new Vector2(Layout.Aisle, PlotTiles + .5f));
+                foreach (var p in lanes) Put(Vector2Int.zero, p);
+                Put(toOrigin, new Vector2(Layout.Aisle, PlotTiles + .5f));
+            }
+            var last = toLayout.ToAisle(toPlace, toSlot);
+            for (int i = last.Count - 1; i >= 0; i--) Put(toOrigin, last[i]);
+            return ride;
+        }
+
+        public static List<Vector2> Ride(Vector2Int fromOrigin, Layout fromLayout, Place fromPlace, int fromSlot, Vector2Int toOrigin, Layout toLayout, Place toPlace, int toSlot, IReadOnlyList<Vector2Int> way)
+        {
+            var ride = new List<Vector2>();
+            foreach (var p in RideTiles(fromOrigin, fromLayout, fromPlace, fromSlot, toOrigin, toLayout, toPlace, toSlot, way)) ride.Add(Point(p.x, p.y));
             return ride;
         }
 

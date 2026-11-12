@@ -4,31 +4,37 @@ using UnityEngine;
 
 namespace TheGrid
 {
-    // Messages arriving, as the world shows them: a courier appears beside the sender, rides to the recipient (by the lanes
-    // and roads when they are in different sectors) and leaves a trail of light behind it; a ring of light then pulses
-    // under the recipient, and the trail fades over two minutes. Nothing here decides what is shown; Deliveries does that.
+    // Messages arriving, as the world shows them. A courier appears at the front of the sender's building, rides to the
+    // front of the recipient's (down the middle of the lanes and roads when they are in different sectors) and rides
+    // back the way it came. Behind it stands a ribbon of light as tall as the bike, see-through, in the sender's colour:
+    // it stays for two minutes after the courier is back, fading, so that a ride nobody watched can still be read. As
+    // the courier arrives, a ring of light pulses under the recipient. Bike and ribbon are drawn in their true place: a
+    // road behind a building is behind it. Nothing here decides what is shown; Deliveries does that.
     public sealed class WorldTraffic
     {
-        const float Leaves = .6f, PulseStep = .3f, SenderSignals = .9f;   // Leaves: how long a courier stands beside its sender before it rides
+        const float Leaves = .6f, PulseStep = .3f, SenderSignals = .9f;   // Leaves: how long a courier stands before it rides
+        const float SliceWide = 4f, RibbonHigh = 26f;                     // art pixels: the ribbon's slices, and the bike's height
         const int PulseSteps = ArtNames.PulseSteps;
-        // The trail, brightest first: the violet of the pulse and of its glow (tools/art/kit.py: violetw, violet, vg1, vg0).
-        static readonly Color32[] Fades = { new Color32(0xd9, 0xc8, 0xff, 255), new Color32(0xa0, 0x70, 0xff, 255), new Color32(0x66, 0x57, 0xb8, 255), new Color32(0x4b, 0x46, 0x96, 255) };
-        static Material lit;
+        // How much of what is behind it the ribbon hides, at each step of its fading (Deliveries.Trail).
+        static readonly byte[] Fades = { 128, 96, 64, 36 };
+        static Sprite white;   // one pixel, standing on its lower edge: every slice of every ribbon
 
         sealed class Trip
         {
             public Delivery d;
-            public List<Vector2> route = new List<Vector2>();   // pixels
-            public float started, rides, length;                 // rides: seconds until it arrives, standing beside the sender included
+            public List<Vector2> route = new List<Vector2>();   // pixels, the way out
+            public float started, oneWay, length;                // oneWay: seconds on the road, each way
             public SpriteRenderer bike, pulse;
-            public LineRenderer trail;
-            public int fade = -2;                                // the step of its fading the trail is drawn at; -1 is gone
+            public List<Iso.RibbonSlice> cut;                    // the ribbon, in slices, in the order the courier lays them
+            public readonly List<SpriteRenderer> ribbon = new List<SpriteRenderer>();   // those laid so far
+            public Transform holder;
+            public Color32 light;
+            public int fade = -2;                                // the step of its fading the ribbon is drawn at; -1 is gone
         }
 
         readonly Transform root;
         readonly WorldStage stage;
         readonly List<Trip> trips = new List<Trip>();
-        float wide = 4f;   // how wide a trail is drawn, in art pixels
 
         public WorldTraffic(Transform parent, WorldStage stage)
         {
@@ -37,50 +43,49 @@ namespace TheGrid
             this.stage = stage;
         }
 
-        // Returns how long the courier takes to arrive: the pulse starts when it does.
+        // Returns how long the courier takes to reach the recipient: the pulse starts when it does.
         public float Add(Delivery d, float now)
         {
-            // From where the sender stands to where the recipient stands. One of them not drawn: nothing to ride between.
-            if (!stage.TryGetBot(d.fromBot, out var from) || !stage.TryGetBot(d.toBot, out var to)) return 0f;
-            var trip = new Trip { d = d, started = now, route = Iso.Ride(from, d.way, to) };
+            var trip = new Trip { d = d, started = now, route = d.ride, light = stage.Light(d.fromBot) };
             for (int i = 1; i < trip.route.Count; i++) trip.length += (trip.route[i] - trip.route[i - 1]).magnitude;
-            trip.rides = Leaves + Iso.RideSeconds(trip.length);
+            trip.oneWay = Iso.RideSeconds(trip.length);
+            trip.cut = Iso.Ribbon(trip.route, SliceWide);
+            trip.holder = new GameObject("ribbon").transform;
+            trip.holder.SetParent(root, false);
             trips.Add(trip);
             // The recipient holds a hand to its helmet until the pulse is over; the sender only as the courier leaves.
-            stage.Signal(d.toBot, now + trip.rides + PulseSteps * PulseStep);
+            stage.Signal(d.toBot, now + Leaves + trip.oneWay + PulseSteps * PulseStep);
             stage.Signal(d.fromBot, now + SenderSignals);
-            return trip.rides;
+            return Leaves + trip.oneWay;
         }
 
-        // Moves couriers and pulses on, and fades trails. Returns true when the map has to be drawn again: all the while a
-        // courier rides or a pulse runs, and after that only at each step of a trail's fading. zoom: screen pixels to the art
-        // pixel, as the map is drawn now.
-        public bool Tick(float now, float zoom)
+        // Moves couriers and pulses on, and fades ribbons. Returns true when the map has to be drawn again: all the while a
+        // courier rides or a pulse runs, and after that only at each step of a ribbon's fading.
+        public bool Tick(float now)
         {
             bool changed = false;
-            // A trail is four art pixels wide, and never under three of the screen's: far out it is still a line.
-            wide = Mathf.Max(4f, 3f / zoom);
             for (int i = trips.Count - 1; i >= 0; i--)
             {
                 var t = trips[i];
-                float since = now - t.started;
-                if (since < t.rides)
+                float since = now - t.started, there = Leaves + t.oneWay, home = there + t.oneWay;
+                if (since < home)
                 {
-                    Ride(t, Mathf.Clamp01((since - Leaves) / (t.rides - Leaves)));
+                    // Out, laying the ribbon; then back along it.
+                    bool back = since >= there;
+                    float gone = t.length * (back ? 1f - (since - there) / t.oneWay : Mathf.Clamp01((since - Leaves) / t.oneWay));
+                    Ride(t, gone, back);
+                    Lay(t, back ? t.length : gone);
                     changed = true;
-                    continue;
                 }
-                if (t.bike != null)
+                else if (t.bike != null)
                 {
                     WorldStage.Kill(t.bike.gameObject);
                     t.bike = null;
                     changed = true;
                 }
-                // The whole way it came, also for a courier that was never seen riding because the app stood still meanwhile.
-                if (t.fade == -2) Trail(t, t.route.Count - 1, t.route[t.route.Count - 1]);
-                int step = (int)((since - t.rides) / PulseStep);
                 // The pulse is under the recipient where it stands now. If it has gone, there is nothing to pulse under.
-                if (step < PulseSteps && stage.TryGetBot(t.d.toBot, out var at))
+                int step = since < there ? -1 : (int)((since - there) / PulseStep);
+                if (step >= 0 && step < PulseSteps && stage.TryGetBot(t.d.toBot, out var at))
                 {
                     if (t.pulse == null) t.pulse = New("pulse");
                     t.pulse.sprite = WorldStage.Art(ArtNames.Pulse(step));
@@ -95,26 +100,28 @@ namespace TheGrid
                     t.pulse = null;
                     changed = true;
                 }
-                t.trail.widthMultiplier = wide;
-                int fade = Deliveries.Trail(since - t.rides);
+                if (since < home) continue;
+                // Back where it started: the ribbon stays, all of it, also if nobody saw the ride because the app stood still.
+                Lay(t, t.length);
+                int fade = Deliveries.Trail(since - home);
                 if (fade == t.fade) continue;
                 changed = true;
                 t.fade = fade;
-                if (fade >= 0) t.trail.startColor = t.trail.endColor = Fades[fade];
+                if (fade >= 0)
+                    foreach (var slice in t.ribbon) slice.color = new Color32(t.light.r, t.light.g, t.light.b, Fades[fade]);
                 else
                 {
-                    // Two minutes on: the trail is gone, and with it the last of this message.
-                    if (t.trail != null) WorldStage.Kill(t.trail.gameObject);
-                    if (t.pulse != null) WorldStage.Kill(t.pulse.gameObject);
+                    // Two minutes on: the ribbon is gone, and with it the last of this message.
+                    WorldStage.Kill(t.holder.gameObject);
                     trips.RemoveAt(i);
                 }
             }
             return changed;
         }
 
-        void Ride(Trip t, float part)
+        // Puts the courier so many pixels along its way, facing the way it rides.
+        void Ride(Trip t, float gone, bool back)
         {
-            float gone = part * t.length;
             for (int i = 1; i < t.route.Count; i++)
             {
                 Vector2 a = t.route[i - 1], b = t.route[i];
@@ -125,40 +132,33 @@ namespace TheGrid
                     continue;
                 }
                 var p = Vector2.Lerp(a, b, leg <= 0 ? 1 : Mathf.Clamp01(gone / leg));
-                if (t.bike == null)
-                {
-                    t.bike = New("courier");
-                    // Over everything, buildings included. A lane runs behind whatever sector stands in front of it, and a
-                    // courier drawn in its true place would be out of sight for most of most rides.
-                    t.bike.sortingOrder = 5;
-                }
-                // It faces the way it rides, and carries its sender's colours.
-                string facing = b.x >= a.x ? (b.y < a.y ? "se" : "ne") : (b.y >= a.y ? "nw" : "sw");
+                if (t.bike == null) t.bike = New("courier");
+                var ahead = back ? a - b : b - a;
+                // It carries its sender's colours.
+                string facing = ahead.x >= 0 ? (ahead.y < 0 ? "se" : "ne") : (ahead.y >= 0 ? "nw" : "sw");
                 t.bike.sprite = stage.BotArt(t.d.fromBot, ArtNames.Bike(facing));
+                // In its true place, as a bot is: before a building it rides in front of, behind one it rides behind.
                 t.bike.transform.localPosition = new Vector3(Mathf.Round(p.x), Mathf.Round(p.y), -1);
-                Trail(t, i, p);
                 return;
             }
         }
 
-        // Draws a trip's trail: along the first `corners` points of its way, and on to `end`.
-        void Trail(Trip t, int corners, Vector2 end)
+        // Stands up the slices of the ribbon as far as the courier has ridden.
+        void Lay(Trip t, float gone)
         {
-            if (t.trail == null)
+            if (white == null) white = Sprite.Create(Texture2D.whiteTexture, new Rect(0, 0, 1, 1), new Vector2(.5f, 0f), 1f);
+            while (t.ribbon.Count < t.cut.Count && t.cut[t.ribbon.Count].at <= gone)
             {
-                if (lit == null) lit = new Material(Shader.Find("Sprites/Default"));
-                t.trail = new GameObject("trail").AddComponent<LineRenderer>();
-                t.trail.transform.SetParent(root, false);
-                t.trail.useWorldSpace = false;
-                t.trail.sharedMaterial = lit;
-                t.trail.alignment = LineAlignment.TransformZ;
-                t.trail.sortingOrder = 4;   // over the map, as the courier is, and under the courier
-                t.trail.startColor = t.trail.endColor = Fades[0];
+                var cut = t.cut[t.ribbon.Count];
+                var slice = New("slice");
+                slice.transform.SetParent(t.holder, false);
+                slice.sprite = white;
+                slice.color = new Color32(t.light.r, t.light.g, t.light.b, Fades[0]);
+                // Each in its own place among the buildings, just behind a bot standing where it stands.
+                slice.transform.localPosition = new Vector3(Mathf.Round(cut.x), Mathf.Round(cut.y), -.9f);
+                slice.transform.localScale = new Vector3(cut.wide, RibbonHigh + cut.rise, 1);
+                t.ribbon.Add(slice);
             }
-            t.trail.widthMultiplier = wide;
-            t.trail.positionCount = corners + 1;
-            for (int i = 0; i < corners; i++) t.trail.SetPosition(i, new Vector3(t.route[i].x, t.route[i].y, -1));
-            t.trail.SetPosition(corners, new Vector3(end.x, end.y, -1));
         }
 
         SpriteRenderer New(string name)

@@ -11,7 +11,6 @@ namespace TheGrid.Core.Tests
     {
         const long Opened = 1794000092000;   // the world was opened between the two messages being sent
         RosterSnapshot snap;
-        WorldModel world;
         PileSnapshot pile;
 
         [SetUp]
@@ -52,27 +51,70 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(0, Iso.Route(within.way).Count);
         }
 
+        // True when a point of the map, in tiles, is on a building, the relay or the fountain of that sector.
+        static bool Built(WorldSector s, Vector2 at)
+        {
+            foreach (Structure kind in Enum.GetValues(typeof(Structure)))
+            {
+                var f = s.layout.Footprint(kind);
+                if (at.x > s.origin.x + f.xMin - .5f && at.x < s.origin.x + f.xMax - .5f && at.y > s.origin.y + f.yMin - .5f && at.y < s.origin.y + f.yMax - .5f) return true;
+            }
+            return false;
+        }
+
+        static void AssertRidesRoundEverything(List<Vector2> ride, string who)
+        {
+            for (int i = 1; i < ride.Count; i++)
+            {
+                Vector2 p = ride[i - 1], q = ride[i];
+                Assert.AreNotEqual(p, q, who + ": a leg of no length");
+                Assert.IsTrue(p.x == q.x || p.y == q.y, who + ": a courier turns square corners: " + p + " to " + q);
+                for (float k = 0; k <= (q - p).magnitude; k += .25f)
+                    foreach (var sector in world.sectors) Assert.IsFalse(Built(sector, Vector2.MoveTowards(p, q, k)), who + ": rides through something of " + sector.name + " at " + Vector2.MoveTowards(p, q, k));
+            }
+        }
+
+        static WorldModel world;
+
         [Test]
-        public void ACourierRidesFromTheSenderToTheRecipientAlsoWithinOneSector()
+        public void ACourierRidesFromTheFrontOfOneBuildingToTheFrontOfAnotherRoundEverythingBetween()
         {
             var got = new Deliveries(Opened).New(pile, world);
             Delivery between = got.Single(d => d.key == "m-0001"), within = got.Single(d => d.key == "m-0002");
-            Vector2 from = new Vector2(-40, 12), to = new Vector2(900, -300);   // where the two bots stand, in art pixels
-            // between two sectors: from beside the sender, by its sector's crossing, the lanes and the road, to the recipient
-            var ride = Iso.Ride(from, between.way, to);
-            Assert.AreEqual(from, ride[0]);
-            Assert.AreEqual(to, ride[ride.Count - 1]);
-            CollectionAssert.AreEqual(Iso.Route(between.way).Select(c => Iso.Point(c.x, c.y)).ToList(), ride.Skip(1).Take(ride.Count - 2).ToList());
-            // within one sector: straight from the one to the other
-            CollectionAssert.AreEqual(new[] { from, to }, Iso.Ride(from, within.way, to));
-
-            // a courier starts at the front of its sender's building and stops at the front of the recipient's
             WorldSector alpha = world.sectors[0], beta = world.sectors[1];
-            WorldBot sender = alpha.bots.Single(b => b.name == "alpha-04"), recipient = beta.bots.Single(b => b.name == "beta-01");
-            Vector2 leaves = alpha.layout.Front(sender.place, sender.slot), arrives = beta.layout.Front(recipient.place, recipient.slot);
-            Assert.AreEqual(Iso.Point(alpha.origin.x + leaves.x, alpha.origin.y + leaves.y), between.fromFront);
-            Assert.AreEqual(Iso.Point(beta.origin.x + arrives.x, beta.origin.y + arrives.y), between.toFront);
-            Assert.AreNotEqual(within.fromFront, within.toFront);
+            WorldBot Bot(WorldSector s, string name) => s.bots.Single(b => b.name == name);
+            Vector2 Before(WorldSector s, WorldBot b) => new Vector2(s.origin.x, s.origin.y) + s.layout.Front(b.place, b.slot);
+
+            // between two sectors: from the front of the sender's building, over its plot to its crossing, by the lanes and
+            // the road, and over the recipient's plot to the front of its building
+            WorldBot sender = Bot(alpha, "alpha-04"), recipient = Bot(beta, "beta-01");
+            var ride = Iso.RideTiles(alpha.origin, alpha.layout, sender.place, sender.slot, beta.origin, beta.layout, recipient.place, recipient.slot, between.way);
+            Assert.AreEqual(Before(alpha, sender), ride[0]);
+            Assert.AreEqual(Before(beta, recipient), ride[ride.Count - 1]);
+            var lanes = Iso.Route(between.way);
+            int at = ride.IndexOf(lanes[0]);
+            Assert.Greater(at, 0, "it comes to the crossing over the plot");
+            CollectionAssert.AreEqual(lanes, ride.GetRange(at, lanes.Count));
+            AssertRidesRoundEverything(ride, "between sectors");
+            // what the world draws is that ride, in art pixels
+            CollectionAssert.AreEqual(ride.Select(p => Iso.Point(p.x, p.y)).ToList(), between.ride);
+
+            // within one sector: over the plot from the one front to the other, and never out on the lane
+            WorldBot a = Bot(alpha, "alpha-02"), b = Bot(alpha, "alpha-03");
+            var across = Iso.RideTiles(alpha.origin, alpha.layout, a.place, a.slot, alpha.origin, alpha.layout, b.place, b.slot, within.way);
+            Assert.AreEqual(Before(alpha, a), across[0]);
+            Assert.AreEqual(Before(alpha, b), across[across.Count - 1]);
+            Assert.IsTrue(across.All(p => p.y < alpha.origin.y + Iso.PlotTiles - .5f), "it stays on the plot");
+            AssertRidesRoundEverything(across, "within a sector");
+            CollectionAssert.AreEqual(across.Select(p => Iso.Point(p.x, p.y)).ToList(), within.ride);
+
+            // from and to every place a bot can be, in every arrangement, nothing is ridden through
+            foreach (var from in alpha.bots)
+                foreach (var to in beta.bots)
+                    AssertRidesRoundEverything(Iso.RideTiles(alpha.origin, alpha.layout, from.place, from.slot, beta.origin, beta.layout, to.place, to.slot, between.way), from.name + " to " + to.name);
+            foreach (var from in alpha.bots)
+                foreach (var to in alpha.bots)
+                    if (from != to) AssertRidesRoundEverything(Iso.RideTiles(alpha.origin, alpha.layout, from.place, from.slot, alpha.origin, alpha.layout, to.place, to.slot, within.way), from.name + " to " + to.name);
         }
 
         [Test]

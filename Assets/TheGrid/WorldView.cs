@@ -238,7 +238,7 @@ namespace TheGrid
         {
             if (holder == null || !holder.gameObject.activeSelf) return;
             float now = Time.unscaledTime;
-            bool riding = traffic.Tick(now, Iso.Zoom[level]);
+            bool riding = traffic.Tick(now);
             stale |= stage.Tick(now) | riding;
             if (stage.Walking || riding) fastUntil = now + .2f;
             // Ten frames a second is plenty for a lens that sits open all day; a walk or a drag gets sixty while it lasts.

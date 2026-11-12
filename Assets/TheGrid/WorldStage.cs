@@ -132,6 +132,9 @@ namespace TheGrid
         public Sprite BotArt(string botKey, string name) =>
             bots.TryGetValue(botKey, out var b) ? Lit(name, b.data.colour) : Art(name);
 
+        // The colour of a bot's light: its account's. What its courier's ribbon is drawn in.
+        public Color32 Light(string botKey) => Colourways[(bots.TryGetValue(botKey, out var b) ? b.data.colour : 0) % Colourways.Length][0];
+
         // Every picture the world, its panels and its traffic draw comes through here. One that is missing is said once,
         // by name, and the world is drawn without it.
         public static Sprite Art(string name)
