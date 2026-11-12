@@ -95,6 +95,49 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
+        public void ThePointerRestingAtAnEdgeOfTheMapMovesItThatWay()
+        {
+            var view = new Rect(8, 32, 1000, 600);   // the map, in the window's points: y runs down
+            Assert.AreEqual(Vector2.zero, Iso.EdgePan(view, new Vector2(500, 300), 28));
+            // to the left and the right; up is toward the top of the window
+            Assert.AreEqual(new Vector2(-1, 0), Iso.EdgePan(view, new Vector2(13, 300), 28));
+            Assert.AreEqual(new Vector2(1, 0), Iso.EdgePan(view, new Vector2(1003, 300), 28));
+            Assert.AreEqual(new Vector2(0, 1), Iso.EdgePan(view, new Vector2(500, 37), 28));
+            Assert.AreEqual(new Vector2(0, -1), Iso.EdgePan(view, new Vector2(500, 627), 28));
+            Assert.AreEqual(new Vector2(-1, 1), Iso.EdgePan(view, new Vector2(13, 37), 28), "a corner moves it both ways");
+            // only within the edge
+            Assert.AreEqual(Vector2.zero, Iso.EdgePan(view, new Vector2(8 + 28, 300), 28));
+            Assert.AreNotEqual(Vector2.zero, Iso.EdgePan(view, new Vector2(8 + 27.5f, 300), 28));
+            // and only while the pointer is on the map: off it, in the bar above or outside the window, nothing moves
+            Assert.AreEqual(Vector2.zero, Iso.EdgePan(view, new Vector2(2, 300), 28));
+            Assert.AreEqual(Vector2.zero, Iso.EdgePan(view, new Vector2(500, 20), 28));
+            Assert.AreEqual(Vector2.zero, Iso.EdgePan(view, new Vector2(1200, 300), 28));
+            Assert.AreEqual(Vector2.zero, Iso.EdgePan(view, new Vector2(500, 640), 28));
+        }
+
+        [Test]
+        public void TheWheelZoomsOneLevelAtATimeHoweverItIsTurned()
+        {
+            float pending = 0;
+            // a notch of a mouse's wheel is a level: in for a turn away, out for a turn toward
+            Assert.AreEqual(1, Iso.WheelStep(ref pending, -1f, 1f));
+            Assert.AreEqual(-1, Iso.WheelStep(ref pending, 1f, 1f));
+            Assert.AreEqual(1, Iso.WheelStep(ref pending, -5f, 1f), "a hard turn is still one level");
+            Assert.AreEqual(0f, pending);
+            // two fingers on a trackpad send many small turns: they add up to a level
+            for (int i = 0; i < 3; i++) Assert.AreEqual(0, Iso.WheelStep(ref pending, -.3f, 1f));
+            Assert.AreEqual(1, Iso.WheelStep(ref pending, -.3f, 1f));
+            // and then the map rests: what is turned in the next moment is dropped, or one swipe would run through every level
+            Assert.AreEqual(0, Iso.WheelStep(ref pending, -3f, .05f));
+            Assert.AreEqual(0f, pending);
+            Assert.AreEqual(1, Iso.WheelStep(ref pending, -3f, Iso.WheelRest));
+            // turning back starts afresh: nothing left over has to be undone first
+            Assert.AreEqual(0, Iso.WheelStep(ref pending, -.6f, 1f));
+            Assert.AreEqual(0, Iso.WheelStep(ref pending, .6f, 1f));
+            Assert.AreEqual(-1, Iso.WheelStep(ref pending, .5f, 1f));
+        }
+
+        [Test]
         public void ARoadBetweenTwoSectorsThatDoNotFaceEachOtherSquarelyBendsTwiceInTheOpenGroundBetween()
         {
             Vector2Int a = new Vector2Int(0, 0), b = new Vector2Int(30, 7);   // b to the right, seven tiles further forward

@@ -38,6 +38,9 @@ namespace TheGrid.EditorTools
                 File.WriteAllBytes("Logs/world-" + (far ? "far" : "near") + ".png", view.Picture(World.Build(snap, new Plots()), 2000, 1250, far, 0f).EncodeToPNG());
             // And the same sector a beat later: the lights of the buildings bots are working in at the dim half of their pulse.
             File.WriteAllBytes("Logs/world-near-dim.png", view.Picture(World.Build(snap, new Plots()), 2000, 1250, false, 1f).EncodeToPNG());
+            // And the bots at their jobs, a beat or two apart: the same bots in other poses, and those that carry in other places.
+            foreach (int beat in new[] { 2, 5, 9 })
+                File.WriteAllBytes("Logs/world-jobs-" + beat + ".png", view.Picture(World.Build(snap, new Plots()), 2000, 1250, false, beat * Jobs.BeatSeconds + .1f).EncodeToPNG());
             // And a while later: some have gone to work on another floor, and are caught three fifths of their way there.
             var later = JsonUtility.FromJson<RosterSnapshot>(File.ReadAllText("fixtures/world/later.json"));
             File.WriteAllBytes("Logs/world-stairs.png", view.Picture(World.Build(later, new Plots()), 2000, 1250, false, 0f, .6f).EncodeToPNG());

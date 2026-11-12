@@ -17,7 +17,7 @@ import kit
 from kit import PALETTE, box, disc, hex_rgb, light, record, render
 
 FACINGS = [("se", 0), ("ne", 1), ("nw", 2), ("sw", 3)]
-POSES = ["stand", "walk-a", "walk-b", "type", "inspect", "signal", "off"]
+POSES = ["stand", "walk-a", "walk-b", "type", "inspect", "signal", "off", "press-a", "press-b", "pull-a", "pull-b", "carry-a", "carry-b"]
 SUIT, SLAB, BOOT = ("g2", "g0", "k1"), ("c0", "g5", "g3"), ("g5", "g3", "g1")
 HELMET = ["c1", "c0", "g5", "g5", "g3", "g4", "g2"]     # the crown; then upper, middle and lower, each on the lit side and the far side
 
@@ -44,7 +44,7 @@ def bot(pose="stand", s=1.0):
     def l(x, y, z, w, d, h, c): light(x * s, y * s, z * s, w * s, d * s, h * s, c)
     def ring(x, y, z, r, h, c, axis="z"): disc(x * s, y * s, z * s, r * s, h * s, c, axis=axis)
     near = -1 if kit.TURN % 4 in (0, 1) else 1                        # the arm on the side the camera sees does the acting
-    stride = {"walk-a": .08, "walk-b": -.08}.get(pose, 0)
+    stride = {"walk-a": .08, "walk-b": -.08, "carry-a": .08, "carry-b": -.08}.get(pose, 0)
 
     l(0, 0, .001, .26, .28, .001, "k1")                               # its shadow
     for side in (-1, 1):                                              # a stride moves one leg forward, one back
@@ -60,10 +60,23 @@ def bot(pose="stand", s=1.0):
     else:                                                             # or on its back: a ring of light
         ring(-.115, 0, .345, .115, .03, main, "x"); ring(-.125, 0, .345, .065, .03, "k1", "x")
 
+    if pose.startswith("carry"):                                      # a core or a drive, held before it in both hands
+        b(.3, 0, .3, .16, .26, .16, "g5", "g3", "g2"); l(.3, 0, .46, .1, .2, .012, main); l(.383, 0, .33, .012, .2, .1, hi)
+
     for side in (-1, 1):
         y = side * .205
         if pose == "type":                                            # both held forward, to a keyboard
             b(.12, y, .33, .26, .09, .09, *SLAB); l(.25, y, .335, .03, .09, .08, main)
+        elif pose.startswith("carry"):                                # both held forward, under what it carries
+            b(.13, y * .8, .29, .28, .09, .09, *SLAB)
+        elif pose == "press-a" and side == near:                      # out to a button or a socket, the hand lit
+            b(.16, y, .37, .34, .09, .09, *SLAB); l(.33, y, .37, .04, .1, .1, main)
+        elif pose == "press-b" and side == near:                      # and drawn back
+            b(.08, y, .34, .2, .09, .09, *SLAB); l(.18, y, .34, .03, .1, .1, dim)
+        elif pose == "pull-a" and side == near:                       # up to a lever
+            b(.1, y, .4, .12, .09, .26, *SLAB); l(.11, y, .64, .12, .1, .05, main)
+        elif pose == "pull-b" and side == near:                       # and down with it
+            b(.14, y, .22, .22, .09, .1, *SLAB); l(.26, y, .22, .04, .1, .1, main)
         elif pose == "inspect" and side == near:                      # one held forward, under the disc
             b(.09, y, .33, .2, .09, .09, *SLAB)
         elif pose == "signal" and side == near:                       # a hand up to the helmet

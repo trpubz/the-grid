@@ -173,6 +173,13 @@ namespace TheGrid
 
         public void ZoomBy(int steps) => level = Iso.ClampLevel(level + steps);
 
+        // False to keep the map still under a pointer at its edge: for pictures.
+        public bool EdgeMoves = true;
+        const float EdgePoints = 28f, EdgeSpeed = 600f;   // how wide the edge is, and how fast the map moves, in the window's points
+        float wheel, wheelAt = -10f;                      // what the wheel has turned toward its next level, and when it last zoomed
+        Func<Vector2, bool> taken;                        // as the last Gui was told: where panels are, and whether the map listens
+        bool deaf;
+
         // What has to be in view is more than the ground: the skyline stands above the back of a sector, with its names over it.
         void Fit(Rect ground)
         {
@@ -241,6 +248,21 @@ namespace TheGrid
             bool riding = traffic.Tick(now);
             stale |= stage.Tick(now) | riding;
             if (stage.Walking || riding) fastUntil = now + .2f;
+            // The pointer resting at an edge of the map moves the map that way: not while something is being dragged, nor
+            // over a panel, nor while this is not the window in front.
+            if (EdgeMoves && !deaf && !dragging && Application.isFocused)
+            {
+                var pointer = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y) / pointScale;
+                var push = taken != null && taken(pointer) ? Vector2.zero : Iso.EdgePan(view, pointer, EdgePoints);
+                if (push != Vector2.zero)
+                {
+                    var was = centre;
+                    centre += push * (EdgeSpeed * Time.unscaledDeltaTime * pointScale / Iso.Zoom[level]);
+                    PlaceCamera();
+                    // Sixty frames a second only while the map is moving: at its limit a pointer resting at the edge costs nothing.
+                    if (centre != was) fastUntil = now + .2f;
+                }
+            }
             // Ten frames a second is plenty for a lens that sits open all day; a walk or a drag gets sixty while it lasts.
             Application.targetFrameRate = now < fastUntil ? 60 : 10;
         }
@@ -292,6 +314,8 @@ namespace TheGrid
             if (holder == null) return;
             var e = Event.current;
             RegionClicked = MovedRegion = MovedPlot = DepotClicked = SectorClicked = -1;
+            taken = covered;
+            deaf = !listens;
             // With something open over the whole window, the map takes no press, scroll or key: they are for what is open.
             if (listens) Handle(e, covered);
             if (e.type != EventType.Repaint) return;
@@ -518,8 +542,15 @@ namespace TheGrid
                     e.Use();
                     break;
                 case EventType.ScrollWheel when inside:
-                    if (e.command || e.control) ZoomBy(e.delta.y < 0 ? 1 : -1);
-                    else centre += new Vector2(e.delta.x, -e.delta.y) * 12f / k;
+                    // The wheel zooms, a level at a time, and what is under the pointer stays under it.
+                    int levels = Iso.WheelStep(ref wheel, e.delta.y, Time.unscaledTime - wheelAt);
+                    if (levels != 0)
+                    {
+                        wheelAt = Time.unscaledTime;
+                        var under = ToWorld(e.mousePosition - view.position);
+                        ZoomBy(levels);
+                        centre += under - ToWorld(e.mousePosition - view.position);
+                    }
                     Moved(e);
                     break;
                 case EventType.KeyDown when e.keyCode == KeyCode.Equals || e.keyCode == KeyCode.Plus || e.keyCode == KeyCode.KeypadPlus:

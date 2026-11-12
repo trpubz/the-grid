@@ -84,7 +84,20 @@ A bot at work goes inside. While anyone works in a building it is drawn opened, 
 
 **The lights of a building someone is working in pulse**: its lines, windows and glow go a step dimmer and back, about once every second and a half. A sector where lights are pulsing has agents at work; one that is still has none. Nothing else on the map moves for it.
 
-![Bots at work inside the server tower, the review hall and the works](docs/art/world-working.png)
+**A bot inside a building does one of the building's jobs**, and after a while the other one its place has:
+
+| Building | Jobs |
+|---|---|
+| Server tower | swaps a drive between two racks; plugs a cable into a rack; holds its disc up to read |
+| Review hall | pushes buttons on the console; reads a screen upstairs; holds its disc up |
+| Works | moves a core from one reactor to the other; pulls a lever on the panel; tends a reactor |
+| Test workshop | types at the terminal; pulls the lever at the bench; pushes buttons; moves a crate |
+
+It moves on the beat the building's lights pulse on, a pose every 0.7 seconds: an arm out and back, up to a lever and down, and a bot that carries takes a step each beat. Nothing moves between beats, so the map is drawn no more often than the pulse already has it drawn. Which job a bot is at follows from the bot and the clock alone: two bots in one building are out of step, and the same moment always looks the same. What a bot carries is lit in the bot's own colour.
+
+![Bots at their jobs in the server tower, the review hall and the works](docs/art/world-working.png)
+
+![The same bots three beats later: other poses, and the one that carries a step further on](docs/art/world-working-later.png)
 
 ![Bots on the stairs: two in the tower changing floors, one coming down in the hall](docs/art/world-stairs.png)
 
@@ -124,8 +137,8 @@ Those for you stand nearest the door. The depot's name says how many are open, a
 
 A lane runs round every sector, and roads cross the open ground so that every sector can be reached from every other: a short link between two sectors side by side in one region, a longer road between regions, which bends twice where the two sectors it joins do not face each other squarely. Past the last sector the city carries on to the edge of the window as dark blocks. Lanes, roads and blocks are scenery, worked out from where the sectors are; they say nothing about any agent.
 
-- **Move:** drag, or scroll with two fingers.
-- **Zoom:** the **−** and **+** buttons, the `-` and `+` keys, or scroll while holding Command. There are five levels, each double the last.
+- **Move:** drag the map, or rest the pointer at an edge of it: the map moves that way for as long as the pointer stays there. Not over a panel, and not while the window is behind another.
+- **Zoom:** the wheel, or two fingers on a trackpad: a level at a time, and what is under the pointer stays under it. Also the **−** and **+** buttons and the `-` and `+` keys. There are five levels, each double the last.
 - **Far out,** each sector shows its name, how many bots need you and how many are done, and with more than one workspace each region shows its workspace's name. Click a region's name to give it the next light; the choice is kept in `settings.json`. Click a sector's name to give its repo another workspace, from the same list as in the lists: this works for a repo with no session too, which has no row and no bot. A workspace with a repo in it has a region, so a new workspace gets a region and the next light the moment a repo is put in it, and the sector moves there. Drag a name to move what it names (below). **Closer in,** buildings and bots are named; where the two would overlap, the bot's name wins. The colour of a bot's light (blue, white or orange) is its account: an account gets the next colour the first time it is seen, and keeps it. Small bots beside a bot are its subagents.
 - **Click a bot** to see its card.
 
@@ -162,7 +175,7 @@ To look at the world without any agent sessions, start the app on a roster snaps
 Builds/TheGrid.app/Contents/MacOS/"The Grid" -snapshot "$PWD/fixtures/world/snapshot.json"
 ```
 
-Add `-shots <folder>` and it saves `far.png` and `near.png` there and quits; `-select <account>|<session id>` selects that bot for `near.png`, and `-messages <pile snapshot file>` (try `fixtures/world/messages.json`) shows its messages arriving and saves `start.png`, `courier.png` and `pulse.png` too. `-pulls <file>` (try `fixtures/world/pulls.json`) puts those pull requests at the depots, since a snapshot never asks GitHub, and `-depot <sector name>` opens that depot's list in `near.png`. `-moved <world file>` lays the map again from that `world.json` after `far.png` and saves `moved.png`: a picture of a map its owner has arranged. `-workspace <sector name>` opens that sector's list of workspaces in `near.png`, and with `-give <workspace>` too the repo is given that workspace and `given.png` shows the map afterwards. `-where <text>` puts that on the selected bot's card as the place its session lives, since a snapshot never asks zellij. `-then <snapshot file>` (try `fixtures/world/later.json`) swaps the snapshot for a later one after `near.png` and saves `stairs.png` with every bot that has somewhere new to go three fifths of its way there. With the editor closed, **The Grid > Render World Pictures** does much the same without a window, into `Logs/`, though without the names and badges:
+Add `-shots <folder>` and it saves `far.png` and `near.png` there and quits; `-select <account>|<session id>` selects that bot for `near.png`, and `-messages <pile snapshot file>` (try `fixtures/world/messages.json`) shows its messages arriving and saves `start.png`, `courier.png` and `pulse.png` too. `-pulls <file>` (try `fixtures/world/pulls.json`) puts those pull requests at the depots, since a snapshot never asks GitHub, and `-depot <sector name>` opens that depot's list in `near.png`. `-moved <world file>` lays the map again from that `world.json` after `far.png` and saves `moved.png`: a picture of a map its owner has arranged. `-workspace <sector name>` opens that sector's list of workspaces in `near.png`, and with `-give <workspace>` too the repo is given that workspace and `given.png` shows the map afterwards. `-where <text>` puts that on the selected bot's card as the place its session lives, since a snapshot never asks zellij. `-then <snapshot file>` (try `fixtures/world/later.json`) swaps the snapshot for a later one after `near.png` and saves `stairs.png` with every bot that has somewhere new to go three fifths of its way there. With the editor closed, **The Grid > Render World Pictures** does much the same without a window, into `Logs/`, though without the names and badges; it also renders the first sector at three beats (`world-jobs-2.png`, `-5`, `-9`), where the bots at work are seen in other poses and places:
 
 ```bash
 /Applications/Unity/Hub/Editor/6000.4.3f1/Unity.app/Contents/MacOS/Unity -batchmode -projectPath "$PWD" -executeMethod TheGrid.EditorTools.GridMenu.WorldPictures -quit
