@@ -69,6 +69,8 @@ namespace TheGrid.Core.Tests
                 Vector2 p = ride[i - 1], q = ride[i];
                 Assert.AreNotEqual(p, q, who + ": a leg of no length");
                 Assert.IsTrue(p.x == q.x || p.y == q.y, who + ": a courier turns square corners: " + p + " to " + q);
+                // and never rides a stretch only to come straight back along it
+                if (i > 1) Assert.GreaterOrEqual(Vector2.Dot(q - p, p - ride[i - 2]), 0f, who + ": doubles back at " + p + ", from " + ride[i - 2] + " and on to " + q);
                 for (float k = 0; k <= (q - p).magnitude; k += .25f)
                     foreach (var sector in world.sectors) Assert.IsFalse(Built(sector, Vector2.MoveTowards(p, q, k)), who + ": rides through something of " + sector.name + " at " + Vector2.MoveTowards(p, q, k));
             }
@@ -91,10 +93,12 @@ namespace TheGrid.Core.Tests
             var ride = Iso.RideTiles(alpha.origin, alpha.layout, sender.place, sender.slot, beta.origin, beta.layout, recipient.place, recipient.slot, between.way);
             Assert.AreEqual(Before(alpha, sender), ride[0]);
             Assert.AreEqual(Before(beta, recipient), ride[ride.Count - 1]);
+            // all of the lanes' way but its two ends, the crossings: a crossing is ridden through only where it is on the way
             var lanes = Iso.Route(between.way);
-            int at = ride.IndexOf(lanes[0]);
-            Assert.Greater(at, 0, "it comes to the crossing over the plot");
-            CollectionAssert.AreEqual(lanes, ride.GetRange(at, lanes.Count));
+            var middle = lanes.GetRange(1, lanes.Count - 2);
+            int at = ride.IndexOf(middle[0]);
+            Assert.Greater(at, 0, "it comes to the lanes over the plot");
+            CollectionAssert.AreEqual(middle, ride.GetRange(at, middle.Count));
             AssertRidesRoundEverything(ride, "between sectors");
             // what the world draws is that ride, in art pixels
             CollectionAssert.AreEqual(ride.Select(p => Iso.Point(p.x, p.y)).ToList(), between.ride);

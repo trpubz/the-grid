@@ -232,6 +232,15 @@ namespace TheGrid.Core
             void Put(Vector2Int o, Vector2 p)
             {
                 var at = new Vector2(o.x + p.x, o.y + p.y);
+                // Never out along a stretch and straight back along it. The lanes' way begins and ends at a sector's
+                // crossing, and the aisle meets the lane a tile and a half to one side of it: coming from that side the
+                // courier turns up the aisle as it reaches it, and leaving to that side it does not go to the crossing first.
+                while (ride.Count >= 2)
+                {
+                    Vector2 last = ride[ride.Count - 1] - ride[ride.Count - 2], next = at - ride[ride.Count - 1];
+                    if (last.x * next.y - last.y * next.x != 0 || Vector2.Dot(last, next) >= 0) break;
+                    ride.RemoveAt(ride.Count - 1);
+                }
                 if (ride.Count == 0 || ride[ride.Count - 1] != at) ride.Add(at);
             }
             foreach (var p in fromLayout.ToAisle(fromPlace, fromSlot)) Put(fromOrigin, p);
