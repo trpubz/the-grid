@@ -231,7 +231,7 @@ namespace TheGrid.Core.Tests
         public void ABotsLightIsThreeMarkersAndABotThatIsOffShowsNone()
         {
             var bots = Read().sprites.Select(s => s.name).Where(n => n.StartsWith("bot-")).ToList();
-            Assert.AreEqual(7 * 4 + 1, bots.Count, "seven poses in four facings, and the small one");
+            Assert.AreEqual((7 + ArtNames.AtWork.Length) * 4 + 1, bots.Count, "seven poses and the six of a bot at work, in four facings, and the small one");
             foreach (var name in bots)
             {
                 var t = Load(name).texture;

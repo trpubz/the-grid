@@ -127,16 +127,16 @@ namespace TheGrid.Core
         public static int Floors(Structure s) => s == Structure.ServerTower ? 3 : s == Structure.ReviewHall ? 2 : 1;
 
         // Where the six stand in each tall building, from the corner of its footprint: column, row and floor. In the order
-        // of the slots, which spreads them over the floors. On the ground they are clear of the racks along the far
-        // walls. On an upper floor they stand on its walk, near the open edge, where the floor above does not hide them,
+        // of the slots, which spreads them over the floors. On the ground they stand before what they work at (Jobs): the
+        // racks, the console. On an upper floor they stand on its walk, near the open edge, where the floor above does not hide them,
         // and clear of the head of the stair. None stands in the far right of a floor: the building next along the back
         // row, a tile away, would hide it behind its corner.
         static readonly Vector3[][] InATall =
         {
             // the server tower: two to a floor
-            new[] { new Vector3(1.25f, .9f, 0), new Vector3(.55f, WalkRow, 1), new Vector3(.4f, WalkRow, 2), new Vector3(.9f, 1.7f, 0), new Vector3(1.1f, WalkRow, 1), new Vector3(.95f, WalkRow, 2) },
+            new[] { new Vector3(.75f, .9f, 0), new Vector3(.55f, WalkRow, 1), new Vector3(.4f, WalkRow, 2), new Vector3(1.35f, .9f, 0), new Vector3(1.1f, WalkRow, 1), new Vector3(.95f, WalkRow, 2) },
             // the review hall: three to a floor
-            new[] { new Vector3(1f, 1.2f, 0), new Vector3(.4f, WalkRow, 1), new Vector3(.55f, 1.65f, 0), new Vector3(.76f, WalkRow, 1), new Vector3(1.6f, 1.7f, 0), new Vector3(1.12f, WalkRow, 1) },
+            new[] { new Vector3(.95f, .8f, 0), new Vector3(.4f, WalkRow, 1), new Vector3(.55f, .8f, 0), new Vector3(.76f, WalkRow, 1), new Vector3(1.4f, .8f, 0), new Vector3(1.12f, WalkRow, 1) },
             // the works: one floor
             new[] { new Vector3(1.25f, .85f, 0), new Vector3(.6f, 1.45f, 0), new Vector3(1.9f, 1.45f, 0), new Vector3(.6f, .85f, 0), new Vector3(1.25f, 2f, 0), new Vector3(1.9f, 2f, 0) },
         };
