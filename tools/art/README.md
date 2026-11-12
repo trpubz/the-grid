@@ -66,7 +66,7 @@ Unity's import settings are set by `Assets/TheGrid/Editor/ArtImport.cs`, which t
    ```
 
 2. Call it from `make()`.
-3. Render and look at the contact sheet. A building's lines of light are one colour: pick `"cyanw"`, `"cyan"` or `"violet"`. A low building may also have warm (`"amber"`) windows.
+3. Render and look at the contact sheet. A building carries one light: pick `"cyanw"`, `"cyan"` or `"violet"` and use nothing else on it, lit windows included. Keep windows clear of the lines `shaft` draws up a wall.
 
 Keep the building, and the glow round it, inside its picture. The tests fail if a pixel touches the edge.
 
