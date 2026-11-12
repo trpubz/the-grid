@@ -67,6 +67,21 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(listed.Count, listed.Distinct().Count(), "a name is listed twice");
         }
 
+        [Test]
+        public void EveryPictureTheGameCanAskForIsInTheManifest()
+        {
+            // The game builds some names from parts (a pose and a facing). A sprite renamed in the art script would pass
+            // every other test here and only be missed when the world came to draw it.
+            var listed = new HashSet<string>(Read().sprites.Select(s => s.name));
+            var asked = ArtNames.All().ToList();
+            Assert.Greater(asked.Count, 50);
+            Assert.AreEqual(asked.Count, asked.Distinct().Count(), "a name is asked for twice in the list");
+            foreach (var name in asked) Assert.IsTrue(listed.Contains(name), "the game asks for '" + name + "', which is not in the manifest");
+            // one of each family, spelled out, so a typo in ArtNames itself cannot hide
+            foreach (var name in new[] { "b-server-tower", "fountain", "bot-walk-b-nw", "bot-signal-se", "bot-off-sw", "bot-small", "bike-ne", "badge-approve", "pulse-2", "tile-crossing-a", "line-b", "block-c" })
+                Assert.Contains(name, asked);
+        }
+
         [TestCaseSource(nameof(Names))]
         public void SpriteIsAsTheManifestSays(string name)
         {
