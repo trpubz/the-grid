@@ -45,7 +45,7 @@ namespace TheGrid.EditorTools
         Vector2 Pivot(string name)
         {
             var centre = new Vector2(.5f, .5f);
-            if (name == "palette" || name == "palette-1") return centre;
+            if (name == "palette") return centre;
             context.DependsOnSourceAsset(ManifestPath);   // a changed manifest imports the pictures again
             Entry e = null;
             if (File.Exists(ManifestPath)) e = JsonUtility.FromJson<Manifest>(File.ReadAllText(ManifestPath)).sprites.Find(s => s.name == name);

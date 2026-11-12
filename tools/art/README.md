@@ -22,7 +22,7 @@ This rewrites every PNG, `sprites.json` beside them, and `docs/art/contact-sheet
 | `ground.py` | Paving, the lane, the void, lines of light, the fountain, city blocks |
 | `buildings.py` | The six buildings |
 | `bots.py` | Bots in every pose and facing, the courier's bike, badges, the pulse |
-| `make_sprites.py` | The entry point. It also still holds the first sprite set, which goes when the world stops using it |
+| `make_sprites.py` | The entry point |
 
 ## How it stays pixel art
 
