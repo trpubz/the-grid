@@ -38,6 +38,7 @@ namespace TheGrid
         Deliveries deliveries;      // made when the world is first opened: only what arrives after that is shown
         PileSnapshot deliveredFrom; // the pile snapshot last looked through for deliveries
         string lastRecipient = "";
+        bool leftWorld;             // the world has been closed since it was last drawn
         Plots plots;
         string plotsPath, selected = "", shotsDir;
         int plotsWarned = -1;
@@ -211,7 +212,11 @@ namespace TheGrid
             if (worldOpen) DrawWorld(area, scale, now);
             else
             {
-                if (Event.current.type == EventType.Layout) world.Hide();
+                if (Event.current.type == EventType.Layout)
+                {
+                    world.Hide();
+                    leftWorld = true;
+                }
                 if (wide)
                 {
                     float half = (width - 12) / 2;
@@ -248,6 +253,9 @@ namespace TheGrid
                 world.Show(worldDrawn, map, scale);
                 card = selected == "" ? null : Panels.Card(drawn, selected, now);
                 // Messages that arrived since the world was opened, each shown once. Looked for only when the pile has changed.
+                // Coming back from the lists, what arrived meanwhile is old mail and is not replayed.
+                if (leftWorld && deliveries != null) deliveries.Reopen(now);
+                leftWorld = false;
                 if (deliveries == null) deliveries = new Deliveries(now);
                 if (!ReferenceEquals(pileDrawn, deliveredFrom))
                 {

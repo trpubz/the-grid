@@ -17,13 +17,17 @@ namespace TheGrid.Core
     // sends nothing and holds nothing back.
     public sealed class Deliveries
     {
-        readonly long openedAt;
+        long openedAt;
         // Rows shown, or found unfit to show: never looked at again. A row is remembered twice: by its key, and by who it
         // was between and when it arrived. The pile can fold a receipt into the row of its send, found later, and then the
         // same message comes back under the send's key.
         readonly HashSet<string> settled = new HashSet<string>();
 
         public Deliveries(long openedAtMs) => openedAt = openedAtMs;
+
+        // The world was closed for a while and is open again. What arrived meanwhile is old mail, not mail arriving now:
+        // only what is received from this moment on is shown.
+        public void Reopen(long nowMs) => openedAt = nowMs;
 
         // The rows that were received after the world opened and have not been returned before. Each row at most once, ever.
         // A row is shown only when its sender and its recipient each match exactly one bot, by account and session name;
@@ -45,21 +49,27 @@ namespace TheGrid.Core
             return found;
         }
 
+        // The one bot of that name on that account. An ended session stays on the map for hours as an offline bot, and a
+        // session restarted under the same name is a second bot called the same: among namesakes, only the live ones count.
         static bool One(WorldModel world, string account, string name, out string key, out Vector2Int cell)
         {
             key = "";
             cell = default;
             if (account == "" || name == "") return false;
-            int n = 0;
+            int live = 0, ended = 0;
             foreach (var sector in world.sectors)
                 foreach (var b in sector.bots)
-                    if (b.account == account && b.name == name)
+                {
+                    if (b.account != account || b.name != name) continue;
+                    bool isLive = b.state != "Offline";
+                    if (isLive) live++; else ended++;
+                    if (isLive || live == 0)
                     {
-                        n++;
                         key = b.key;
                         cell = sector.cell;
                     }
-            return n == 1;
+                }
+            return live == 1 || (live == 0 && ended == 1);
         }
     }
 }

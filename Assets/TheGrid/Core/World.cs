@@ -104,6 +104,11 @@ namespace TheGrid.Core
             return b == Badge.Question || b == Badge.Approve || b == Badge.Fault;
         }
 
+        // The sector the view opens on: the first with a bot that needs the owner, else the first with anyone in it. A repo
+        // keeps its plot after its sessions are gone, so the first sector may well be empty. Null while there is nobody anywhere.
+        public static WorldSector Opening(WorldModel world) =>
+            world.sectors.Find(s => s.needOwner > 0) ?? world.sectors.Find(s => s.bots.Count > 0);
+
         // What a sector says about itself when it is too far off to make out bots: "2 need you · 1 done". Empty when neither applies.
         public static string Summary(WorldSector sector)
         {

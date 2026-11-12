@@ -100,6 +100,27 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
+        public void WhatArrivedWhileTheWorldWasClosedIsNotShownOnReturn()
+        {
+            // The owner looks at the lists for a while and comes back: mail that arrived meanwhile is old, not arriving now.
+            var d = new Deliveries(Opened);
+            d.Reopen(Opened + 10);
+            Assert.AreEqual(0, d.New(Only(Row("alpha-04", "beta-01", "two", Opened + 5, "while-away")), world).Count);
+            Assert.AreEqual(1, d.New(Only(Row("alpha-04", "beta-01", "two", Opened + 11, "after")), world).Count);
+        }
+
+        [Test]
+        public void ASessionThatHasEndedDoesNotStandInTheWayOfItsNamesake()
+        {
+            // The roster keeps an ended session for hours as an offline bot. Restart a session under the same name and there
+            // are two bots called that; the message is for the one that is alive.
+            snap.agents.Add(new AgentRow { sessionId = "old", name = "beta-01", account = "two", repoRoot = "/work/beta", repoName = "beta", state = "Offline" });
+            var got = new Deliveries(Opened).New(Only(Row("alpha-04", "beta-01", "two", Opened + 1)), World.Build(snap, new Plots()));
+            Assert.AreEqual(1, got.Count);
+            Assert.AreEqual("two|00000000-0000-4000-8000-000000000008", got[0].toBot);
+        }
+
+        [Test]
         public void EmptyPileEmptyWorld()
         {
             Assert.AreEqual(0, new Deliveries(Opened).New(new PileSnapshot(), world).Count);
