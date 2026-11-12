@@ -103,6 +103,53 @@ namespace TheGrid.Core.Tests
         public void WhyGhGaveNoAnswerIsSaidInPlainWords(string stderr, string reason) => Assert.AreEqual(reason, Gh.Reason(stderr));
 
         [Test]
+        public void WhileAskingIsTurnedOffTheReaderAsksNothingAndHasNothing()
+        {
+            int asked = 0;
+            bool on = true;
+            var reader = new PullReader(root => { asked++; return Fixture("pulls.json"); }, () => on);
+            reader.Refresh(new[] { "/work/alpha" });
+            Assert.AreEqual(1, asked);
+            Assert.AreEqual(14, reader.Latest.For("/work/alpha").open.Count);
+
+            on = false;   // the owner turned it off in the settings file while the app runs
+            reader.Refresh(new[] { "/work/alpha" });
+            Assert.AreEqual(1, asked, "asked again though turned off");
+            Assert.AreEqual(0, reader.Latest.repos.Count, "what was heard before is not shown as if it were still being asked");
+
+            on = true;
+            reader.Refresh(new[] { "/work/alpha" });
+            Assert.AreEqual(2, asked);
+            Assert.AreEqual(14, reader.Latest.For("/work/alpha").open.Count);
+        }
+
+        // gh says which repo a folder is, and on which host: github.com, or a company's own GitHub.
+        [TestCase("{\"nameWithOwner\":\"example/alpha\",\"url\":\"https://github.com/example/alpha\"}", "github.com", "example", "alpha")]
+        [TestCase("{\"nameWithOwner\":\"platform-team/billing.api\",\"url\":\"https://github.example.com/platform-team/billing.api\"}", "github.example.com", "platform-team", "billing.api")]
+        public void TheRepoAndItsHostAreReadFromWhatGhSaysOfTheFolder(string answer, string host, string owner, string name)
+        {
+            Assert.IsTrue(Gh.TryWhere(answer, out var repo));
+            Assert.AreEqual(host, repo.host);
+            Assert.AreEqual(owner, repo.owner);
+            Assert.AreEqual(name, repo.name);
+            // and the question goes to that host, about that repo, by name: nothing left for gh to guess
+            string args = Gh.Arguments(repo);
+            StringAssert.Contains("--hostname " + host + " ", args);
+            // as plain text (-f): a repo called 123 must not be sent as the number
+            StringAssert.Contains("-f owner=" + owner + " ", args);
+            StringAssert.EndsWith("-f name=" + name, args);
+            StringAssert.DoesNotContain("{owner}", args);
+            StringAssert.Contains(PullRequests.Query, args);
+        }
+
+        [TestCase("{ broken")]
+        [TestCase("{}")]
+        [TestCase("{\"nameWithOwner\":\"alpha\",\"url\":\"https://github.com/alpha\"}")]
+        [TestCase("{\"nameWithOwner\":\"example/alpha\",\"url\":\"not a web address\"}")]
+        [TestCase("{\"nameWithOwner\":\"example/al pha\\\" --hostname evil.example\",\"url\":\"https://github.com/example/alpha\"}")]   // nothing but a plain name goes on a command line
+        public void AnAnswerThatDoesNotNameARepoAndAHostIsNotUsed(string answer) => Assert.IsFalse(Gh.TryWhere(answer, out _));
+
+        [Test]
         public void GhIsLookedForWhereItIsUsuallyInstalled()
         {
             CollectionAssert.Contains(Gh.UsualPlaces(), "/opt/homebrew/bin/gh");

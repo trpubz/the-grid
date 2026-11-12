@@ -22,7 +22,7 @@ namespace TheGrid
         const int MaxMessages = 200;
 
         Collector collector;
-        PullReader pullReader;                 // asks GitHub about open pull requests; null on a snapshot or when turned off
+        PullReader pullReader;                 // asks GitHub about open pull requests, while that is turned on; null on a snapshot
         PullsSnapshot pullsFixed, pullsFrom;   // a snapshot's pull requests from a file; and the ones worldDrawn was built from
         int depotOpen = -1;                    // the plot of the sector whose depot list is open
         Pile pile;
@@ -96,12 +96,11 @@ namespace TheGrid
             collector = new Collector(settings, home, dir => ClaudeCli.AgentsJson(claude, dir, home), SessionFiles.ChangeStamp);
             collector.Start();
             // The one thing the app asks of the network: GitHub, through the owner's own gh, about the repos on the map.
-            if (settings.pullRequests)
-            {
-                var gh = ClaudeCli.ResolvePath(settings.ghPath, Gh.UsualPlaces());
-                pullReader = new PullReader(root => Gh.Ask(gh, root));
-                pullReader.Start();
-            }
+            // The reader looks at the setting before every round, so turning it off in the file stops the asking as soon as
+            // the file is read again.
+            var gh = ClaudeCli.ResolvePath(settings.ghPath, Gh.UsualPlaces());
+            pullReader = new PullReader(root => Gh.Ask(gh, root), () => settings.pullRequests);
+            pullReader.Start();
             // The pile's file sits beside settings.json, never under an agent app's folder.
             pile = new Pile(settings, home, Path.Combine(Application.persistentDataPath, "pile.json"));
             pile.Start();
@@ -266,7 +265,7 @@ namespace TheGrid
             if (Event.current.type == EventType.Layout)
             {
                 // The same snapshot gives the same world: build it once, so the view can tell that nothing changed.
-                var pullsNow = pullReader != null ? pullReader.Latest : pullsFixed;
+                var pullsNow = pullReader == null ? pullsFixed : settings.pullRequests ? pullReader.Latest : null;   // turned off: none, at once
                 if (!ReferenceEquals(drawn, worldFrom) || !ReferenceEquals(pullsNow, pullsFrom))
                 {
                     worldFrom = drawn;
@@ -311,7 +310,7 @@ namespace TheGrid
             if (drawn.errors.Count > 0) GUI.Label(new Rect(map.x + 4, map.y + 4, map.width - 8, 32), string.Join(" | ", drawn.errors), error);
             string notAsked = depotOf == null ? "" : depotOf.repoRoot == "" ? "Sessions with no repo have no pull requests."
                 : fixedSnap != null ? "This snapshot has no pull requests for this repo."
-                : pullReader == null ? "Asking GitHub is turned off: pullRequests in settings.json." : "GitHub has not answered yet.";
+                : !settings.pullRequests ? "Asking GitHub is turned off: pullRequests in settings.json." : "GitHub has not answered yet.";
             string clicked = panels.Draw(map, needsYou, card, detail, title, depotOf, notAsked);
             // A click on a depot opens its list, or closes it if it is the open one. A click on a row opens that pull request.
             if (world.DepotClicked >= 0) depotOpen = depotOpen == world.DepotClicked ? -1 : world.DepotClicked;
@@ -468,6 +467,7 @@ namespace TheGrid
         {
             if (fixedSnap != null) return; // a picture of a snapshot changes nothing
             settings.Reload(settingsPath); // pick up workspaces added by hand since the app started
+            pullReader?.Wake();            // and the pull request setting: off stops the asking, on starts it
             settings.CycleWorkspace(repoRoot);
             TrySave();
             pile.Refresh(); // the cross-workspace flags follow the new assignment
@@ -478,6 +478,7 @@ namespace TheGrid
         {
             // On a snapshot the light changes for as long as the app is open: there is no settings file to keep it in.
             if (fixedSnap == null) settings.Reload(settingsPath);
+            pullReader?.Wake();
             settings.CycleLight(region.name, region.look);
             if (fixedSnap == null) TrySave();
             worldFrom = null;   // the same roster, lit otherwise: build the world again

@@ -145,6 +145,36 @@ namespace TheGrid.Core
     // Runs `gh`, the GitHub command the owner is already signed in to. The Grid keeps no token of its own.
     public static class Gh
     {
+        // Which repo a folder is, and which GitHub it is on: github.com, or a company's own.
+        public struct Where { public string host, owner, name; }
+
+#pragma warning disable 0649   // filled by JsonUtility
+        [Serializable] sealed class View { public string nameWithOwner, url; }
+#pragma warning restore 0649
+        static readonly System.Text.RegularExpressions.Regex Plain = new System.Text.RegularExpressions.Regex("^[A-Za-z0-9._-]+$");
+        static readonly Dictionary<string, Where> known = new Dictionary<string, Where>();   // by folder, once gh has said
+
+        // Reads `gh repo view --json nameWithOwner,url`. False unless it names an owner, a repo and a host in plain
+        // characters: they go on a command line next.
+        public static bool TryWhere(string answer, out Where repo)
+        {
+            repo = default;
+            View v = null;
+            try { v = JsonUtility.FromJson<View>(answer); }
+            catch (ArgumentException) { }
+            if (v == null || string.IsNullOrEmpty(v.nameWithOwner) || !Uri.TryCreate(v.url, UriKind.Absolute, out var at) || at.Scheme != "https") return false;
+            var parts = v.nameWithOwner.Split('/');
+            if (parts.Length != 2 || !Plain.IsMatch(parts[0]) || !Plain.IsMatch(parts[1]) || !Plain.IsMatch(at.Host)) return false;
+            repo = new Where { host = at.Host, owner = parts[0], name = parts[1] };
+            return true;
+        }
+
+        // What gh is run with to ask about a repo's open pull requests: the host by name and the repo by name. Left to
+        // itself `gh api` takes the repo from the folder but sends the question to its default host, so a repo on a
+        // company's GitHub would be asked about on github.com.
+        public static string Arguments(Where repo) =>
+            "api graphql --hostname " + repo.host + " -f \"query=" + PullRequests.Query + "\" -f owner=" + repo.owner + " -f name=" + repo.name;
+
         public static string[] UsualPlaces() => new[] { "/opt/homebrew/bin/gh", "/usr/local/bin/gh", "/usr/bin/gh" };
 
         // Why gh gave no answer, from what it wrote: the common cases in plain words, anything else as gh's own first line.
@@ -157,14 +187,28 @@ namespace TheGrid.Core
             return stderr == "" ? "gh gave no answer." : "gh: " + stderr.Split('\n')[0];
         }
 
-        // GitHub's answer about the open pull requests of the repo in this folder. `gh` works out which repo that is from
-        // the folder's git remote. Throws, saying why in words, when there is no answer to be had.
+        // GitHub's answer about the open pull requests of the repo in this folder. gh says which repo and which host the
+        // folder is, from its git remote, once; after that the question goes to that host by name. Throws, saying why in
+        // words, when there is no answer to be had.
         public static string Ask(string ghPath, string repoRoot, int timeoutMs = 10000)
         {
             if (string.IsNullOrEmpty(ghPath)) throw new InvalidOperationException("gh was not found: install the GitHub CLI, or set ghPath in settings.json");
-            var psi = new ProcessStartInfo(ghPath, "api graphql -f \"query=" + PullRequests.Query + "\" -F owner={owner} -F name={repo}")
+            Where repo;
+            bool found;
+            lock (known) found = known.TryGetValue(repoRoot, out repo);
+            if (!found)
             {
-                RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = repoRoot,
+                if (!TryWhere(Run(ghPath, "repo view --json nameWithOwner,url", repoRoot, timeoutMs), out repo)) throw new InvalidOperationException("gh could not say which repo this folder is.");
+                lock (known) known[repoRoot] = repo;
+            }
+            return Run(ghPath, Arguments(repo), repoRoot, timeoutMs);
+        }
+
+        static string Run(string ghPath, string arguments, string folder, int timeoutMs)
+        {
+            var psi = new ProcessStartInfo(ghPath, arguments)
+            {
+                RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = folder,
             };
             // An app started from the Finder has a bare PATH; gh runs git to read the remote.
             psi.EnvironmentVariables["PATH"] = (psi.EnvironmentVariables["PATH"] ?? "/usr/bin:/bin") + ":/opt/homebrew/bin:/usr/local/bin";
@@ -193,20 +237,31 @@ namespace TheGrid.Core
         public const int EveryMs = 180000;
 
         readonly Func<string, string> ask;   // a repo's folder in, GitHub's answer out; throws when there is none
+        readonly Func<bool> wanted;          // false while the owner has asking turned off; looked at before every round
         readonly ManualResetEventSlim stop = new ManualResetEventSlim(false);
         readonly AutoResetEvent wake = new AutoResetEvent(false);
         volatile PullsSnapshot latest = new PullsSnapshot();
         volatile string[] watched = new string[0];
         Thread thread;
 
-        public PullReader(Func<string, string> ask) => this.ask = ask;
+        public PullReader(Func<string, string> ask, Func<bool> wanted = null)
+        {
+            this.ask = ask;
+            this.wanted = wanted;
+        }
 
         public PullsSnapshot Latest => latest;
 
-        // Asks once about each of these repos and makes the new snapshot. A repo that cannot be asked keeps the list it
+        // Asks once about each of these repos and makes the new snapshot, unless asking is turned off. A repo that cannot be asked keeps the list it
         // had, with the reason beside it. A repo not among these is dropped.
         public void Refresh(IEnumerable<string> repoRoots)
         {
+            // Turned off: nothing is asked, and what was heard before goes, so no depot shows an answer nobody is keeping up.
+            if (wanted != null && !wanted())
+            {
+                if (latest.repos.Count > 0) latest = new PullsSnapshot();
+                return;
+            }
             var before = latest;
             var next = new PullsSnapshot();
             foreach (var root in repoRoots)
@@ -237,6 +292,9 @@ namespace TheGrid.Core
             watched = repoRoots.ToArray();
             wake.Set();
         }
+
+        // A round now, not at the next three minutes: the owner's settings were read again.
+        public void Wake() => wake.Set();
 
         public void Start()
         {
