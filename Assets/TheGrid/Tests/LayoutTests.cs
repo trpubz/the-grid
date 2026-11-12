@@ -334,6 +334,31 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
+        public void TheFrontOfABotsBuildingIsOutsideItAndBeforeItsFront()
+        {
+            foreach (int a in All)
+            {
+                var l = Layout.Of(a);
+                foreach (var place in Places)
+                    for (int slot = 0; slot < 8; slot++)
+                    {
+                        string who = "arrangement " + a + ": " + place + " slot " + slot;
+                        Vector2 spot = l.Spot(place, slot), front = l.Front(place, slot);
+                        Assert.IsNull(l.Room(front), who + ": the front is inside a building");
+                        if (l.Room(spot) is Structure room)
+                        {
+                            // never the bot's own place on a floor, never behind: on the ground before the building's front
+                            var f = l.Footprint(room);
+                            Assert.Greater(front.y, f.yMax - .5f, who + " is not before the front");
+                            Assert.IsTrue(front.x > f.xMin - .5f && front.x < f.xMax - .5f, who + " is off to the side of its building");
+                            Assert.IsTrue(front.y < Iso.PlotTiles - .5f, who + " is off the plot");
+                        }
+                        else Assert.AreEqual(spot, front, who + " stands in the open: there");
+                    }
+            }
+        }
+
+        [Test]
         public void ABotChangingPlacesGoesByTheStairsAndNoFurtherThanItMust()
         {
             foreach (int a in All)

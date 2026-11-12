@@ -28,6 +28,7 @@ namespace TheGrid
         readonly Transform root;
         readonly WorldStage stage;
         readonly List<Trip> trips = new List<Trip>();
+        float wide = 4f;   // how wide a trail is drawn, in art pixels
 
         public WorldTraffic(Transform parent, WorldStage stage)
         {
@@ -52,10 +53,13 @@ namespace TheGrid
         }
 
         // Moves couriers and pulses on, and fades trails. Returns true when the map has to be drawn again: all the while a
-        // courier rides or a pulse runs, and after that only at each step of a trail's fading.
-        public bool Tick(float now)
+        // courier rides or a pulse runs, and after that only at each step of a trail's fading. zoom: screen pixels to the art
+        // pixel, as the map is drawn now.
+        public bool Tick(float now, float zoom)
         {
             bool changed = false;
+            // A trail is four art pixels wide, and never under three of the screen's: far out it is still a line.
+            wide = Mathf.Max(4f, 3f / zoom);
             for (int i = trips.Count - 1; i >= 0; i--)
             {
                 var t = trips[i];
@@ -91,6 +95,7 @@ namespace TheGrid
                     t.pulse = null;
                     changed = true;
                 }
+                t.trail.widthMultiplier = wide;
                 int fade = Deliveries.Trail(since - t.rides);
                 if (fade == t.fade) continue;
                 changed = true;
@@ -147,11 +152,10 @@ namespace TheGrid
                 t.trail.useWorldSpace = false;
                 t.trail.sharedMaterial = lit;
                 t.trail.alignment = LineAlignment.TransformZ;
-                // Wide enough to be a line still, far out, where four art pixels are one of the screen's.
-                t.trail.widthMultiplier = 4f;
                 t.trail.sortingOrder = 4;   // over the map, as the courier is, and under the courier
                 t.trail.startColor = t.trail.endColor = Fades[0];
             }
+            t.trail.widthMultiplier = wide;
             t.trail.positionCount = corners + 1;
             for (int i = 0; i < corners; i++) t.trail.SetPosition(i, new Vector3(t.route[i].x, t.route[i].y, -1));
             t.trail.SetPosition(corners, new Vector3(end.x, end.y, -1));

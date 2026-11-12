@@ -212,9 +212,9 @@ namespace TheGrid.Core
             return new List<Vector2Int>(tiles);
         }
 
-        // The whole of a courier's ride, in art pixels: from where the sender stands, by the crossings, lanes and roads of
-        // the sectors on its way (Route), to where the recipient stands. Within one sector, straight from the one to the
-        // other.
+        // The whole of a courier's ride out, in art pixels: from the front of the sender's building, by the crossings, lanes
+        // and roads of the sectors on its way (Route), to the front of the recipient's. Within one sector, straight from
+        // the one to the other. It rides back the same way.
         public static List<Vector2> Ride(Vector2 from, IReadOnlyList<Vector2Int> way, Vector2 to)
         {
             var ride = new List<Vector2> { from };
@@ -223,13 +223,50 @@ namespace TheGrid.Core
             return ride;
         }
 
+        // One upright slice of the ribbon of light a courier leaves behind it. x: the middle of the slice. y: the ground at
+        // the lower end of the piece of the way it stands on. wide: how wide it is. rise: how much higher the ground is at
+        // the other end of that piece, which the slice is taller by. at: how far along the ride it starts.
+        public struct RibbonSlice { public float x, y, wide, rise, at; }
+
+        // A ride (Ride), cut into upright slices so many art pixels wide, side by side: a wall along the way, seen as the
+        // map is seen. Each is a thing of its own, so that each is drawn in its own place among the buildings. Where the
+        // way runs straight down the screen the wall is seen edge on: one slice, as much taller as that piece is long.
+        public static List<RibbonSlice> Ribbon(IReadOnlyList<Vector2> ride, float step)
+        {
+            var slices = new List<RibbonSlice>();
+            float gone = 0;
+            for (int i = 1; i < ride.Count; i++)
+            {
+                Vector2 a = ride[i - 1], b = ride[i];
+                float dx = b.x - a.x, dy = b.y - a.y, leg = (b - a).magnitude, across = Mathf.Abs(dx);
+                if (across < .001f)
+                {
+                    if (leg > 0) slices.Add(new RibbonSlice { x = a.x, y = Mathf.Min(a.y, b.y), wide = step, rise = Mathf.Abs(dy), at = gone });
+                }
+                else
+                    for (float from = 0; from < across - .001f; from += step)
+                    {
+                        float to = Mathf.Min(from + step, across), y0 = a.y + dy * from / across, y1 = a.y + dy * to / across;
+                        slices.Add(new RibbonSlice { x = a.x + Mathf.Sign(dx) * (from + to) / 2, y = Mathf.Min(y0, y1), wide = to - from, rise = Mathf.Abs(y1 - y0), at = gone + leg * from / across });
+                    }
+                gone += leg;
+            }
+            return slices;
+        }
+
         // How long a courier takes over so many art pixels: four tiles a second, and never under three seconds, or a short
         // ride is over before anyone has looked.
         public static float RideSeconds(float pixels) => Mathf.Max(3f, pixels / (4f * TileStep));
 
+        // A place on a sector's lane (Ring), moved from the middle of the lane's inner tile to the middle of the lane, which
+        // is two tiles wide: half a tile further out. Along the lane it moves half a tile on, to the middle of the road
+        // that meets the lane there, which is two tiles wide as well.
+        static Vector2 Middle(Vector2Int ring) => new Vector2(ring.x == -1 ? -1.5f : ring.x + .5f, ring.y == -1 ? -1.5f : ring.y + .5f);
+
         // The way a courier rides through the sectors at these origins, first to last: corner points, in tiles (column,
         // row). It leaves from the crossing in front of the first, goes round each sector's lane to the side the next one
-        // is on and along the road to it, and ends at the last one's crossing. Empty for fewer than two.
+        // is on and along the road to it, and ends at the last one's crossing: all of it down the middle of the lane or
+        // the road. Empty for fewer than two.
         public static List<Vector2> Route(IReadOnlyList<Vector2Int> hops)
         {
             var route = new List<Vector2>();
@@ -238,7 +275,7 @@ namespace TheGrid.Core
             {
                 if (route.Count == 0 || route[route.Count - 1] != p) route.Add(p);
             }
-            void Add(Vector2Int o, int node) => Put(o + Ring[node]);
+            void Add(Vector2Int o, int node) => Put(o + Middle(Ring[node]));
             // Round the lane from one node to another, the shorter way; only the corners and the last node are corner points.
             void Round(Vector2Int o, int from, int to)
             {
@@ -260,9 +297,13 @@ namespace TheGrid.Core
                 bool forward = RoadRunsFrom(at, next);
                 var line = forward ? RoadLine(at, next) : RoadLine(next, at);
                 if (!forward) line.Reverse();
-                foreach (var p in line) Put(p);
+                int arrive = (leave + Ring.Length / 2) % Ring.Length;   // a road arrives on the side facing the one it left
+                // RoadLine runs along the first of the road's two rows of tiles, from lane to lane: the middle of the road
+                // is half a tile over, and its ends are the middles of the two lanes.
+                for (int k = 0; k < line.Count; k++)
+                    Put(k == 0 ? at + Middle(Ring[leave]) : k == line.Count - 1 ? next + Middle(Ring[arrive]) : line[k] + new Vector2(.5f, .5f));
                 at = next;
-                node = (leave + Ring.Length / 2) % Ring.Length;   // a road arrives on the side facing the one it left
+                node = arrive;
             }
             Round(at, node, InFront);
             return route;

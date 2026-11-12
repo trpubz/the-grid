@@ -110,17 +110,17 @@ namespace TheGrid.Core.Tests
             Assert.IsTrue(tiles.Contains(new Vector2Int(27, 7 + Iso.Crossing)) && tiles.Contains(new Vector2Int(27, 7 + Iso.Crossing + 1)));
             Assert.IsFalse(tiles.Contains(new Vector2Int(27, Iso.Crossing)));
 
-            // a courier rides it: out of a's side, along, across, along, into b's side, and round to b's crossing
+            // a courier rides it down the middle: out of a's side, along, across, along, into b's side, and round to b's crossing
             var route = Iso.Route(new[] { a, b });
             CollectionAssert.AreEqual(new[]
             {
-                new Vector2(5, 12), new Vector2(12, 12), new Vector2(12, 5), new Vector2(20, 5), new Vector2(20, 12), new Vector2(29, 12), new Vector2(29, 19), new Vector2(35, 19),
+                new Vector2(5.5f, 12.5f), new Vector2(12.5f, 12.5f), new Vector2(12.5f, 5.5f), new Vector2(20.5f, 5.5f), new Vector2(20.5f, 12.5f), new Vector2(28.5f, 12.5f), new Vector2(28.5f, 19.5f), new Vector2(35.5f, 19.5f),
             }, route);
             // and back the same way
             var back = Iso.Route(new[] { b, a });
-            CollectionAssert.Contains(back, new Vector2(20, 12));
-            CollectionAssert.Contains(back, new Vector2(20, 5));
-            Assert.AreEqual(new Vector2(5, 12), back[back.Count - 1]);
+            CollectionAssert.Contains(back, new Vector2(20.5f, 12.5f));
+            CollectionAssert.Contains(back, new Vector2(20.5f, 5.5f));
+            Assert.AreEqual(new Vector2(5.5f, 12.5f), back[back.Count - 1]);
 
             // in front, the same turned a quarter
             var front = new HashSet<Vector2Int>(Iso.RoadTiles(a, new Vector2Int(-4, 26)));

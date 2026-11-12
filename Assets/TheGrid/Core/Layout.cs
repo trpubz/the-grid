@@ -156,6 +156,21 @@ namespace TheGrid.Core
         // Which floor a bot stands on: 0 for the ground, and for everyone not inside a tall building.
         public int Floor(Place place, int slot) => Tall(place) >= 0 && slot < Inside ? (int)InATall[Tall(place)][slot].z : 0;
 
+        // Where a courier stops for a bot: where the bot stands, if that is in the open; for a bot inside a building, on the
+        // ground before the building's front, at its door. Never on an upper floor, never behind.
+        public Vector2 Front(Place place, int slot)
+        {
+            var spot = Spot(place, slot);
+            if (!(Room(spot) is Structure room)) return spot;
+            if (Tall(place) >= 0 && slot < Inside)
+            {
+                var door = Way(place, slot)[0];
+                return new Vector2(door.x, door.y);
+            }
+            var f = Footprint(room);   // the workshop has no door: before the middle of its open front
+            return new Vector2(f.x + (f.width - 1) / 2f, f.yMax - .1f);
+        }
+
         // The building a point of the plot is inside, if it is one a bot works inside.
         public Structure? Room(Vector2 at)
         {
