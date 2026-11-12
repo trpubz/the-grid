@@ -19,8 +19,8 @@ namespace TheGrid
         // In the order of Structure.
         public static readonly string[] StructureNames = { "Server tower", "Review hall", "Relay", "Works", "Assembly bay", "", "Test workshop" };
         // A bot's light is drawn in three marker colours: the light, its highlight, its dim partner. They become one of
-        // these colourways, one an account: blue, white, orange. All from the art palette, and none of them amber: amber
-        // is for badges.
+        // these colourways: blue, white, orange. Which one is the account's number, kept in the world's file, so an account
+        // keeps its colour. All from the art palette, and none of them amber: amber is for badges.
         // shortcut: three colourways, so a fourth account looks like the first. Add colourways if people run that many.
         static readonly Color32[] Markers = { Hex(0xffffff), Hex(0xc9fbff), Hex(0x1a8f9c) };
         static readonly Color32[][] Colourways =
@@ -51,7 +51,6 @@ namespace TheGrid
         readonly Dictionary<string, Bot> bots = new Dictionary<string, Bot>();
         readonly HashSet<int> painted = new HashSet<int>();
         readonly Dictionary<Vector2Int, GameObject> outlands = new Dictionary<Vector2Int, GameObject>();
-        readonly List<string> accounts = new List<string>();
         readonly Dictionary<string, float> signals = new Dictionary<string, float>();   // bot key: signalling until this time
         readonly float[] tops = new float[ArtNames.Structures.Length];
         int outlandsFor = -1;
@@ -94,7 +93,7 @@ namespace TheGrid
 
         // A picture in the colourway of a bot's account: the courier's bike is its sender's. Plain if the bot has gone.
         public Sprite BotArt(string botKey, string name) =>
-            bots.TryGetValue(botKey, out var b) ? Lit(name, Mathf.Max(0, accounts.IndexOf(b.data.account))) : Art(name);
+            bots.TryGetValue(botKey, out var b) ? Lit(name, b.data.colour) : Art(name);
 
         // Every picture the world, its panels and its traffic draw comes through here. One that is missing is said once,
         // by name, and the world is drawn without it.
@@ -154,12 +153,6 @@ namespace TheGrid
             }
             LayOutlands(cells);
 
-            accounts.Clear();
-            foreach (var sector in model.sectors)
-                foreach (var b in sector.bots)
-                    if (!accounts.Contains(b.account)) accounts.Add(b.account);
-            accounts.Sort(StringComparer.Ordinal);
-
             var seen = new HashSet<string>();
             foreach (var sector in model.sectors)
                 foreach (var b in sector.bots)
@@ -208,7 +201,7 @@ namespace TheGrid
                     // At a building a bot faces it; in the open it faces us.
                     facing = b.data.place <= Place.Workshop ? "ne" : "se";
                 }
-                int account = Mathf.Max(0, accounts.IndexOf(b.data.account));
+                int account = b.data.colour;
                 string shown = ArtNames.Bot(pose, facing) + "#" + account;
                 if (shown != b.shown || b.at.localPosition != at)
                 {
@@ -378,9 +371,7 @@ namespace TheGrid
                 s.transform.localPosition = new Vector3(11 * (b.small.Count + 1), -5 * (b.small.Count + 1), 0);
                 b.small.Add(s);
             }
-            // Every time, not only when one is made: which colourway an account has can change when another account's
-            // sessions come or go, and a bot's subagents must change with it.
-            var small = Lit(ArtNames.SmallBot, Mathf.Max(0, accounts.IndexOf(data.account)));
+            var small = Lit(ArtNames.SmallBot, data.colour);
             foreach (var s in b.small) s.sprite = small;
         }
 
