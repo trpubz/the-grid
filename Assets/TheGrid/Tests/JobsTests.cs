@@ -97,6 +97,18 @@ namespace TheGrid.Core.Tests
                                 var next = job[(i + 1) % job.Length].at;
                                 Assert.LessOrEqual((next - job[i].at).magnitude, .45f, who + " jumps from " + job[i].at + " to " + next);
                             }
+                            // wherever the job takes it, it is drawn over its building as it is at its own place: as far
+                            // down the order as there, though it stands a step higher or lower on the screen
+                            var o = new Vector2Int(-12, 5);
+                            var stands = Iso.BotSpot(o, l, room, slot);
+                            var own = new Vector3(stands.x, stands.y, stands.y - Iso.BotDepth(o, l, room, slot));
+                            foreach (var frame in job)
+                            {
+                                var there = Iso.AtWork(own, frame.at);
+                                Assert.AreEqual(own.x + Iso.Point(frame.at.x, frame.at.y).x, there.x, .01f, who);
+                                Assert.AreEqual(own.y + Iso.Point(frame.at.x, frame.at.y).y, there.y, .01f, who);
+                                Assert.AreEqual(own.y - own.z, there.y - there.z, .01f, who + " is drawn behind its building at " + frame.at);
+                            }
                             // what is carried is carried somewhere
                             if (job.Any(frame => frame.pose == ArtNames.CarryA)) Assert.GreaterOrEqual(job.Select(frame => frame.at).Distinct().Count(), 3, who);
                         }

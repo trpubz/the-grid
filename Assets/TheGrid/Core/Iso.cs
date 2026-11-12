@@ -122,6 +122,15 @@ namespace TheGrid.Core
             return points;
         }
 
+        // A bot at a job (Jobs), a step from its own place. stands: its own place in art pixels, with how much further down
+        // the screen it is drawn there as if it stood. step: the job's step, in tiles. The bot is drawn a step away, and as
+        // far down the order as at its own place: a step toward the back of its room does not put it behind its building.
+        public static Vector3 AtWork(Vector3 stands, Vector2 step)
+        {
+            var by = Point(step.x, step.y);
+            return new Vector3(stands.x + by.x, stands.y + by.y, stands.z + by.y);
+        }
+
         // How far down the screen a bot is drawn as if it stood, in art pixels: what is lower is drawn later, over what is
         // higher. In the open that is where it stands. Inside a building it is never higher than just below the point the
         // building is drawn from, or a bot at the back of a room would be drawn first and the room over it. Two bots in one

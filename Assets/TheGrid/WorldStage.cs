@@ -378,8 +378,8 @@ namespace TheGrid
                     // At work inside a building: one of the building's jobs, a beat at a time, a step or two from its place.
                     pose = job.pose;
                     facing = job.facing;
-                    var step = Iso.Point(job.at.x, job.at.y);
-                    at += new Vector3(Mathf.Round(step.x), Mathf.Round(step.y), 0);
+                    var there = Iso.AtWork(p, job.at);
+                    at = new Vector3(Mathf.Round(there.x), Mathf.Round(there.y), -1 - there.z);
                 }
                 else
                 {
