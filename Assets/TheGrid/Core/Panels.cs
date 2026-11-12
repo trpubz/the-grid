@@ -16,7 +16,9 @@ namespace TheGrid.Core
     public sealed class BotCard
     {
         public string key = "", title = "", who = "", doing = "", since = "", ticket = "", prUrl = "";
+        public string workspace = "", repoRoot = "";               // repoRoot: empty for a session with no repo, whose workspace cannot be changed
         public int prNumber;
+        public List<string> subagents = new List<string>();        // what each subagent is doing, in the roster's order
     }
 
     // The words of the two panels drawn over the world. Like the world itself, made from the roster snapshot and nothing else.
@@ -43,7 +45,26 @@ namespace TheGrid.Core
                 doing = a.ticket == "" ? Sector(a) : Sector(a) + " · " + a.ticket,
                 since = RosterFormat.Elapsed(a.stateSince, nowMs), ticket = a.ticket,
                 prUrl = RosterFormat.IsWebLink(a.prUrl) ? a.prUrl : "", prNumber = a.prNumber,   // only a web link is ever opened
+                workspace = a.workspace, repoRoot = a.repoRoot, subagents = a.subagents.ConvertAll(s => s.description ?? ""),
             };
+        }
+
+        // The card's lines about subagents, when there is room for `lines` of them: one each while they fit, else all but
+        // the last line and a count of the rest. With room for a single line and more than one subagent, only the count.
+        public static List<string> SubagentLines(BotCard card, int lines)
+        {
+            var said = new List<string>();
+            int n = card.subagents.Count;
+            if (n == 0 || lines <= 0) return said;
+            if (n > lines && lines == 1)
+            {
+                said.Add(n + " subagents");
+                return said;
+            }
+            int named = n <= lines ? n : lines - 1;
+            for (int i = 0; i < named; i++) said.Add("↳ " + card.subagents[i]);
+            if (named < n) said.Add("and " + (n - named) + " more");
+            return said;
         }
 
         static string Key(AgentRow a) => a.account + "|" + a.sessionId;   // as World.Build keys a bot

@@ -79,6 +79,36 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(World.NoProject, Panels.Card(Only(a), "one|s", 1000).doing);
         }
 
+        static AgentRow With(int subagents)
+        {
+            var a = Agent("Running", "editing");
+            a.workspace = "Work";
+            a.repoRoot = "/work/gamma";
+            for (int i = 0; i < subagents; i++) a.subagents.Add(new SubagentRow { agentId = "a" + i, description = "task " + i, agentType = "general-purpose" });
+            return a;
+        }
+
+        [Test]
+        public void ACardSaysWhichWorkspaceAndWhatItsSubagentsAreDoing()
+        {
+            var card = Panels.Card(Only(With(2)), "one|s", 1000);
+            Assert.AreEqual("Work", card.workspace);
+            Assert.AreEqual("/work/gamma", card.repoRoot);
+            CollectionAssert.AreEqual(new[] { "task 0", "task 1" }, card.subagents);
+            Assert.AreEqual(0, Panels.Card(Only(Agent("Running")), "one|s", 1000).subagents.Count);
+        }
+
+        [TestCase(0, 4, "")]
+        [TestCase(2, 4, "↳ task 0|↳ task 1")]
+        [TestCase(4, 4, "↳ task 0|↳ task 1|↳ task 2|↳ task 3")]            // exactly what fits: no line spent on saying so
+        [TestCase(6, 4, "↳ task 0|↳ task 1|↳ task 2|and 3 more")]
+        [TestCase(6, 2, "↳ task 0|and 5 more")]
+        [TestCase(2, 1, "2 subagents")]                                     // room for one line only
+        [TestCase(1, 1, "↳ task 0")]
+        [TestCase(3, 0, "")]
+        public void ACardListsAsManySubagentsAsFitAndCountsTheRest(int subagents, int lines, string expected) =>
+            Assert.AreEqual(expected, string.Join("|", Panels.SubagentLines(Panels.Card(Only(With(subagents)), "one|s", 1000), lines)));
+
         [Test]
         public void ACardOffersOnlyAWebLink()
         {

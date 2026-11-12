@@ -93,7 +93,7 @@ A lane runs round every sector, so between any two neighbours there is one, and 
 Two panels lie over the map, down its right side:
 
 - **Needs you** lists every bot that is waiting on you, most urgent first, with what it wants: an answer, an approval, or a look at a failure. Click a row and the view goes to that bot and selects it. Click the title to fold the list away; in a narrow window it starts folded.
-- **The card** of the selected bot says what it is doing, who it is, in which repo and on which ticket, and for how long. When the agent has a pull request, **PR #n** opens it.
+- **The card** of the selected bot says what it is doing, who it is, in which repo and on which ticket, for how long, and what each of its subagents is doing. Click its workspace to move the repo to the next one, as in the lists. When the agent has a pull request, **PR #n** opens it.
 
 ![A narrow window: the list folded, the card across the bottom](docs/art/world-narrow.png)
 
