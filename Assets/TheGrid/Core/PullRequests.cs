@@ -43,17 +43,19 @@ namespace TheGrid.Core
     // Reads GitHub's answer about a repo's open pull requests. The one place that knows its shape.
     public static class PullRequests
     {
-        // One request for a repo: who is asking, and for each open pull request what decides its state. No line breaks or
-        // quotes: it goes to `gh` as one argument.
+        // The question about a repo: who is asking, and for each open pull request what decides its state. Fifty to a
+        // page; `gh --paginate` asks again from $endCursor until there are no more, so a repo with hundreds open has them
+        // all. No line breaks or quotes: it goes to `gh` as one argument.
         public const string Query =
-            "query($owner:String!,$name:String!){viewer{login} repository(owner:$owner,name:$name){" +
-            "pullRequests(states:OPEN,first:50,orderBy:{field:CREATED_AT,direction:ASC}){nodes{" +
+            "query($owner:String!,$name:String!,$endCursor:String){viewer{login} repository(owner:$owner,name:$name){" +
+            "pullRequests(states:OPEN,first:50,after:$endCursor,orderBy:{field:CREATED_AT,direction:ASC}){pageInfo{hasNextPage endCursor} nodes{" +
             "number title url isDraft reviewDecision mergeable author{login} " +
             "reviewRequests(first:10){nodes{requestedReviewer{... on User{login} ... on Bot{login} ... on Team{name}}}} " +
             "commits(last:1){nodes{commit{statusCheckRollup{state}}}} " +
             "reactions(first:20){nodes{content user{login}}}}}}}";
 
 #pragma warning disable 0649   // filled by JsonUtility
+        [Serializable] sealed class Pages { public List<Answer> pages; }
         [Serializable] sealed class Answer { public Data data; public List<Fault> errors; }
         [Serializable] sealed class Fault { public string message; }
         [Serializable] sealed class Data { public Who viewer; public Repo repository; }
@@ -86,19 +88,27 @@ namespace TheGrid.Core
         {
             pulls = new List<PullRequest>();
             problem = "";
-            Answer a = null;
-            try { a = JsonUtility.FromJson<Answer>(answer); }
-            catch (ArgumentException) { }
-            if (a == null) { problem = "GitHub's answer could not be read"; return false; }
-            if (a.errors != null && a.errors.Count > 0) { problem = "GitHub: " + a.errors[0].message; return false; }
-            var nodes = a.data?.repository?.pullRequests?.nodes;
-            if (nodes == null) { problem = "GitHub does not know this repo, or this login may not see it"; return false; }
-            string owner = a.data.viewer?.login ?? "";
-            foreach (var n in nodes)
+            // One answer, or an array of them: a page each, as `gh --paginate --slurp` hands them over.
+            var pages = new List<Answer>();
+            try
             {
-                var p = new PullRequest { number = n.number, title = n.title ?? "", url = n.url ?? "" };
-                Judge(n, owner, out p.state, out p.status);
-                pulls.Add(p);
+                if ((answer ?? "").TrimStart().StartsWith("[", StringComparison.Ordinal)) pages = JsonUtility.FromJson<Pages>("{\"pages\":" + answer + "}")?.pages ?? pages;
+                else if (JsonUtility.FromJson<Answer>(answer) is Answer one) pages.Add(one);
+            }
+            catch (ArgumentException) { }
+            if (pages.Count == 0) { problem = "GitHub's answer could not be read"; return false; }
+            foreach (var a in pages)
+            {
+                if (a.errors != null && a.errors.Count > 0) { problem = "GitHub: " + a.errors[0].message; pulls.Clear(); return false; }
+                var nodes = a.data?.repository?.pullRequests?.nodes;
+                if (nodes == null) { problem = "GitHub does not know this repo, or this login may not see it"; pulls.Clear(); return false; }
+                string owner = a.data.viewer?.login ?? "";
+                foreach (var n in nodes)
+                {
+                    var p = new PullRequest { number = n.number, title = n.title ?? "", url = n.url ?? "" };
+                    Judge(n, owner, out p.state, out p.status);
+                    pulls.Add(p);
+                }
             }
             pulls.Sort((x, y) => x.state != y.state ? y.state.CompareTo(x.state) : x.number.CompareTo(y.number));
             return true;
@@ -169,11 +179,11 @@ namespace TheGrid.Core
             return true;
         }
 
-        // What gh is run with to ask about a repo's open pull requests: the host by name and the repo by name. Left to
+        // What gh is run with to ask about a repo's open pull requests: every page, the host by name and the repo by name. Left to
         // itself `gh api` takes the repo from the folder but sends the question to its default host, so a repo on a
         // company's GitHub would be asked about on github.com.
         public static string Arguments(Where repo) =>
-            "api graphql --hostname " + repo.host + " -f \"query=" + PullRequests.Query + "\" -f owner=" + repo.owner + " -f name=" + repo.name;
+            "api graphql --paginate --slurp --hostname " + repo.host + " -f \"query=" + PullRequests.Query + "\" -f owner=" + repo.owner + " -f name=" + repo.name;
 
         public static string[] UsualPlaces() => new[] { "/opt/homebrew/bin/gh", "/usr/local/bin/gh", "/usr/bin/gh" };
 

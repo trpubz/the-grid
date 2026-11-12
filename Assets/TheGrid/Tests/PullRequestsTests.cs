@@ -47,6 +47,23 @@ namespace TheGrid.Core.Tests
             CollectionAssert.AreEqual(new[] { 2, 4, 9, 12, 3, 5, 6, 7, 8, 10, 11, 13, 14, 1 }, pulls.Select(p => p.number).ToArray());
         }
 
+        [Test]
+        public void ARepoWithMoreOpenThanOnePageHoldsHasThemAll()
+        {
+            // gh fetches every page and hands them over as one array, one answer to a page
+            Assert.IsTrue(PullRequests.TryParse(Fixture("pulls-pages.json"), out var paged, out var problem), problem);
+            PullRequests.TryParse(Fixture("pulls.json"), out var whole, out _);
+            CollectionAssert.AreEqual(whole.Select(p => p.number + " " + p.state + " " + p.status).ToArray(), paged.Select(p => p.number + " " + p.state + " " + p.status).ToArray());
+            Assert.AreEqual(14, paged.Count);
+            // and it is asked for that way
+            StringAssert.Contains("$endCursor:String", PullRequests.Query);
+            StringAssert.Contains("after:$endCursor", PullRequests.Query);
+            StringAssert.Contains("pageInfo{hasNextPage endCursor}", PullRequests.Query);
+            StringAssert.Contains(" --paginate --slurp ", Gh.Arguments(new Gh.Where { host = "github.com", owner = "example", name = "alpha" }));
+        }
+
+        [TestCase("[]", "GitHub's answer could not be read")]
+        [TestCase("[{\"data\":{\"viewer\":{\"login\":\"owner\"},\"repository\":null}}]", "GitHub does not know this repo, or this login may not see it")]
         [TestCase("{ broken", "GitHub's answer could not be read")]
         [TestCase("{\"data\":{\"viewer\":{\"login\":\"owner\"},\"repository\":null}}", "GitHub does not know this repo, or this login may not see it")]
         [TestCase("{\"errors\":[{\"message\":\"Bad credentials\"}]}", "GitHub: Bad credentials")]

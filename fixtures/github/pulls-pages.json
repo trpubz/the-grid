@@ -1,0 +1,504 @@
+[
+ {
+  "data": {
+   "viewer": {
+    "login": "owner"
+   },
+   "repository": {
+    "pullRequests": {
+     "pageInfo": {
+      "hasNextPage": true,
+      "endCursor": "Y3Vyc29yOjU="
+     },
+     "nodes": [
+      {
+       "number": 1,
+       "title": "A draft",
+       "url": "https://github.com/example/alpha/pull/1",
+       "isDraft": true,
+       "reviewDecision": null,
+       "mergeable": "MERGEABLE",
+       "author": {
+        "login": "owner"
+       },
+       "reviewRequests": {
+        "nodes": []
+       },
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "statusCheckRollup": {
+            "state": "SUCCESS"
+           }
+          }
+         }
+        ]
+       },
+       "reactions": {
+        "nodes": [
+         {
+          "content": "THUMBS_UP",
+          "user": {
+           "login": "review-bot[bot]"
+          }
+         }
+        ]
+       }
+      },
+      {
+       "number": 2,
+       "title": "The bot found nothing",
+       "url": "https://github.com/example/alpha/pull/2",
+       "isDraft": false,
+       "reviewDecision": null,
+       "mergeable": "MERGEABLE",
+       "author": {
+        "login": "owner"
+       },
+       "reviewRequests": {
+        "nodes": []
+       },
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "statusCheckRollup": null
+          }
+         }
+        ]
+       },
+       "reactions": {
+        "nodes": [
+         {
+          "content": "THUMBS_UP",
+          "user": {
+           "login": "review-bot[bot]"
+          }
+         }
+        ]
+       }
+      },
+      {
+       "number": 3,
+       "title": "The bot is reading it",
+       "url": "https://github.com/example/alpha/pull/3",
+       "isDraft": false,
+       "reviewDecision": null,
+       "mergeable": "MERGEABLE",
+       "author": {
+        "login": "owner"
+       },
+       "reviewRequests": {
+        "nodes": []
+       },
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "statusCheckRollup": null
+          }
+         }
+        ]
+       },
+       "reactions": {
+        "nodes": [
+         {
+          "content": "EYES",
+          "user": {
+           "login": "review-bot[bot]"
+          }
+         },
+         {
+          "content": "THUMBS_UP",
+          "user": {
+           "login": "pat"
+          }
+         }
+        ]
+       }
+      },
+      {
+       "number": 4,
+       "title": "Approved by a person",
+       "url": "https://github.com/example/alpha/pull/4",
+       "isDraft": false,
+       "reviewDecision": "APPROVED",
+       "mergeable": "MERGEABLE",
+       "author": {
+        "login": "owner"
+       },
+       "reviewRequests": {
+        "nodes": []
+       },
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "statusCheckRollup": {
+            "state": "SUCCESS"
+           }
+          }
+         }
+        ]
+       },
+       "reactions": {
+        "nodes": []
+       }
+      },
+      {
+       "number": 5,
+       "title": "Checks are running",
+       "url": "https://github.com/example/alpha/pull/5",
+       "isDraft": false,
+       "reviewDecision": "APPROVED",
+       "mergeable": "MERGEABLE",
+       "author": {
+        "login": "owner"
+       },
+       "reviewRequests": {
+        "nodes": []
+       },
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "statusCheckRollup": {
+            "state": "PENDING"
+           }
+          }
+         }
+        ]
+       },
+       "reactions": {
+        "nodes": []
+       }
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "data": {
+   "viewer": {
+    "login": "owner"
+   },
+   "repository": {
+    "pullRequests": {
+     "pageInfo": {
+      "hasNextPage": true,
+      "endCursor": "Y3Vyc29yOjEw"
+     },
+     "nodes": [
+      {
+       "number": 6,
+       "title": "Checks failed",
+       "url": "https://github.com/example/alpha/pull/6",
+       "isDraft": false,
+       "reviewDecision": null,
+       "mergeable": "MERGEABLE",
+       "author": {
+        "login": "owner"
+       },
+       "reviewRequests": {
+        "nodes": []
+       },
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "statusCheckRollup": {
+            "state": "FAILURE"
+           }
+          }
+         }
+        ]
+       },
+       "reactions": {
+        "nodes": [
+         {
+          "content": "THUMBS_UP",
+          "user": {
+           "login": "review-bot[bot]"
+          }
+         }
+        ]
+       }
+      },
+      {
+       "number": 7,
+       "title": "Conflicts",
+       "url": "https://github.com/example/alpha/pull/7",
+       "isDraft": false,
+       "reviewDecision": "APPROVED",
+       "mergeable": "CONFLICTING",
+       "author": {
+        "login": "owner"
+       },
+       "reviewRequests": {
+        "nodes": []
+       },
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "statusCheckRollup": {
+            "state": "SUCCESS"
+           }
+          }
+         }
+        ]
+       },
+       "reactions": {
+        "nodes": []
+       }
+      },
+      {
+       "number": 8,
+       "title": "Someone else is asked",
+       "url": "https://github.com/example/alpha/pull/8",
+       "isDraft": false,
+       "reviewDecision": null,
+       "mergeable": "MERGEABLE",
+       "author": {
+        "login": "owner"
+       },
+       "reviewRequests": {
+        "nodes": [
+         {
+          "requestedReviewer": {
+           "__typename": "User",
+           "login": "pat"
+          }
+         }
+        ]
+       },
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "statusCheckRollup": null
+          }
+         }
+        ]
+       },
+       "reactions": {
+        "nodes": []
+       }
+      },
+      {
+       "number": 9,
+       "title": "The owner is asked",
+       "url": "https://github.com/example/alpha/pull/9",
+       "isDraft": false,
+       "reviewDecision": null,
+       "mergeable": "MERGEABLE",
+       "author": {
+        "login": "pat"
+       },
+       "reviewRequests": {
+        "nodes": [
+         {
+          "requestedReviewer": {
+           "__typename": "User",
+           "login": "sam"
+          }
+         },
+         {
+          "requestedReviewer": {
+           "__typename": "User",
+           "login": "owner"
+          }
+         }
+        ]
+       },
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "statusCheckRollup": {
+            "state": "PENDING"
+           }
+          }
+         }
+        ]
+       },
+       "reactions": {
+        "nodes": []
+       }
+      },
+      {
+       "number": 10,
+       "title": "Changes asked for",
+       "url": "https://github.com/example/alpha/pull/10",
+       "isDraft": false,
+       "reviewDecision": "CHANGES_REQUESTED",
+       "mergeable": "MERGEABLE",
+       "author": {
+        "login": "owner"
+       },
+       "reviewRequests": {
+        "nodes": []
+       },
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "statusCheckRollup": {
+            "state": "SUCCESS"
+           }
+          }
+         }
+        ]
+       },
+       "reactions": {
+        "nodes": []
+       }
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "data": {
+   "viewer": {
+    "login": "owner"
+   },
+   "repository": {
+    "pullRequests": {
+     "pageInfo": {
+      "hasNextPage": false,
+      "endCursor": "Y3Vyc29yOjE0"
+     },
+     "nodes": [
+      {
+       "number": 11,
+       "title": "A review is required",
+       "url": "https://github.com/example/alpha/pull/11",
+       "isDraft": false,
+       "reviewDecision": "REVIEW_REQUIRED",
+       "mergeable": "MERGEABLE",
+       "author": {
+        "login": "owner"
+       },
+       "reviewRequests": {
+        "nodes": []
+       },
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "statusCheckRollup": null
+          }
+         }
+        ]
+       },
+       "reactions": {
+        "nodes": []
+       }
+      },
+      {
+       "number": 12,
+       "title": "Nothing to wait for",
+       "url": "https://github.com/example/alpha/pull/12",
+       "isDraft": false,
+       "reviewDecision": null,
+       "mergeable": "MERGEABLE",
+       "author": {
+        "login": "owner"
+       },
+       "reviewRequests": {
+        "nodes": []
+       },
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "statusCheckRollup": null
+          }
+         }
+        ]
+       },
+       "reactions": {
+        "nodes": [
+         {
+          "content": "HEART",
+          "user": null
+         }
+        ]
+       }
+      },
+      {
+       "number": 13,
+       "title": "A team is asked",
+       "url": "https://github.com/example/alpha/pull/13",
+       "isDraft": false,
+       "reviewDecision": null,
+       "mergeable": "MERGEABLE",
+       "author": {
+        "login": "owner"
+       },
+       "reviewRequests": {
+        "nodes": [
+         {
+          "requestedReviewer": {
+           "__typename": "Team",
+           "name": "reviewers"
+          }
+         }
+        ]
+       },
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "statusCheckRollup": null
+          }
+         }
+        ]
+       },
+       "reactions": {
+        "nodes": []
+       }
+      },
+      {
+       "number": 14,
+       "title": "GitHub has not worked out whether it merges",
+       "url": "https://github.com/example/alpha/pull/14",
+       "isDraft": false,
+       "reviewDecision": null,
+       "mergeable": "UNKNOWN",
+       "author": {
+        "login": "owner"
+       },
+       "reviewRequests": {
+        "nodes": []
+       },
+       "commits": {
+        "nodes": [
+         {
+          "commit": {
+           "statusCheckRollup": null
+          }
+         }
+        ]
+       },
+       "reactions": {
+        "nodes": [
+         {
+          "content": "THUMBS_UP",
+          "user": {
+           "login": "review-bot[bot]"
+          }
+         }
+        ]
+       }
+      }
+     ]
+    }
+   }
+  }
+ }
+]
