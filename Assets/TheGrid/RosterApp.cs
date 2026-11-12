@@ -23,7 +23,7 @@ namespace TheGrid
 
         Collector collector;
         Pile pile;
-        Vector2 scroll, pileScroll, rowScroll;
+        Vector2 scroll, pileScroll;
         RosterSnapshot logged, drawn = new RosterSnapshot();
         PileSnapshot pileDrawn = new PileSnapshot();
         // A click changes the "next" value; it takes effect on the following Layout event, so both IMGUI passes draw the same controls.
@@ -31,6 +31,14 @@ namespace TheGrid
         bool worldOpen, nextWorldOpen;
         WorldView world;
         WorldModel worldDrawn = new WorldModel();
+        RosterSnapshot worldFrom;   // the snapshot worldDrawn was built from
+        readonly WorldPanels panels = new WorldPanels();
+        List<NeedsYouRow> needsYou = new List<NeedsYouRow>();
+        BotCard card;
+        Deliveries deliveries;      // made when the world is first opened: only what arrives after that is shown
+        PileSnapshot deliveredFrom; // the pile snapshot last looked through for deliveries
+        string lastRecipient = "";
+        bool leftWorld;             // the world has been closed since it was last drawn
         Plots plots;
         string plotsPath, selected = "", shotsDir;
         int plotsWarned = -1;
@@ -61,6 +69,12 @@ namespace TheGrid
                 fixedSnap = JsonUtility.FromJson<RosterSnapshot>(File.ReadAllText(snapshotFile));
                 plots = new Plots();   // never the owner's world.json
                 worldOpen = nextWorldOpen = true;
+                // A pile to show arriving, for pictures of couriers: everything in it counts as arriving as the world opens.
+                if (Arg("-messages") != "")
+                {
+                    pileDrawn = JsonUtility.FromJson<PileSnapshot>(File.ReadAllText(Arg("-messages")));
+                    deliveries = new Deliveries(0);
+                }
                 shotsDir = Arg("-shots");
                 if (shotsDir != "") StartCoroutine(Shots());
                 return;
@@ -92,8 +106,18 @@ namespace TheGrid
             Directory.CreateDirectory(shotsDir);
             for (int i = 0; i < 5; i++) yield return null;   // let the window open and the first layout run
             world.LookAtAll();
+            if (deliveries != null)
+            {
+                // A courier is on the road for at least a second and a half; then its recipient pulses for nine tenths.
+                yield return Shot("courier.png");
+                world.LookAt(lastRecipient);
+                yield return new WaitForSecondsRealtime(1.65f);   // the fixture's courier arrives 1.75 seconds in; then the rings widen
+                yield return Shot("pulse.png");
+                world.LookAtAll();
+            }
             yield return Shot("far.png");
-            world.LookAtFirstNeed();
+            world.LookAtOpening();
+            world.Select(Arg("-select"));   // a picture with a bot's card in it
             yield return Shot("near.png");
             Application.Quit();
         }
@@ -188,7 +212,11 @@ namespace TheGrid
             if (worldOpen) DrawWorld(area, scale, now);
             else
             {
-                if (Event.current.type == EventType.Layout) world.Hide();
+                if (Event.current.type == EventType.Layout)
+                {
+                    world.Hide();
+                    leftWorld = true;
+                }
                 if (wide)
                 {
                     float half = (width - 12) / 2;
@@ -200,17 +228,18 @@ namespace TheGrid
             }
         }
 
-        // The map, and under it the roster row of the rider that was clicked. Built from the same snapshot the lists draw.
-        void DrawWorld(Rect area, float scale, long now)
+        // The map, and over it who needs the owner and the card of the bot that was clicked. All from the snapshot the lists draw.
+        void DrawWorld(Rect map, float scale, long now)
         {
-            var row = selected == "" ? null : drawn.agents.Find(a => a.account + "|" + a.sessionId == selected);
-            // The row never takes more than half the view, however many subagents it lists or however short the window: there is
-            // always a map to click, which is also how a selection is cleared. What does not fit scrolls.
-            float rowHeight = row == null ? 0 : Mathf.Min(60 + 16 * row.subagents.Count, area.height / 2);
-            var map = new Rect(area.x, area.y, area.width, area.height - rowHeight);
             if (Event.current.type == EventType.Layout)
             {
-                worldDrawn = World.Build(drawn, plots);
+                // The same snapshot gives the same world: build it once, so the view can tell that nothing changed.
+                if (!ReferenceEquals(drawn, worldFrom))
+                {
+                    worldFrom = drawn;
+                    worldDrawn = World.Build(drawn, plots);
+                    needsYou = Panels.NeedsYou(drawn);
+                }
                 if (fixedSnap == null)
                 {
                     // A failed write is tried again on the next pass, so new plots are not lost when the disk recovers; it is logged once, not ten times a second.
@@ -222,16 +251,31 @@ namespace TheGrid
                     }
                 }
                 world.Show(worldDrawn, map, scale);
+                card = selected == "" ? null : Panels.Card(drawn, selected, now);
+                // Messages that arrived since the world was opened, each shown once. Looked for only when the pile has changed.
+                // Coming back from the lists, what arrived meanwhile is old mail and is not replayed.
+                if (leftWorld && deliveries != null) deliveries.Reopen(now);
+                leftWorld = false;
+                if (deliveries == null) deliveries = new Deliveries(now);
+                if (!ReferenceEquals(pileDrawn, deliveredFrom))
+                {
+                    deliveredFrom = pileDrawn;
+                    foreach (var d in deliveries.New(pileDrawn, worldDrawn))
+                    {
+                        world.Deliver(d);
+                        lastRecipient = d.toBot;
+                    }
+                }
             }
-            world.Gui(detail, title);
+            panels.Place(map, needsYou.Count, card != null);
+            world.Gui(detail, title, panels.Covers);
             if (drawn.errors.Count > 0) GUI.Label(new Rect(map.x + 4, map.y + 4, map.width - 8, 32), string.Join(" | ", drawn.errors), error);
-            if (row == null) return;
-            rowWidth = area.width;
-            GUILayout.BeginArea(new Rect(area.x, map.yMax + 4, area.width, rowHeight - 4));
-            rowScroll = GUILayout.BeginScrollView(rowScroll);
-            DrawAgent(row, now);
-            GUILayout.EndScrollView();
-            GUILayout.EndArea();
+            string clicked = panels.Draw(map, needsYou, card, detail, title);
+            if (clicked != "")
+            {
+                world.Select(clicked);
+                world.LookAt(clicked);
+            }
         }
 
         void DrawRoster(Rect area, RosterSnapshot snap, long now)

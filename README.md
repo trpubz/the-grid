@@ -55,33 +55,55 @@ The shape of the data the window draws is described in [docs/roster-snapshot.md]
 
 ## The world
 
-**World** shows the same agents as the roster, as riders in a city. Every repo gets a plot on one isometric map, and the map grows as new repos turn up. A rider stands at the building that matches what its agent is doing, and rides to another when that changes. Nothing else moves, except a marker that bounces over every rider that needs you.
+**World** shows the same agents as the roster, as bots in a city. Every repo gets a sector on one isometric map, and the map grows as new repos turn up. A bot stands at the building that matches the work its agent is doing, and walks to another when that changes. Nothing else moves, except the badge that bounces over every bot that needs you.
 
-![The world, zoomed in on one city](docs/art/world-near.png)
+![One sector, close up](docs/art/world-near.png)
 
-| Building | A rider is here when its agent is |
+A building stands for a kind of work:
+
+| Building | A bot is here when its agent is |
 |---|---|
-| Garage | editing files |
-| Library | reading or searching |
-| Lab | running tests |
+| Server tower | reading or searching |
+| Assembly bay | editing files |
+| Test workshop | running tests. Its near walls are cut away, so you see the bot at its terminal |
 | Review hall | looking at diffs, commits or a pull request |
-| Workshop | working, when it cannot be told on what |
-| Booth | blocked on a question to you |
-| Gate | waiting for a permission, or on something else |
-| Yard | errored, or in a state The Grid does not know |
-| Lot | done with its turn |
-| Depot | offline |
+| Works | working, when it cannot be told on what |
 
-Past the last plot the land carries on to the edge of the window: stones, outcrops, a spire or a lake here and there. That is scenery, laid out the same way every time; it says nothing about any agent.
+Anything else is shown on the bot itself, wherever it stands:
 
-The Booth, the Gate and the Yard are where you are needed. The tall work buildings stand along the back street of a plot and the low ones along the front, so no tower hides a rider.
+| On the bot | Its agent is |
+|---|---|
+| Amber **?** badge | blocked on a question to you |
+| Amber **!** badge | waiting for a permission, or on something else |
+| Red **×** badge | errored, or in a state The Grid does not know |
+| Pale **✓** badge | done with its turn |
+| No light at all | offline |
+
+Bots that need you stand in the open at the front left of their sector, done ones by the fountain, offline ones in front of the relay. The view opens on the first sector with a bot that needs you, close enough to follow one bot from a doorway to a workstation; in a small window it makes sure that bot is in view.
+
+![Every sector, far out](docs/art/world-far.png)
+
+A lane runs round every sector, so between any two neighbours there is one, and the lanes of the whole map join up. Past the last sector the city carries on to the edge of the window as dark blocks. Lanes and blocks are scenery, worked out from where the sectors are; they say nothing about any agent.
 
 - **Move:** drag, or scroll with two fingers.
-- **Zoom:** the **−** and **+** buttons, the `-` and `+` keys, or scroll while holding Command. There are five levels, each double the last. The view opens at the closest one that shows every plot.
-- **Far out,** each city shows its name, how many riders need you and how many are done. **Closer in,** buildings and riders are named. A rider's glow colour is its account. Small bikes beside a rider are its subagents.
-- **Click a rider** to see that agent's roster row under the map.
+- **Zoom:** the **−** and **+** buttons, the `-` and `+` keys, or scroll while holding Command. There are five levels, each double the last.
+- **Far out,** each sector shows its name, how many bots need you and how many are done. **Closer in,** buildings and bots are named. The colour of a bot's light (blue, white or orange) is its account. Small bots beside a bot are its subagents.
+- **Click a bot** to see its card.
 
-Which repo has which plot is kept in `world.json` beside `settings.json`. A repo keeps its plot for good, also after its sessions are gone; delete the file to start the map again. If its contents are damaged it is kept as `world.json.bad` and the map starts empty.
+Two panels lie over the map, down its right side:
+
+- **Needs you** lists every bot that is waiting on you, most urgent first, with what it wants: an answer, an approval, or a look at a failure. Click a row and the view goes to that bot and selects it. Click the title to fold the list away; in a narrow window it starts folded.
+- **The card** of the selected bot says what it is doing, who it is, in which repo and on which ticket, and for how long. When the agent has a pull request, **PR #n** opens it.
+
+![A narrow window: the list folded, the card across the bottom](docs/art/world-narrow.png)
+
+When a message from one agent reaches another, the world shows it arriving. Between two sectors a courier on a bike, in the sender's colours, rides the lanes from the sender's crossing to the recipient's; then a ring of violet light pulses under the recipient. Within one sector there is only the pulse. While it lasts the recipient holds a hand to its helmet. A courier is drawn over buildings, so you can follow it the whole way.
+
+![A courier leaving a sector](docs/art/world-courier.png)
+
+The Grid only shows deliveries: it sends nothing and holds nothing back. A message is shown once, if it was received after you opened the world and both its sender and its recipient are bots on the map. The review pile has every message, shown or not.
+
+Which repo has which sector is kept in `world.json` beside `settings.json`. A repo keeps its place for good, also after its sessions are gone; delete the file to start the map again. If its contents are damaged it is kept as `world.json.bad` and the map starts empty.
 
 To look at the world without any agent sessions, start the app on a roster snapshot file. It then reads no agent data and writes nothing:
 
@@ -89,7 +111,7 @@ To look at the world without any agent sessions, start the app on a roster snaps
 Builds/TheGrid.app/Contents/MacOS/"The Grid" -snapshot "$PWD/fixtures/world/snapshot.json"
 ```
 
-Add `-shots <folder>` and it saves `far.png` and `near.png` there and quits. With the editor closed, **The Grid > Render World Pictures** does much the same without a window, into `Logs/`, though without the names:
+Add `-shots <folder>` and it saves `far.png` and `near.png` there and quits; `-select <account>|<session id>` selects that bot for `near.png`, and `-messages <pile snapshot file>` (try `fixtures/world/messages.json`) shows its messages arriving and saves `courier.png` and `pulse.png` too. With the editor closed, **The Grid > Render World Pictures** does much the same without a window, into `Logs/`, though without the names and badges:
 
 ```bash
 /Applications/Unity/Hub/Editor/6000.4.3f1/Unity.app/Contents/MacOS/Unity -batchmode -projectPath "$PWD" -executeMethod TheGrid.EditorTools.GridMenu.WorldPictures -quit
@@ -105,7 +127,10 @@ The sprites are made by a script; see [tools/art/README.md](tools/art/README.md)
 | Assets/TheGrid/Demo.unity | Scene with GridReplay attached. Open it and press Play. |
 | Assets/TheGrid/Core/ | Reads live sessions and builds the roster. No scene or editor code. |
 | Assets/TheGrid/RosterApp.cs, Roster.unity | The roster window and its scene. |
-| Assets/TheGrid/WorldView.cs | The world: the map, the riders, moving and zooming. |
+| Assets/TheGrid/WorldView.cs | The world as the window sees it: the camera, moving and zooming, names and badges. |
+| Assets/TheGrid/WorldStage.cs | The world's scene: ground, lanes, buildings, bots and the blocks beyond. |
+| Assets/TheGrid/WorldPanels.cs | The two panels over the world: who needs you, and the selected bot's card. |
+| Assets/TheGrid/WorldTraffic.cs | Messages arriving in the world: couriers and pulses. |
 | Assets/TheGrid/Resources/Art/, tools/art/ | The sprites, and the Blender script that makes them. |
 | Assets/TheGrid/Tests/ | EditMode tests for Core. |
 | fixtures/ | Hand-written sample records and the pinned roster snapshot. |
