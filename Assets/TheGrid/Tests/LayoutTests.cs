@@ -231,6 +231,10 @@ namespace TheGrid.Core.Tests
                         Assert.AreEqual(Layout.FloorPixels + l.Floor(place, slot) * Layout.StoreyPixels, l.Lift(place, slot), .01f);
                         Assert.AreEqual(Iso.Point(origin.x + t.x, origin.y + t.y).y + l.Lift(place, slot), Iso.BotSpot(origin, l, place, slot).y, .01f);
                         // an upper floor reaches two floor squares out from the back wall: who stands on it stands within them
+                        // under a floor, a bot is near enough to that floor's open edge to be seen whole beneath it: a tile
+                        // further back is 32 pixels further under, and a bot is 34 pixels tall under a slab 3 thick
+                        if (l.Floor(place, slot) < floors - 1)
+                            Assert.LessOrEqual((Layout.FloorReach - (t.y - f0.yMin)) * 32 + 34, Layout.StoreyPixels - 3, "arrangement " + a + ": " + place + " slot " + slot + " is hidden by the floor above");
                         if (l.Floor(place, slot) > 0)
                             Assert.IsTrue(t.y - f0.yMin > -.1f && t.y - f0.yMin < Layout.FloorReach - .1f, "arrangement " + a + ": " + place + " slot " + slot + " at " + t + " is off its floor");
                     }

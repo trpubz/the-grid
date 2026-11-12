@@ -353,7 +353,11 @@ namespace TheGrid
                 // drawn over the workshop's floor and not under it.
                 var at = new Vector3(Mathf.Round(p.x), Mathf.Round(p.y), -1 - p.z);
                 string pose, facing;
-                if (t >= 1f && Release(b)) stale = true;   // it has arrived: the building it left can close
+                if (t >= 1f)
+                {
+                    if (b.path.Count > 1) b.path.RemoveRange(0, b.path.Count - 1);   // it has arrived: it stands at the one point
+                    if (Release(b)) stale = true;                                    // and the building it left can close
+                }
                 if (t < 1f)
                 {
                     Walking = true;
