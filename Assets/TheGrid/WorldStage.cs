@@ -50,6 +50,7 @@ namespace TheGrid
         readonly Dictionary<string, Tile> tiles = new Dictionary<string, Tile>();
         readonly Dictionary<string, Bot> bots = new Dictionary<string, Bot>();
         readonly HashSet<int> painted = new HashSet<int>();
+        readonly HashSet<(Vector2Int, Vector2Int)> linked = new HashSet<(Vector2Int, Vector2Int)>();
         readonly Dictionary<Vector2Int, GameObject> outlands = new Dictionary<Vector2Int, GameObject>();
         readonly Dictionary<string, float> signals = new Dictionary<string, float>();   // bot key: signalling until this time
         readonly float[] tops = new float[ArtNames.Structures.Length];
@@ -114,17 +115,32 @@ namespace TheGrid
         }
 
         // A bot's picture with its light turned to the account's colourway. The suit stays as drawn: only the light is the account's.
-        Sprite Lit(string name, int account)
+        Sprite Lit(string name, int account) => Recoloured(name + "#" + account, name, Markers, Colourways[account % Colourways.Length]);
+
+        // A building's picture in one of the lights: its lines, its windows and the glow at its foot. As drawn for the first.
+        Sprite InLight(string name, int light)
         {
-            string key = name + "#" + account;
+            if (light <= 0) return Art(name);
+            var from = new Color32[Lights.Parts];
+            var to = new Color32[Lights.Parts];
+            for (int i = 0; i < Lights.Parts; i++)
+            {
+                from[i] = Hex(Lights.Drawn[i]);
+                to[i] = Hex(Lights.Family(light)[i]);
+            }
+            return Recoloured(name + "@" + light, name, from, to);
+        }
+
+        // A copy of a picture with some colours swapped for others. Made once and kept.
+        Sprite Recoloured(string key, string name, Color32[] from, Color32[] to)
+        {
             if (sprites.TryGetValue(key, out var s)) return s;
             var drawn = Art(name);
             if (drawn == null) return sprites[key] = null;
             var px = drawn.texture.GetPixels32();
-            var way = Colourways[account % Colourways.Length];
             for (int i = 0; i < px.Length; i++)
-                for (int k = 0; k < Markers.Length; k++)
-                    if (px[i].Equals(Markers[k])) { px[i] = way[k]; break; }
+                for (int k = 0; k < from.Length; k++)
+                    if (px[i].Equals(from[k])) { px[i] = to[k]; break; }
             var copy = new Texture2D(drawn.texture.width, drawn.texture.height, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
             copy.SetPixels32(px);
             copy.Apply(false, true);
@@ -151,6 +167,11 @@ namespace TheGrid
                 cells.Add(sector.cell);
                 if (painted.Add(sector.plot)) Paint(sector);   // a new sector is drawn once; the others are not touched
             }
+            // A link joins two sectors that stand side by side. It is laid when the second of them turns up.
+            var there = new HashSet<Vector2Int>(cells);
+            foreach (var cell in cells)
+                foreach (var toward in new[] { Vector2Int.right, Vector2Int.up })
+                    if (there.Contains(cell + toward) && linked.Add((cell, toward))) Link(cell, toward == Vector2Int.right);
             LayOutlands(cells);
 
             var seen = new HashSet<string>();
@@ -158,7 +179,7 @@ namespace TheGrid
                 foreach (var b in sector.bots)
                 {
                     seen.Add(b.key);
-                    PutBot(b, Iso.BotSpot(sector.cell, b.place, b.slot));
+                    PutBot(b, Iso.BotSpot(sector.cell, sector.layout, b.place, b.slot));
                 }
             var gone = new List<string>();
             foreach (var kv in bots) if (!seen.Contains(kv.Key)) gone.Add(kv.Key);
@@ -238,24 +259,34 @@ namespace TheGrid
         // Where a tile of the map is in Unity's isometric grid, whose axes run the other way.
         static Vector3Int At(int col, int row) => new Vector3Int(-row, -col, 0);
 
+        // The square of the map that is one sector's: its plot, its lane, and the open ground out to the next square.
+        const int First = -Iso.LaneTiles, Ring = Iso.PlotTiles + Iso.LaneTiles, Edge = Ring + Iso.GapTiles;
+
+        void OpenGround(Vector2Int origin)
+        {
+            for (int col = First; col < Edge; col++)
+                for (int row = First; row < Edge; row++)
+                    ground.SetTile(At(origin.x + col, origin.y + row), T(ArtNames.Void));
+        }
+
         void Paint(WorldSector sector)
         {
             var o = Iso.PlotOrigin(sector.cell);
-            int last = Iso.PlotTiles + Iso.LaneTiles - 1;
-            // The sector's paving, and the lane round it. A neighbour paints the stretch between the two again, the same way.
-            for (int col = -Iso.LaneTiles; col <= last; col++)
-                for (int row = -Iso.LaneTiles; row <= last; row++)
+            OpenGround(o);
+            // The sector's paving, and its own lane round it. Beyond the lane the ground stays open: a sector stands apart.
+            for (int col = First; col < Ring; col++)
+                for (int row = First; row < Ring; row++)
                     ground.SetTile(At(o.x + col, o.y + row), T(Iso.OnLane(sector.cell, o.x + col, o.y + row) ? Lane(col, row) : Paving(col, row)));
 
             // A line of light down each edge of the lane. line-a runs along a tile's far edge one way, line-b the other; the
             // lane's outer edge is the far edge of the tile beyond it.
-            for (int i = -Iso.LaneTiles; i <= last; i++)
+            for (int i = First; i < Ring; i++)
             {
                 bool inner = i >= 0 && i < Iso.PlotTiles;
-                lines.SetTile(At(o.x + i, o.y - Iso.LaneTiles), T(ArtNames.LineA));
-                lines.SetTile(At(o.x + i, o.y + last + 1), T(ArtNames.LineA));
-                lines.SetTile(At(o.x - Iso.LaneTiles - 1, o.y + i), T(ArtNames.LineB));
-                lines.SetTile(At(o.x + last, o.y + i), T(ArtNames.LineB));
+                lines.SetTile(At(o.x + i, o.y + First), T(ArtNames.LineA));
+                lines.SetTile(At(o.x + i, o.y + Ring), T(ArtNames.LineA));
+                lines.SetTile(At(o.x + First - 1, o.y + i), T(ArtNames.LineB));
+                lines.SetTile(At(o.x + Ring - 1, o.y + i), T(ArtNames.LineB));
                 if (!inner) continue;
                 lines.SetTile(At(o.x + i, o.y), T(ArtNames.LineA));
                 lines.SetTile(At(o.x + i, o.y + Iso.PlotTiles), T(ArtNames.LineA));
@@ -263,8 +294,24 @@ namespace TheGrid
                 lines.SetTile(At(o.x + Iso.PlotTiles - 1, o.y + i), T(ArtNames.LineB));
             }
 
+            // Every sector has the same buildings; where each stands and how it is lit is the sector's own.
             foreach (Structure s in Enum.GetValues(typeof(Structure)))
-                NewSprite(ArtNames.Structures[(int)s], Art(ArtNames.Structures[(int)s]), root).transform.localPosition = Iso.StructureSpot(sector.cell, s);
+                NewSprite(ArtNames.Structures[(int)s], InLight(ArtNames.Structures[(int)s], sector.layout.Light(s)), root).transform.localPosition = Iso.StructureSpot(sector.cell, sector.layout, s);
+        }
+
+        // The road across the open ground from one sector's lane to the next's: to the sector on its right, or to the one
+        // in front. Two tiles wide, a line of light down each side.
+        void Link(Vector2Int cell, bool right)
+        {
+            var o = Iso.PlotOrigin(cell);
+            for (int along = Ring; along < Edge; along++)
+            {
+                for (int across = Iso.Crossing; across <= Iso.Crossing + 1; across++)
+                    ground.SetTile(right ? At(o.x + along, o.y + across) : At(o.x + across, o.y + along), T(ArtNames.Lane));
+                foreach (int side in new[] { Iso.Crossing, Iso.Crossing + 2 })
+                    if (right) lines.SetTile(At(o.x + along, o.y + side), T(ArtNames.LineA));
+                    else lines.SetTile(At(o.x + side - 1, o.y + along), T(ArtNames.LineB));
+            }
         }
 
         // Paving is plain, with a joint every third tile each way.
@@ -317,9 +364,7 @@ namespace TheGrid
             var holder = new GameObject("City " + cell.x + " " + cell.y).transform;
             holder.SetParent(root, false);
             var o = Iso.PlotOrigin(cell);
-            for (int col = 0; col < Iso.PlotTiles; col++)
-                for (int row = 0; row < Iso.PlotTiles; row++)
-                    ground.SetTile(At(o.x + col, o.y + row), T(ArtNames.Void));
+            OpenGround(o);
             var rng = new System.Random(cell.x * 73856093 ^ cell.y * 19349663);
             for (int i = 0; i < 7; i++)
             {

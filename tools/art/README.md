@@ -66,7 +66,7 @@ Unity's import settings are set by `Assets/TheGrid/Editor/ArtImport.cs`, which t
    ```
 
 2. Call it from `make()`.
-3. Render and look at the contact sheet. A building carries one light: pick `"cyanw"`, `"cyan"` or `"violet"` and use nothing else on it, lit windows included. Keep windows clear of the lines `shaft` draws up a wall.
+3. Render and look at the contact sheet. Every building is drawn in the same light: `"cyanw"` lines, `"cyan"` dimmer lines, `"teal"` windows, cyan glow. The game swaps those six colours for another family's in each sector (`Assets/TheGrid/Core/Lights.cs`), so use no other light colour on a building, or the swap will leave it behind. Keep windows clear of the lines `shaft` draws up a wall. If the building is taller than before, raise its number in `Layout.Wall`; a test tells you.
 
 Keep the building, and the glow round it, inside its picture. The tests fail if a pixel touches the edge.
 

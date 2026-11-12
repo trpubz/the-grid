@@ -57,6 +57,8 @@ The shape of the data the window draws is described in [docs/roster-snapshot.md]
 
 **World** shows the same agents as the roster, as bots in a city. Every repo gets a sector on one isometric map, and the map grows as new repos turn up. A bot stands at the building that matches the work its agent is doing, and walks to another when that changes. Nothing else moves, except the badge that bounces over every bot that needs you.
 
+Every sector has the same six buildings and a fountain, but no two beside each other look alike: the buildings stand in a different order, and each is lit in its own colour (white, cyan, blue, mint or violet). A sector's look belongs to its repo and is the same every time. Sectors stand apart, with open ground between them and a short link of road joining each to its neighbours.
+
 ![One sector, close up](docs/art/world-near.png)
 
 A building stands for a kind of work:
@@ -79,15 +81,15 @@ Anything else is shown on the bot itself, wherever it stands:
 | Pale **✓** badge | done with its turn |
 | No light at all | offline |
 
-Bots that need you stand in the open at the front left of their sector, done ones by the fountain, offline ones in front of the relay. The view opens on the first sector with a bot that needs you, close enough to follow one bot from a doorway to a workstation; in a small window it makes sure that bot is in view.
+Bots that need you stand in the open at the front of their sector, done ones by the fountain, offline ones in front of the relay. The view opens on the first sector with a bot that needs you, close enough to follow one bot from a doorway to a workstation; in a small window it makes sure that bot is in view.
 
 ![Every sector, far out](docs/art/world-far.png)
 
-A lane runs round every sector, so between any two neighbours there is one, and the lanes of the whole map join up. Past the last sector the city carries on to the edge of the window as dark blocks. Lanes and blocks are scenery, worked out from where the sectors are; they say nothing about any agent.
+A lane runs round every sector, and links cross the open ground to the lanes of its neighbours, so the roads of the whole map join up. Past the last sector the city carries on to the edge of the window as dark blocks. Lanes, links and blocks are scenery, worked out from where the sectors are; they say nothing about any agent.
 
 - **Move:** drag, or scroll with two fingers.
 - **Zoom:** the **−** and **+** buttons, the `-` and `+` keys, or scroll while holding Command. There are five levels, each double the last.
-- **Far out,** each sector shows its name, how many bots need you and how many are done. **Closer in,** buildings and bots are named. The colour of a bot's light (blue, white or orange) is its account: an account gets the next colour the first time it is seen, and keeps it. Small bots beside a bot are its subagents.
+- **Far out,** each sector shows its name, how many bots need you and how many are done. **Closer in,** buildings and bots are named; where the two would overlap, the bot's name wins. The colour of a bot's light (blue, white or orange) is its account: an account gets the next colour the first time it is seen, and keeps it. Small bots beside a bot are its subagents.
 - **Click a bot** to see its card.
 
 Two panels lie over the map, down its right side:
@@ -97,9 +99,9 @@ Two panels lie over the map, down its right side:
 
 ![A narrow window: the list folded, the card across the bottom](docs/art/world-narrow.png)
 
-When a message from one agent reaches another, the world shows it arriving. Between two sectors a courier on a bike, in the sender's colours, rides the lanes from the sender's crossing to the recipient's; then a ring of violet light pulses under the recipient. Within one sector there is only the pulse. While it lasts the recipient holds a hand to its helmet. A courier is drawn over buildings, so you can follow it the whole way.
+When a message from one agent reaches another, the world shows it arriving. Between two sectors a courier on a bike, in the sender's colours, rides the lanes and links from the sender's crossing to the recipient's; then a ring of violet light pulses under the recipient. Within one sector there is only the pulse. While it lasts the recipient holds a hand to its helmet. A courier is drawn over buildings, so you can follow it the whole way.
 
-![A courier leaving a sector](docs/art/world-courier.png)
+![A courier arriving at a sector](docs/art/world-courier.png)
 
 The Grid only shows deliveries: it sends nothing and holds nothing back. A message is shown once, if it was received after you opened the world and both its sender and its recipient are bots on the map. The review pile has every message, shown or not.
 

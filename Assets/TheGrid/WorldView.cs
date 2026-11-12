@@ -20,6 +20,7 @@ namespace TheGrid
         Transform holder;
         WorldStage stage;
         WorldTraffic traffic;
+        readonly List<Rect> botNames = new List<Rect>();
         readonly Sprite[] badges = new Sprite[5];   // in the order of Badge; none for Badge.None
 
         WorldModel model = new WorldModel();
@@ -108,7 +109,7 @@ namespace TheGrid
             // view moves off the sector's middle only as far as that takes.
             var waiting = sector.bots.Find(b => b.needsOwner);
             if (waiting == null) return true;
-            var at = Iso.BotSpot(sector.cell, waiting.place, waiting.slot) + new Vector2(0, 16);
+            var at = Iso.BotSpot(sector.cell, sector.layout, waiting.place, waiting.slot) + new Vector2(0, 16);
             float zoom = Iso.Zoom[level], reachX = Mathf.Max(0, pixelW / (2 * zoom) - 48), reachY = Mathf.Max(0, pixelH / (2 * zoom) - 48);
             centre.x = Mathf.Clamp(centre.x, at.x - reachX, at.x + reachX);
             centre.y = Mathf.Clamp(centre.y, at.y - reachY, at.y + reachY);
@@ -131,11 +132,8 @@ namespace TheGrid
             centre = at;
         }
 
-        // Shows a message arriving: a courier between sectors, a pulse under the recipient.
-        public void Deliver(Delivery d)
-        {
-            if (traffic != null) traffic.Add(d, Time.unscaledTime);
-        }
+        // Shows a message arriving: a courier between sectors, a pulse under the recipient. Returns the seconds until the pulse.
+        public float Deliver(Delivery d) => traffic != null ? traffic.Add(d, Time.unscaledTime) : 0f;
 
         // Selects a bot as a click on it does. A key no bot has selects nothing.
         public void Select(string botKey)
@@ -155,7 +153,7 @@ namespace TheGrid
         }
 
         // How far the tallest roof, and the name over it, stand above the back corner of the ground.
-        float Skyline => Mathf.Max(0, Iso.StructureSpot(Vector2Int.zero, Structure.ServerTower).y + stage.Top(Structure.ServerTower) + 24 - Iso.Bounds(new[] { Vector2Int.zero }).yMax);
+        float Skyline => Mathf.Max(0, Iso.StructureSpot(Vector2Int.zero, Layout.Of(0), Structure.ServerTower).y + stage.Top(Structure.ServerTower) + 24 - Iso.Bounds(new[] { Vector2Int.zero }).yMax);
 
         void Lay(WorldModel world, int width, int height)
         {
@@ -270,6 +268,16 @@ namespace TheGrid
             GUI.BeginGroup(view);
             if (model.sectors.Count == 0) GUI.Label(new Rect(8, 8, view.width - 16, 20), "No live agent sessions.", label);
             bool up = (int)(Time.unscaledTime / BounceSeconds) % 2 == 0;
+            // Where the bots' names will go: a building's name gives way to them.
+            botNames.Clear();
+            if (!Far)
+                foreach (var sector in model.sectors)
+                    foreach (var b in sector.bots)
+                        if (stage.TryGetBot(b.key, out var at))
+                        {
+                            var plate = Plate(ToView(at - new Vector2(0, 8)), BotName(b), label);
+                            if (plate.width > 0) botNames.Add(plate);
+                        }
             foreach (var sector in model.sectors)
             {
                 var o = Iso.PlotOrigin(sector.cell);
@@ -285,19 +293,26 @@ namespace TheGrid
                         GUI.DrawTexture(new Rect(at.x - 8, at.y - 26 - (up ? 2 : 0), 16, 20), badges[(int)Badge.Question].texture);
                     continue;
                 }
-                // The sector's name lies on the lane along its front. A building's name floats over its roof: bots stand in
-                // front of buildings, so that is the one place it never covers one.
+                // The sector's name lies on the lane along its front. A building's name floats over its roof. A bot at a
+                // door behind a low building has its name there too: then the building goes unnamed, and is known by sight.
                 Text(ToView(Iso.Point(o.x + 5.5f, o.y + Iso.PlotTiles + .5f)) - new Vector2(0, 9), sector.name, loud);
                 foreach (Structure s in Enum.GetValues(typeof(Structure)))
-                    if (WorldStage.StructureNames[(int)s] != "")
-                        Text(ToView(Iso.StructureSpot(sector.cell, s) + new Vector2(0, stage.Top(s) + 3)) - new Vector2(0, 18), WorldStage.StructureNames[(int)s], label);
+                {
+                    if (WorldStage.StructureNames[(int)s] == "") continue;
+                    var at = ToView(Iso.StructureSpot(sector.cell, sector.layout, s) + new Vector2(0, stage.Top(s) + 3)) - new Vector2(0, 18);
+                    var plate = Plate(at, WorldStage.StructureNames[(int)s], label);
+                    plate = new Rect(plate.x + 6, plate.y + 3, plate.width - 12, plate.height - 6);   // plates that only touch both stay
+                    bool taken = false;
+                    foreach (var name in botNames) taken |= name.Overlaps(plate);
+                    if (!taken) Text(at, WorldStage.StructureNames[(int)s], label);
+                }
             }
             // Bots are named last, over everything: where two sectors meet, a bot's name matters more than a roof's.
             if (!Far)
                 foreach (var sector in model.sectors)
                     foreach (var b in sector.bots)
                         if (stage.TryGetBot(b.key, out var at))
-                            Text(ToView(at - new Vector2(0, 8)), b.subagents > 0 ? b.name + " +" + b.subagents : b.name, b.key == Selected ? loud : label);
+                            Text(ToView(at - new Vector2(0, 8)), BotName(b), b.key == Selected ? loud : label);
             // Badges go on last of all, over buildings and over names: what a bot needs from the owner is never covered.
             // The three that need the owner bounce; done does not.
             float k = Iso.Zoom[level] / pointScale;
@@ -312,14 +327,23 @@ namespace TheGrid
             GUI.EndGroup();
         }
 
+        static string BotName(WorldBot b) => b.subagents > 0 ? b.name + " +" + b.subagents : b.name;
+
+        // The dark plate a line of text centred on a point is drawn on. Nothing when off the view.
+        Rect Plate(Vector2 at, string text, GUIStyle style)
+        {
+            if (at.x < -80 || at.y < -20 || at.x > view.width + 80 || at.y > view.height + 20) return default;
+            // Text is drawn at the screen's scale, where it comes out a little wider than it measures; without slack the end is cut off.
+            var size = style.CalcSize(new GUIContent(text)) + new Vector2(10, 0);
+            return new Rect(Mathf.Round(at.x - size.x / 2), Mathf.Round(at.y), size.x, size.y);
+        }
+
         // One line of text centred on a point, on a dark plate so it reads over the art. Skipped when off the view.
         void Text(Vector2 at, string text, GUIStyle style)
         {
-            if (at.x < -80 || at.y < -20 || at.x > view.width + 80 || at.y > view.height + 20) return;
+            var rect = Plate(at, text, style);
+            if (rect.width <= 0) return;
             var content = new GUIContent(text);
-            // Text is drawn at the screen's scale, where it comes out a little wider than it measures; without slack the end is cut off.
-            var size = style.CalcSize(content) + new Vector2(10, 0);
-            var rect = new Rect(Mathf.Round(at.x - size.x / 2), Mathf.Round(at.y), size.x, size.y);
             var old = GUI.color;
             GUI.color = new Color(.02f, .03f, .06f, .8f);
             GUI.DrawTexture(rect, Texture2D.whiteTexture);

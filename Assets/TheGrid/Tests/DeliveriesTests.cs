@@ -156,12 +156,12 @@ namespace TheGrid.Core.Tests
                 Assert.AreNotEqual(route[i - 1], route[i], "a leg of no length");
                 Along(route[i - 1], route[i], (col, row) =>
                 {
-                    // on the lane round some cell: the cell this tile's column and row fall in, or one beside it
-                    bool lane = false;
+                    // on the lane round some sector, or on a link between two
+                    bool road = Iso.OnLink(col, row);
                     for (int cx = Mathf.FloorToInt((float)col / Iso.Pitch) - 1; cx <= Mathf.FloorToInt((float)col / Iso.Pitch) + 1; cx++)
                         for (int cy = Mathf.FloorToInt((float)row / Iso.Pitch) - 1; cy <= Mathf.FloorToInt((float)row / Iso.Pitch) + 1; cy++)
-                            lane |= Iso.OnLane(new Vector2Int(cx, cy), col, row);
-                    Assert.IsTrue(lane, "tile " + col + ", " + row + " is not lane");
+                            road |= Iso.OnLane(new Vector2Int(cx, cy), col, row);
+                    Assert.IsTrue(road, "tile " + col + ", " + row + " is neither lane nor link");
                 });
             }
         }

@@ -3,6 +3,10 @@
 Every building is graphite and smoked glass, and carries one light. That light is a recessed strip round the footing with
 its glow on the paving, a line up each corner the camera sees and up each side, unbroken from footing to roof, and on
 round the roof edge. What tells one building from another is its shape and one or two things only it has.
+
+Every building is drawn in the same light: white lines, cyan dimmer lines, teal windows, cyan glow. The game swaps those
+six colours for another family's, so a kind of building is lit differently from sector to sector (Core/Lights.cs). Use
+no other light colour on a building, or the swap will leave it behind.
 """
 import math
 
@@ -12,7 +16,7 @@ import kit
 from kit import PALETTE, box, disc, glow, light, mat, render
 
 # One light a building: the bright line for corners and strips, its dimmer partner for sides, and its glow on the ground.
-LIGHTS = {"cyanw": ("cyanw", "cyan", "cyan"), "cyan": ("cyan", "teal", "cyan"), "violet": ("violetw", "violet", "violet")}
+LIGHTS = {"cyanw": ("cyanw", "cyan", "cyan")}
 WALL = ("c0", "g4", "g1")       # concrete over graphite: top, left face, right face
 TRIM = ("c1", "g5", "g2")
 
@@ -59,7 +63,7 @@ def entrance(x, f, lit, w=.6):
 
 def glazing(cx, cy, w, d, z0, floors, per_floor, lit, every=5):
     """Smoked glass in panes, a few of them lit from inside in the building's dim light. Secondary to the lines."""
-    pane = "violet" if lit == "violet" else "teal"      # dimmer than any line on the building
+    pane = "teal"                                       # dimmer than any line on the building
     f, r = cy - d / 2, cx + w / 2
     for floor in range(floors):
         z = z0 + floor * .43
@@ -101,23 +105,23 @@ def server_tower():
 
 def review_hall():
     """Reviewing. Told by: two blocks joined by a bridge at the top."""
-    w, h, lit = 2.5, 3.4, "violet"
+    w, h, lit = 2.5, 3.4, "cyanw"
     z = footing(w, w, lit)
     for x in (-.8, .8):
         glazing(x, 0, .9, w, .9, 5, 2, lit, every=4)
         shaft(x, 0, .9, w, z, h - z, lit, sides=1)
         roof(x, 0, .9, w, h, lit)
     box(0, -.2, 2.5, .72, 1.5, .5, *TRIM)                                            # the bridge
-    light(0, -.96, 2.5, .72, .02, .05, "violetw"); light(0, -.96, 2.95, .72, .02, .05, "violetw")
+    light(0, -.96, 2.5, .72, .02, .05, "cyanw"); light(0, -.96, 2.95, .72, .02, .05, "cyanw")
     for i in range(3):
-        light(-.2 + i * .2, -.955, 2.66, .12, .02, .2, "violet")
+        light(-.2 + i * .2, -.955, 2.66, .12, .02, .2, "teal")
     entrance(-.8, -w / 2, lit, w=.5)
     render("b-review-hall", 256, 288, 80)
 
 
 def works():
     """Working, when it cannot be told on what. Told by: a plain shed with one stack."""
-    w, h, lit = 2.4, 1.5, "cyan"
+    w, h, lit = 2.4, 1.5, "cyanw"
     z = footing(w, w, lit)
     shaft(0, 0, w, w, z, h - z, lit, sides=1)
     top = roof(0, 0, w, w, h, lit)
@@ -149,7 +153,7 @@ def relay():
 
 def assembly_bay():
     """Editing. Told by: a wide low hall, one large lit door, a gantry across the roof."""
-    w, d, h, lit = 3.4, 2.4, 1.4, "cyan"
+    w, d, h, lit = 3.4, 2.4, 1.4, "cyanw"
     z = footing(w, d, lit)
     shaft(0, 0, w, d, z, h - z, lit, sides=0)
     f = -d / 2
