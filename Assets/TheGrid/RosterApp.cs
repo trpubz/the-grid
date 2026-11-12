@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using TheGrid.Core;
 using UnityEngine;
 
@@ -40,6 +41,9 @@ namespace TheGrid
         readonly WorldPanels panels = new WorldPanels();
         List<NeedsYouRow> needsYou = new List<NeedsYouRow>();
         BotCard card;
+        // Where the session of the card that is open lives: asked once when the card opens, on a thread of its own.
+        string whereFor = "", whereFixed = "", zellij = "";
+        Task<string> where;
         Deliveries deliveries;      // made when the world is first opened: only what arrives after that is shown
         PileSnapshot deliveredFrom; // the pile snapshot last looked through for deliveries
         string lastRecipient = "";  // picture mode: the recipient of the longest ride, how long that ride is and when it ends
@@ -86,6 +90,7 @@ namespace TheGrid
                 }
                 // Pull requests for a picture of the depot come from a file: a snapshot never asks GitHub.
                 if (Arg("-pulls") != "") pullsFixed = JsonUtility.FromJson<PullsSnapshot>(File.ReadAllText(Arg("-pulls")));
+                whereFixed = Arg("-where");   // nor does it ask zellij where a session lives: for a picture, the card is told
                 shotsDir = Arg("-shots");
                 if (shotsDir != "") StartCoroutine(Shots());
                 return;
@@ -103,6 +108,7 @@ namespace TheGrid
             var gh = ClaudeCli.ResolvePath(settings.ghPath, Gh.UsualPlaces());
             pullReader = new PullReader(root => Gh.Ask(gh, root), () => settings.pullRequests);
             pullReader.Start();
+            zellij = ClaudeCli.ResolvePath(settings.zellijPath, Zellij.UsualPlaces(home));
             // The pile's file sits beside settings.json, never under an agent app's folder.
             pile = new Pile(settings, home, Path.Combine(Application.persistentDataPath, "pile.json"));
             pile.Start();
@@ -315,6 +321,19 @@ namespace TheGrid
                 }
                 world.Show(worldDrawn, map, scale);
                 card = selected == "" ? null : Panels.Card(drawn, selected, now);
+                if (card == null) whereFor = "";
+                else
+                {
+                    // shortcut: asked when the card opens and not again while it stays open, so a session moved to another tab meanwhile is shown in the old one; click the bot again
+                    if (card.key != whereFor)
+                    {
+                        whereFor = card.key;
+                        int pid = card.pid;
+                        string path = zellij;
+                        where = fixedSnap != null || pid <= 0 ? null : Task.Run(() => Zellij.Where(pid, path, Zellij.Run));
+                    }
+                    card.where = fixedSnap != null ? whereFixed : where != null && where.Status == TaskStatus.RanToCompletion ? where.Result : "";
+                }
                 // Messages that arrived since the world was opened, each shown once. Looked for only when the pile has changed.
                 // Coming back from the lists, what arrived meanwhile is old mail and is not replayed.
                 if (leftWorld && deliveries != null) deliveries.Reopen(now);

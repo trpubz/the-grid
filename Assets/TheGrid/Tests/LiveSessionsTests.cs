@@ -22,6 +22,8 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(1001, s[0].Pid);
             Assert.AreEqual(1794000000000L, s[0].StartedAt);
             Assert.AreEqual(0, s[4].Pid); // background rows have no pid
+            Assert.AreEqual("bg000001", s[4].Id);   // but an id of their own, which they are attached to by
+            Assert.AreEqual("", s[0].Id);
         }
 
         [TestCase("interactive", "shell", null, null, AgentState.Unknown)]

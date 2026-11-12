@@ -11,6 +11,7 @@ namespace TheGrid.Core
     public sealed class LiveSession
     {
         public string SessionId, Name, Cwd, Kind, Status, WaitingFor, State, ConfigDir;
+        public string Id = "";   // a background session's short id, which `claude attach` takes; the others have none
         public int Pid;
         public long StartedAt;
     }
@@ -18,7 +19,7 @@ namespace TheGrid.Core
     public static class LiveSessions
     {
         // JsonUtility matches fields by exact name and cannot read a top-level array.
-        [Serializable] sealed class Row { public string sessionId, name, cwd, kind, status, waitingFor, state; public int pid; public long startedAt; }
+        [Serializable] sealed class Row { public string id, sessionId, name, cwd, kind, status, waitingFor, state; public int pid; public long startedAt; }
         [Serializable] sealed class Rows { public List<Row> items; }
 
         public static bool TryParse(string json, string configDir, out List<LiveSession> sessions, out string error)
@@ -34,7 +35,7 @@ namespace TheGrid.Core
                 {
                     SessionId = r.sessionId ?? "", Name = r.name ?? "", Cwd = r.cwd ?? "", Kind = r.kind ?? "",
                     Status = r.status ?? "", WaitingFor = r.waitingFor ?? "", State = r.state ?? "",
-                    ConfigDir = configDir, Pid = r.pid, StartedAt = r.startedAt,
+                    ConfigDir = configDir, Pid = r.pid, StartedAt = r.startedAt, Id = r.id ?? "",
                 });
             return true;
         }

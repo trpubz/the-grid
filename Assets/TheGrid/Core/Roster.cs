@@ -13,6 +13,10 @@ namespace TheGrid.Core
         public string activity = "";
         public int prNumber;
         public long stateSince;
+        // How to get into the conversation: the command to run in a terminal. And the session's process, 0 for a background
+        // session, which has none: where a session already lives is asked of its process.
+        public string enter = "";
+        public int pid;
         public List<SubagentRow> subagents = new List<SubagentRow>();
 
         internal AgentRow Copy()
@@ -34,6 +38,27 @@ namespace TheGrid.Core
 
     public static class RosterFormat
     {
+        // The command that opens a session's conversation in a terminal: a background session is attached to by its short
+        // id, any other is resumed by its session id, in the folder it was started in, and for an account other than the
+        // default one with that account's folder named. "" when there is nothing to open it by. It is meant for the owner's
+        // shell, so whatever a shell would not read as one plain word is quoted.
+        public static string Enter(string kind, string id, string sessionId, string cwd, string configDir, string home)
+        {
+            bool background = kind == "background";
+            string by = background ? id : sessionId;
+            if (string.IsNullOrEmpty(by)) return "";
+            bool usual = string.IsNullOrEmpty(configDir) || configDir.TrimEnd('/') == Path.Combine(home ?? "", ".claude");
+            return (string.IsNullOrEmpty(cwd) ? "" : "cd " + Word(cwd) + " && ") + (usual ? "" : "CLAUDE_CONFIG_DIR=" + Word(configDir) + " ")
+                + (background ? "claude attach " : "claude --resume ") + Word(by);
+        }
+
+        static string Word(string s)
+        {
+            foreach (char c in s)
+                if (!(char.IsLetterOrDigit(c) && c < 128) && "/._-+:@%".IndexOf(c) < 0) return "'" + s.Replace("'", "'\\''") + "'";
+            return s;
+        }
+
         // "4m", "1h 12m". Never negative.
         public static string Elapsed(long sinceMs, long nowMs)
         {
@@ -63,7 +88,14 @@ namespace TheGrid.Core
         readonly Settings settings;
         readonly Dictionary<string, Memory> memory = new Dictionary<string, Memory>();
 
-        public RosterBuilder(Settings settings) { this.settings = settings; }
+        readonly string home;
+
+        // home: the folder whose .claude is the default account, which a command need not name.
+        public RosterBuilder(Settings settings, string home = null)
+        {
+            this.settings = settings;
+            this.home = home ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        }
 
         public static string AccountLabel(string configDir)
         {
@@ -128,6 +160,8 @@ namespace TheGrid.Core
             row.account = AccountLabel(s.ConfigDir);
             row.state = state.ToString();
             row.rawStatus = LiveSessions.RawStatus(s);
+            row.enter = RosterFormat.Enter(s.Kind, s.Id, s.SessionId, s.Cwd, s.ConfigDir, home);
+            row.pid = s.Pid;
 
             var repo = RepoResolver.Resolve(s.Cwd);
             row.repoRoot = repo.Root;

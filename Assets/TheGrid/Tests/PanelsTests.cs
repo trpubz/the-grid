@@ -23,6 +23,18 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
+        public void TheCardCarriesTheWayIntoTheConversation()
+        {
+            var a = Agent("BackgroundBlocked");
+            a.enter = "cd /work/gamma && claude attach bg000009";
+            a.pid = 7;
+            var card = Panels.Card(Only(a), "one|s", 1000);
+            Assert.AreEqual("cd /work/gamma && claude attach bg000009", card.enter);
+            Assert.AreEqual(7, card.pid);
+            Assert.AreEqual("", card.where, "where it lives is asked of the machine, not of the snapshot");
+        }
+
+        [Test]
         public void NeedsYouIsExactlyTheBotsThatNeedTheOwnerInTheRostersOrder()
         {
             var want = snap.agents.Where(a => World.NeedsOwner(a.state)).Select(a => a.account + "|" + a.sessionId).ToList();

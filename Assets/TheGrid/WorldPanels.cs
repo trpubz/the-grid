@@ -52,7 +52,7 @@ namespace TheGrid
                 float w = narrow ? map.width - 2 * Margin : CardWide;
                 // A short map has room for one line about subagents, so that the card never takes most of it.
                 subagents = Panels.SubagentLines(about, map.height < 300 ? SubagentLinesWhenShort : SubagentLines);
-                float h = CardHigh + subagents.Count * LineHigh;
+                float h = CardHigh + (subagents.Count + Entry(about)) * LineHigh;
                 card = new Rect(map.xMax - Margin - w, map.yMax - Margin - h, w, h);
             }
             if (depotOf != null)
@@ -140,8 +140,32 @@ namespace TheGrid
                         if (GUI.Button(ws, GUIContent.none, GUIStyle.none)) WorkspaceClicked = true;
                     }
                 }
+                float y = card.y + 86;
+                // The way into the conversation: where it already lives, if it is in a zellij pane, and the command that
+                // opens it in a terminal. Of the command the card shows the end, which says which conversation; Copy takes
+                // all of it. Nothing is run.
+                if (about.where != "")
+                {
+                    Faint(new Rect(card.x + 10, y, card.width - 20, 20), "zellij: " + about.where, text);
+                    y += LineHigh;
+                }
+                if (about.enter != "")
+                {
+                    var copy = new Rect(card.xMax - 62, y + 1, 52, 16);
+                    GUI.Label(new Rect(card.x + 10, y, copy.x - card.x - 16, 20), about.enter.Substring(Mathf.Max(0, about.enter.LastIndexOf("claude ", StringComparison.Ordinal))), text);
+                    Fill(copy, Edge);
+                    bool copied = copiedKey == about.key && Time.unscaledTime < copiedUntil;
+                    GUI.Label(new Rect(copy.x + 6, copy.y - 2, copy.width - 8, 20), copied ? "Copied" : "Copy", text);
+                    if (GUI.Button(copy, GUIContent.none, GUIStyle.none))
+                    {
+                        GUIUtility.systemCopyBuffer = about.enter;
+                        copiedKey = about.key;
+                        copiedUntil = Time.unscaledTime + 1.5f;
+                    }
+                    y += LineHigh;
+                }
                 for (int i = 0; i < subagents.Count; i++)
-                    Faint(new Rect(card.x + 10, card.y + 86 + i * LineHigh, card.width - 20, 20), subagents[i], text);
+                    Faint(new Rect(card.x + 10, y + i * LineHigh, card.width - 20, 20), subagents[i], text);
                 if (about.prNumber > 0 && about.prUrl != "")
                 {
                     var pr = new Rect(card.xMax - 84, card.y + 60, 74, 22);
@@ -249,6 +273,12 @@ namespace TheGrid
                 if (picked != "") give(picked); else close();
             }, GUIContent.none, GUIStyle.none);
         }
+
+        // How many lines of the card are about getting into the conversation.
+        static int Entry(BotCard about) => (about.where != "" ? 1 : 0) + (about.enter != "" ? 1 : 0);
+
+        string copiedKey = "";   // the bot whose command was last copied, and until when the card says so
+        float copiedUntil;
 
         const float ListWide = 236, ListRow = 24;
         string typed = "";   // the name of a new workspace, as far as it has been typed
