@@ -12,6 +12,9 @@ namespace TheGrid.Core
     {
         public const int TileW = 64, TileH = 32, PlotTiles = 12;
 
+        // How far apart on screen the centres of two neighbouring tiles are, in pixels.
+        public static readonly float TileStep = Mathf.Sqrt(TileW * TileW / 4f + TileH * TileH / 4f);
+
         // A lane runs round every plot, so between two neighbouring plots there is one, and the lanes of the whole map join up.
         public const int LaneTiles = 2, Pitch = PlotTiles + LaneTiles;
 
@@ -90,6 +93,33 @@ namespace TheGrid.Core
             }
             var s = Spots[(int)place];
             return Point(o.x + s.col + slot % s.perRow * s.along, o.y + s.row + slot / s.perRow * s.away);
+        }
+
+        // The column, within a sector, of the crossing painted on the lane along its front: where a courier stops.
+        public const int Crossing = 5;
+
+        // The way a courier rides from one sector to another: corner points, in tiles (column, row), every leg along a lane.
+        // It leaves from the crossing on the lane along the sender's front, keeps to that lane as far as the recipient's
+        // column of sectors, turns down the lane beside the recipient, and ends at the recipient's crossing. The front lane,
+        // not the back: a sector's own buildings never stand between that lane and us. Empty within one sector.
+        // shortcut: a lane is drawn only round a sector that exists, so across a gap in the map a courier rides over open
+        // ground; and a sector in front can still hide a stretch. Route round both if either turns out to matter.
+        public static List<Vector2> Route(Vector2Int fromCell, Vector2Int toCell)
+        {
+            var route = new List<Vector2>();
+            if (fromCell == toCell) return route;
+            Vector2Int a = PlotOrigin(fromCell), b = PlotOrigin(toCell);
+            var start = new Vector2(a.x + Crossing, a.y + PlotTiles);
+            var end = new Vector2(b.x + Crossing, b.y + PlotTiles);
+            route.Add(start);
+            if (start.y != end.y)
+            {
+                float turn = b.x - 1;                                    // the lane down the recipient's left side
+                if (turn != start.x) route.Add(new Vector2(turn, start.y));
+                route.Add(new Vector2(turn, end.y));
+            }
+            route.Add(end);
+            return route;
         }
 
         // The pixel rectangle that covers these plots' ground and the lanes round them.

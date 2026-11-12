@@ -97,6 +97,12 @@ Two panels lie over the map, down its right side:
 
 ![A narrow window: the list folded, the card across the bottom](docs/art/world-narrow.png)
 
+When a message from one agent reaches another, the world shows it arriving. Between two sectors a courier on a bike, in the sender's colours, rides the lanes from the sender's crossing to the recipient's; then a ring of violet light pulses under the recipient. Within one sector there is only the pulse. While it lasts the recipient holds a hand to its helmet. A courier is drawn over buildings, so you can follow it the whole way.
+
+![A courier leaving a sector](docs/art/world-courier.png)
+
+The Grid only shows deliveries: it sends nothing and holds nothing back. A message is shown once, if it was received after you opened the world and both its sender and its recipient are bots on the map. The review pile has every message, shown or not.
+
 Which repo has which sector is kept in `world.json` beside `settings.json`. A repo keeps its place for good, also after its sessions are gone; delete the file to start the map again. If its contents are damaged it is kept as `world.json.bad` and the map starts empty.
 
 To look at the world without any agent sessions, start the app on a roster snapshot file. It then reads no agent data and writes nothing:
@@ -105,7 +111,7 @@ To look at the world without any agent sessions, start the app on a roster snaps
 Builds/TheGrid.app/Contents/MacOS/"The Grid" -snapshot "$PWD/fixtures/world/snapshot.json"
 ```
 
-Add `-shots <folder>` and it saves `far.png` and `near.png` there and quits; `-select <account>|<session id>` selects that bot for `near.png`. With the editor closed, **The Grid > Render World Pictures** does much the same without a window, into `Logs/`, though without the names and badges:
+Add `-shots <folder>` and it saves `far.png` and `near.png` there and quits; `-select <account>|<session id>` selects that bot for `near.png`, and `-messages <pile snapshot file>` (try `fixtures/world/messages.json`) shows its messages arriving and saves `courier.png` and `pulse.png` too. With the editor closed, **The Grid > Render World Pictures** does much the same without a window, into `Logs/`, though without the names and badges:
 
 ```bash
 /Applications/Unity/Hub/Editor/6000.4.3f1/Unity.app/Contents/MacOS/Unity -batchmode -projectPath "$PWD" -executeMethod TheGrid.EditorTools.GridMenu.WorldPictures -quit
@@ -124,6 +130,7 @@ The sprites are made by a script; see [tools/art/README.md](tools/art/README.md)
 | Assets/TheGrid/WorldView.cs | The world as the window sees it: the camera, moving and zooming, names and badges. |
 | Assets/TheGrid/WorldStage.cs | The world's scene: ground, lanes, buildings, bots and the blocks beyond. |
 | Assets/TheGrid/WorldPanels.cs | The two panels over the world: who needs you, and the selected bot's card. |
+| Assets/TheGrid/WorldTraffic.cs | Messages arriving in the world: couriers and pulses. |
 | Assets/TheGrid/Resources/Art/, tools/art/ | The sprites, and the Blender script that makes them. |
 | Assets/TheGrid/Tests/ | EditMode tests for Core. |
 | fixtures/ | Hand-written sample records and the pinned roster snapshot. |

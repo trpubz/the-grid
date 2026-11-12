@@ -19,6 +19,7 @@ namespace TheGrid
         Camera cam;
         Transform holder;
         WorldStage stage;
+        WorldTraffic traffic;
         readonly Sprite[] badges = new Sprite[5];   // in the order of Badge; none for Badge.None
 
         WorldModel model = new WorldModel();
@@ -90,20 +91,22 @@ namespace TheGrid
         // Every sector in view, at the closest level that fits them.
         public void LookAtAll() => Fit(bounds);
 
-        // The view the world opens on: close on the first sector that needs the owner, else on the first sector.
-        public void LookAtOpening()
+        // The view the world opens on: close on the first sector that needs the owner, else on the first with anyone in it.
+        // False while there is nobody anywhere to open on.
+        public bool LookAtOpening()
         {
-            if (model.sectors.Count == 0) return;
-            var sector = model.sectors.Find(s => s.needOwner > 0) ?? model.sectors[0];
+            var sector = World.Opening(model);
+            if (sector == null) return false;
             LookAtSector(sector.cell);
             // In a window too small for the whole sector, the first bot that needs the owner must still be in view: the
             // view moves off the sector's middle only as far as that takes.
             var waiting = sector.bots.Find(b => b.needsOwner);
-            if (waiting == null) return;
+            if (waiting == null) return true;
             var at = Iso.BotSpot(sector.cell, waiting.place, waiting.slot) + new Vector2(0, 16);
             float zoom = Iso.Zoom[level], reachX = Mathf.Max(0, pixelW / (2 * zoom) - 48), reachY = Mathf.Max(0, pixelH / (2 * zoom) - 48);
             centre.x = Mathf.Clamp(centre.x, at.x - reachX, at.x + reachX);
             centre.y = Mathf.Clamp(centre.y, at.y - reachY, at.y + reachY);
+            return true;
         }
 
         // One sector and its lane, at the closest level that fits: near enough to follow a bot from a doorway to a workstation.
@@ -120,6 +123,12 @@ namespace TheGrid
             if (stage == null || !stage.TryGetBot(botKey, out var at)) return;
             while (Far && level < Iso.Zoom.Length - 1) level++;
             centre = at;
+        }
+
+        // Shows a message arriving: a courier between sectors, a pulse under the recipient.
+        public void Deliver(Delivery d)
+        {
+            if (traffic != null) traffic.Add(d, Time.unscaledTime);
         }
 
         // Selects a bot as a click on it does. A key no bot has selects nothing.
@@ -160,11 +169,8 @@ namespace TheGrid
                 var cells = new List<Vector2Int>();
                 foreach (var s in model.sectors) cells.Add(s.cell);
                 bounds = Iso.Bounds(cells);
-                if (!opened && cells.Count > 0)
-                {
-                    LookAtOpening();
-                    opened = true;
-                }
+                // Opened once, and not before there is someone to open on: the first roster may arrive after the first click.
+                if (!opened) opened = LookAtOpening();
                 stale |= stage.Sync(model);
                 if (Selected != "" && !stage.TryGetBot(Selected, out _)) Selected = "";
             }
@@ -190,6 +196,7 @@ namespace TheGrid
             cam.transparencySortAxis = new Vector3(0, 1, .001f);
 
             stage = new WorldStage(holder);
+            traffic = new WorldTraffic(holder, stage);
             string[] art = { "", "badge-question", "badge-approve", "badge-fault", "badge-done" };
             for (int i = 1; i < art.Length; i++) badges[i] = Resources.Load<Sprite>("Art/" + art[i]);
         }
@@ -198,8 +205,9 @@ namespace TheGrid
         {
             if (holder == null || !holder.gameObject.activeSelf) return;
             float now = Time.unscaledTime;
-            stale |= stage.Tick(now);
-            if (stage.Walking) fastUntil = now + .2f;
+            bool riding = traffic.Tick(now);
+            stale |= stage.Tick(now) | riding;
+            if (stage.Walking || riding) fastUntil = now + .2f;
             // Ten frames a second is plenty for a lens that sits open all day; a walk or a drag gets sixty while it lasts.
             Application.targetFrameRate = now < fastUntil ? 60 : 10;
         }

@@ -1,0 +1,40 @@
+{
+  "generatedAt": 1794000100000,
+  "rows": [
+    {
+      "key": "m-0001",
+      "from": "alpha-04",
+      "fromRepoName": "alpha",
+      "to": "beta-01",
+      "toRepoName": "beta",
+      "account": "two",
+      "summary": "Synthetic: the diff is ready to review",
+      "firstLine": "Synthetic message one.",
+      "fromWorkspace": "Personal",
+      "toWorkspace": "Work",
+      "at": 1794000090000,
+      "receivedAt": 1794000095000,
+      "ticked": false,
+      "crossWorkspace": true
+    },
+    {
+      "key": "m-0002",
+      "from": "alpha-02",
+      "fromRepoName": "alpha",
+      "to": "alpha-03",
+      "toRepoName": "alpha",
+      "account": "one",
+      "summary": "Synthetic: run the tests again",
+      "firstLine": "Synthetic message two.",
+      "fromWorkspace": "Personal",
+      "toWorkspace": "Personal",
+      "at": 1794000091000,
+      "receivedAt": 1794000096000,
+      "ticked": false,
+      "crossWorkspace": false
+    }
+  ],
+  "archived": 0,
+  "reading": false,
+  "errors": []
+}

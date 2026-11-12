@@ -164,6 +164,29 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
+        public void TheWorldOpensWhereThereIsSomeoneToSee()
+        {
+            // on the fixture: the first sector with a bot that needs the owner
+            Assert.AreEqual("alpha", World.Opening(World.Build(snap, new Plots())).name);
+
+            // Plot 0 belongs for good to a repo whose sessions are long gone. Nobody needs the owner: open on the first sector
+            // that has anyone in it, not on empty concrete.
+            var plots = new Plots();
+            plots.IndexFor("/work/gone", out _);
+            var quiet = new RosterSnapshot();
+            quiet.agents.Add(new AgentRow { sessionId = "g", name = "gamma-01", account = "one", state = "Running", activity = "editing", repoRoot = "/work/gamma", repoName = "gamma" });
+            Assert.AreEqual("gamma", World.Opening(World.Build(quiet, plots)).name);
+
+            // a sector with a waiting bot comes before a busy one that is listed first
+            quiet.agents.Add(new AgentRow { sessionId = "d", name = "delta-01", account = "one", state = "BlockedOnQuestion", repoRoot = "/work/delta", repoName = "delta" });
+            Assert.AreEqual("delta", World.Opening(World.Build(quiet, plots)).name);
+
+            // nobody anywhere, as before the first roster arrives: nowhere to open yet
+            Assert.IsNull(World.Opening(World.Build(new RosterSnapshot(), plots)));
+            Assert.IsNull(World.Opening(new WorldModel()));
+        }
+
+        [Test]
         public void TwoAccountsWithTheSameSessionAreTwoBots()
         {
             var twin = new RosterSnapshot();
