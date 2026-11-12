@@ -94,6 +94,18 @@ namespace TheGrid.Core
             return false;
         }
 
+        // How far down the screen a bot is drawn as if it stood, in art pixels: what is lower is drawn later, over what is
+        // higher. In the open that is where it stands. Inside a building it is never higher than just below the point the
+        // building is drawn from, or a bot at the back of a room would be drawn first and the room over it. Two bots in one
+        // room keep their order.
+        public static float BotDepth(Vector2Int origin, Layout layout, Place place, int slot)
+        {
+            float stands = BotSpot(origin, layout, place, slot).y;
+            if (!layout.IsInside(place, slot) || !(World.StructureOf(place) is Structure building)) return stands;
+            float front = StructureSpot(origin, layout, building).y - 1;
+            return stands <= front ? stands : front + (stands - front) * .001f;
+        }
+
         // Where a crate of the depot stands, in a sector arranged as `layout`.
         public static Vector2 CrateSpot(Vector2Int origin, Layout layout, int slot)
         {

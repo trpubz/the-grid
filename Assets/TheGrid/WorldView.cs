@@ -214,12 +214,12 @@ namespace TheGrid
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = Ground;
             cam.enabled = false;   // it draws when Draw says so, into the picture, never on its own
-            cam.nearClipPlane = -10;
-            cam.farClipPlane = 10;
+            cam.nearClipPlane = -1000;   // a thing's z is how many pixels nearer it is drawn than where it stands
+            cam.farClipPlane = 1000;
             // Lower on the screen is nearer the viewer, so it is drawn later and covers what stands behind it. Of two things at
             // the same height on screen, the one nearer the camera wins: a bot, over the floor it stands on.
             cam.transparencySortMode = TransparencySortMode.CustomAxis;
-            cam.transparencySortAxis = new Vector3(0, 1, .001f);
+            cam.transparencySortAxis = new Vector3(0, 1, 1);
 
             stage = new WorldStage(holder);
             traffic = new WorldTraffic(holder, stage);

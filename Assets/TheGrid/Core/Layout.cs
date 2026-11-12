@@ -116,6 +116,19 @@ namespace TheGrid.Core
             new Vector2(1.25f, .85f), new Vector2(.6f, 1.45f), new Vector2(1.9f, 1.45f), new Vector2(.6f, .85f), new Vector2(1.25f, 2f), new Vector2(1.9f, 2f),
         };
 
+        // True for a bot that stands inside its building: the first six at a tall one, the first four in the workshop.
+        public bool IsInside(Place place, int slot)
+        {
+            switch (place)
+            {
+                case Place.ServerTower:
+                case Place.ReviewHall:
+                case Place.Works: return slot < Inside;
+                case Place.Workshop: return slot < InTheWorkshop.Length;
+                default: return false;
+            }
+        }
+
         Vector2 AtATall(int which, int slot) =>
             slot < Inside ? (Vector2)template.tall[order[which]] + InATall[slot] : template.tallDoor[order[which]].Spot(slot - Inside);
         public const int Crates = 9;

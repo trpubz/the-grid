@@ -49,6 +49,7 @@ namespace TheGrid
             public SpriteRenderer body;
             public readonly List<SpriteRenderer> small = new List<SpriteRenderer>();
             public Vector2 from, to;
+            public float sink;   // how much further down the screen it is drawn as if it stood: a bot in a room, drawn over the room
             public float started = -100f, seconds = 1f;
             public WorldBot data;
             public string shown = "";
@@ -264,7 +265,10 @@ namespace TheGrid
                 foreach (var b in sector.bots)
                 {
                     seen.Add(b.key);
-                    PutBot(b, Iso.BotSpot(sector.origin, sector.layout, b.place, b.slot));
+                {
+                    var spot = Iso.BotSpot(sector.origin, sector.layout, b.place, b.slot);
+                    PutBot(b, spot, spot.y - Iso.BotDepth(sector.origin, sector.layout, b.place, b.slot));
+                }
                 }
             var gone = new List<string>();
             foreach (var kv in bots) if (!seen.Contains(kv.Key)) gone.Add(kv.Key);
@@ -346,7 +350,7 @@ namespace TheGrid
                 var p = Vector2.Lerp(b.from, b.to, t);
                 // A bot stands a little nearer the camera than the ground it is on, so that standing inside the workshop it is
                 // drawn over the workshop's floor and not under it.
-                var at = new Vector3(Mathf.Round(p.x), Mathf.Round(p.y), -1);
+                var at = new Vector3(Mathf.Round(p.x), Mathf.Round(p.y), -1 - b.sink);
                 string pose, facing;
                 if (t < 1f)
                 {
@@ -548,14 +552,14 @@ namespace TheGrid
             return sr;
         }
 
-        void PutBot(WorldBot data, Vector2 spot)
+        void PutBot(WorldBot data, Vector2 spot, float sink)
         {
             if (!bots.TryGetValue(data.key, out var b))
             {
                 bots[data.key] = b = new Bot { from = spot, to = spot };
                 b.body = NewSprite(data.name, null, root);
                 b.at = b.body.transform;
-                b.at.localPosition = new Vector3(spot.x, spot.y, -1);   // first sight: it is simply there
+                b.at.localPosition = new Vector3(spot.x, spot.y, -1 - sink);   // first sight: it is simply there
             }
             else if (spot != b.to)
             {
@@ -565,6 +569,7 @@ namespace TheGrid
                 b.seconds = Mathf.Max(.3f, (b.to - b.from).magnitude / WalkPixelsPerSecond);
             }
             b.data = data;
+            b.sink = sink;
 
             int want = Mathf.Min(data.subagents, MaxSmall);
             while (b.small.Count > want)

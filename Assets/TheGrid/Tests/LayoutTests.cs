@@ -176,6 +176,33 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
+        public void ABotInsideABuildingIsDrawnOverItWhereverInTheRoomItStands()
+        {
+            var origin = new Vector2Int(-19, 43);
+            foreach (int a in All)
+            {
+                var l = Layout.Of(a);
+                foreach (var place in Places)
+                    for (int slot = 0; slot < 10; slot++)
+                    {
+                        float depth = Iso.BotDepth(origin, l, place, slot), stands = Iso.BotSpot(origin, l, place, slot).y;
+                        string who = "arrangement " + a + ": " + place + " slot " + slot;
+                        bool inside = place == Place.Workshop ? slot < 4 : World.StructureOf(place) != null && slot < Layout.Inside;
+                        // lower on the screen is drawn later: a bot in a room is drawn after the room, also at its back
+                        if (inside) Assert.Less(depth, Iso.StructureSpot(origin, l, World.StructureOf(place).Value).y, who + " would be drawn under its own building");
+                        else Assert.AreEqual(stands, depth, who + " stands in the open and is drawn where it stands");
+                        Assert.LessOrEqual(depth, stands, who);
+                    }
+                // and two in one room keep their order: the one nearer the viewer is drawn later
+                foreach (var place in new[] { Place.ServerTower, Place.ReviewHall, Place.Works })
+                    for (int i = 0; i < Layout.Inside; i++)
+                        for (int j = 0; j < Layout.Inside; j++)
+                            if (Iso.BotSpot(origin, l, place, i).y < Iso.BotSpot(origin, l, place, j).y)
+                                Assert.Less(Iso.BotDepth(origin, l, place, i), Iso.BotDepth(origin, l, place, j), "arrangement " + a + ": " + place + " slots " + i + " and " + j);
+            }
+        }
+
+        [Test]
         public void SixWorkInsideABuildingAndTheSeventhWaitsAtItsDoor()
         {
             Assert.AreEqual(6, Layout.Inside);
