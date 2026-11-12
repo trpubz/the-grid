@@ -149,6 +149,16 @@ namespace TheGrid
             var depot = worldDrawn.sectors.Find(s => s.name == Arg("-depot"));   // and with that sector's depot list open
             if (depot != null) depotOpen = depot.plot;
             yield return Shot("near.png");
+            // A picture of bots on their way: the snapshot is swapped for a later one, in which some have gone to work on
+            // another floor, and every one of them is put three fifths of its way there.
+            if (Arg("-then") != "")
+            {
+                fixedSnap = JsonUtility.FromJson<RosterSnapshot>(File.ReadAllText(Arg("-then")));
+                yield return null;
+                yield return null;
+                world.Hurry(.6f);
+                yield return Shot("stairs.png");
+            }
             Application.Quit();
         }
 

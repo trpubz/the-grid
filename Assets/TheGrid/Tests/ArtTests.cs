@@ -299,6 +299,33 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
+        public void AnUpperFloorIsDrawnWhereTheGameStandsABotOnIt()
+        {
+            // The game stands a bot on an upper floor so many pixels up (Layout.Lift), within so far of the back
+            // (Layout.FloorReach). The art script draws the floors. This holds the two together: straight out from every
+            // such bot, at the open edge of its floor, the picture shows the line of light that runs along that edge.
+            var l = Layout.Of(0);
+            int seen = 0;
+            foreach (var place in new[] { Place.ServerTower, Place.ReviewHall })
+            {
+                var s = World.StructureOf(place).Value;
+                var e = Find(ArtNames.Opened[(int)s]);
+                var t = Load(e.name).texture;
+                for (int slot = 0; slot < Layout.Inside; slot++)
+                {
+                    if (l.Floor(place, slot) == 0) continue;
+                    var feet = Iso.BotSpot(Vector2Int.zero, l, place, slot) - Iso.StructureSpot(Vector2Int.zero, l, s);
+                    float rows = l.Footprint(s).yMin + Layout.FloorReach - l.Spot(place, slot).y;     // from the bot out to the edge
+                    int x = e.groundX + Mathf.RoundToInt(feet.x - rows * 32), y = e.groundY + Mathf.RoundToInt(feet.y - rows * 16);
+                    bool lit = Enumerable.Range(y - 6, 9).Any(row => ((Color32)t.GetPixel(x, row)).Equals(Highlight));
+                    Assert.IsTrue(lit, e.name + ": no floor edge in front of slot " + slot + " on floor " + l.Floor(place, slot) + ", looked at " + x + "," + y);
+                    seen++;
+                }
+            }
+            Assert.AreEqual(7, seen, "four in the tower and three in the hall stand on an upper floor");
+        }
+
+        [Test]
         public void AnOpenedBuildingStandsWhereItsClosedPictureDoesAndShowsItsFloor()
         {
             for (int s = 0; s < ArtNames.Opened.Length; s++)

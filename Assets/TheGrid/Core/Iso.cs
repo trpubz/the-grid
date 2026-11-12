@@ -75,7 +75,8 @@ namespace TheGrid.Core
         {
             var o = origin;
             var at = layout.Spot(place, slot);
-            return Point(o.x + at.x, o.y + at.y);
+            // A bot on an upper floor is drawn a storey up the screen for each floor.
+            return Point(o.x + at.x, o.y + at.y) + new Vector2(0, layout.Lift(place, slot));
         }
 
         // True for a point of the map, in art pixels, that is on a sector's depot or on one of the crates shown in front
@@ -94,14 +95,43 @@ namespace TheGrid.Core
             return false;
         }
 
+        // The way a bot walks to its place (Layout.Way), in art pixels: each floor up is a storey up the screen.
+        public static List<Vector2> Way(Vector2Int origin, Layout layout, Place place, int slot)
+        {
+            var points = new List<Vector2>();
+            var way = layout.Way(place, slot);
+            // The door, where a way of more than one point starts, is on the paving; the rest is on the building's floors.
+            float room = layout.Lift(place, slot) - layout.Floor(place, slot) * Layout.StoreyPixels;
+            for (int i = 0; i < way.Count; i++)
+                points.Add(Point(origin.x + way[i].x, origin.y + way[i].y) + new Vector2(0, i == 0 && way.Count > 1 ? 0 : room + way[i].z * Layout.StoreyPixels));
+            return points;
+        }
+
+        // The walk from one place to another (Layout.Walk), in art pixels, and with each point how much further down the
+        // screen a bot there is drawn as if it stood: a bot in a room, on any floor or on a stair, is drawn over the room.
+        public static List<Vector3> Walk(Vector2Int origin, Layout layout, Place from, int fromSlot, Place to, int toSlot)
+        {
+            var points = new List<Vector3>();
+            foreach (var p in layout.Walk(from, fromSlot, to, toSlot))
+            {
+                var at = Point(origin.x + p.x, origin.y + p.y);
+                var room = layout.Room(new Vector2(p.x, p.y));
+                if (room is Structure tall && tall != Structure.Workshop) at.y += Layout.FloorPixels + p.z * Layout.StoreyPixels;
+                points.Add(new Vector3(at.x, at.y, at.y - Depth(origin, layout, room, at.y)));
+            }
+            return points;
+        }
+
         // How far down the screen a bot is drawn as if it stood, in art pixels: what is lower is drawn later, over what is
         // higher. In the open that is where it stands. Inside a building it is never higher than just below the point the
         // building is drawn from, or a bot at the back of a room would be drawn first and the room over it. Two bots in one
         // room keep their order.
-        public static float BotDepth(Vector2Int origin, Layout layout, Place place, int slot)
+        public static float BotDepth(Vector2Int origin, Layout layout, Place place, int slot) =>
+            Depth(origin, layout, layout.IsInside(place, slot) ? World.StructureOf(place) : null, BotSpot(origin, layout, place, slot).y);
+
+        static float Depth(Vector2Int origin, Layout layout, Structure? room, float stands)
         {
-            float stands = BotSpot(origin, layout, place, slot).y;
-            if (!layout.IsInside(place, slot) || !(World.StructureOf(place) is Structure building)) return stands;
+            if (!(room is Structure building)) return stands;
             float front = StructureSpot(origin, layout, building).y - 1;
             return stands <= front ? stands : front + (stands - front) * .001f;
         }

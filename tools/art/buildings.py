@@ -175,9 +175,41 @@ def rack(x, y, along_back):
             light(x + .19, y, .42 + i * .19, .012, .38, .07, "teal" if i % 2 else "cyan")
 
 
+# A tall building has floors. The game stands bots on them (Core/Layout.cs: StoreyPixels, FloorReach, the stairs' ends), and
+# a test holds the two together, so change these only with those.
+STOREY = 1.5                    # from one floor to the next
+REACH = 2 * kit.PANEL           # how far an upper floor reaches out from the back wall: two floor squares
+
+
+def upper_floor(x0, x1, w, z, lit, depth=REACH, back=0.0):
+    """A floor along the back wall from x0 to x1, its top at z, with the line of light along its open edge. `back` leaves
+    it short of the wall by so much: the walk beside the well a stair comes up through."""
+    y1 = w / 2 - .14 - back
+    box((x0 + x1) / 2, y1 - (depth - back) / 2, z - .08, x1 - x0, depth - back, .08, "c0", "g4", "g2")
+    light((x0 + x1) / 2, w / 2 - .14 - depth - .012, z - .08, x1 - x0, .02, .08, lit)
+
+
+def stair(x0, y0, z0, x1, y1, steps=8, wide=.42):
+    """A flight up one storey from (x0, y0) to (x1, y1), along x or along y, as solid steps with a lit edge to each."""
+    along_y = abs(y1 - y0) > abs(x1 - x0)
+    run = (abs(y1 - y0) if along_y else abs(x1 - x0)) / steps
+    for i in range(steps):
+        t = (i + .5) / steps
+        x, y, top = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, z0 + STOREY * (i + 1) / steps
+        if along_y:
+            box(x, y, z0, wide, run, top - z0, "c0", "g4", "g2"); light(x, y - run / 2 - .006, top - .03, wide, .012, .03, "cyan")
+        else:
+            box(x, y, z0, run, wide, top - z0, "c0", "g4", "g2"); light(x, y - wide / 2 - .006, top - .03, run, .012, .03, "cyan")
+
+
+def first_stair(w):
+    """Up the left wall from the ground floor to the first, landing on it."""
+    stair(-.87, -.85, .25, -.87, .4)
+
+
 def server_tower_open():
-    """The server tower with a bot at work in it. Told by: racks along both far walls, storey on storey of them up the
-    inside, and two of its roof fans on a ledge over the back wall."""
+    """The server tower with a bot at work in it. Told by: racks along the back wall on each of its three floors, a stair
+    up the left wall and another up the back, and two of its roof fans on a ledge over the back wall."""
     w, h, lit = 2.5, 5.0, "cyanw"
     opened(w, w, h, lit)
     back_wall(0, w, w, h, lit)
@@ -191,28 +223,39 @@ def server_tower_open():
                 light(-w / 2 + .152, -.9 + i * .45, z + .1, .012, .3, .22, "teal")
     for x in (-.75, -.05, .65):
         rack(x, w / 2 - .42, True)
-    for y in (-.6, .15):
-        rack(-w / 2 + .42, y, False)
+    left, right, g1, g2 = -w / 2 + .14, w / 2 - .06, .25 + STOREY, .25 + 2 * STOREY
+    first_stair(w)
+    upper_floor(left, right, w, g1, lit)
+    stair(-.87, .87, g1, .05, .87, wide=.4)             # the second stair, up along the back wall from the left
+    upper_floor(.05, right, w, g2, lit)                 # the second floor: whole on the right,
+    upper_floor(left, .05, w, g2, lit, back=.44)        # and a walk past the well the stair comes up through
+    for z in (g1, g2):                                  # a rack on each upper floor
+        box(.75, w / 2 - .34, z, .52, .3, .8, "g5", "g3", "g2")
+        for i in range(3):
+            light(.75, w / 2 - .5, z + .15 + i * .2, .38, .012, .07, "cyan" if i % 2 else "teal")
     box(0, w / 2 - .5, h, w + .12, 1.1, .14, *TRIM); fan(-.6, w / 2 - .55, h + .14); fan(.6, w / 2 - .55, h + .14)
     render("b-server-tower-open", 256, 352, 80)
 
 
 def review_hall_open():
-    """The review hall with a bot at work in it. Told by: its back wall in two with the bridge across the top, two wall
-    screens side by side to compare, and a console of buttons under them."""
+    """The review hall with a bot at work in it. Told by: its back wall in two with the bridge across the top, an upper
+    floor with two wall screens side by side to compare, and a console of buttons on the ground under it."""
     w, h, lit = 2.5, 3.4, "cyanw"
     opened(w, w, h, lit)
     back_wall(-.8, .9, w, h, lit, right_edge=True); back_wall(.8, .9, w, h, lit, right_edge=True)
     box(0, w / 2 - .2, 2.5, .72, .4, .5, *TRIM)                                       # the bridge
     light(0, w / 2 - .41, 2.5, .72, .02, .05, lit); light(0, w / 2 - .41, 2.95, .72, .02, .05, lit)
-    for x in (-.8, .8):                                                               # a screen on each half of the wall
-        box(x, w / 2 - .18, .75, .78, .05, .62, "k1"); light(x, w / 2 - .21, .8, .68, .02, .52, "teal")
+    g1 = .25 + STOREY
+    first_stair(w)
+    upper_floor(-w / 2 + .14, w / 2 - .06, w, g1, lit)
+    for x in (-.8, .8):                                                               # a screen on each half of the wall, upstairs
+        box(x, w / 2 - .18, g1 + .4, .78, .05, .62, "k1"); light(x, w / 2 - .21, g1 + .45, .68, .02, .52, "teal")
         for i in range(3):
-            light(x - .12 + (i % 2) * .16, w / 2 - .225, .88 + i * .15, .34, .012, .05, "cyanw" if i == 1 else "cyan")
+            light(x - .12 + (i % 2) * .16, w / 2 - .225, g1 + .53 + i * .15, .34, .012, .05, "cyanw" if i == 1 else "cyan")
     box(0, w / 2 - .52, .25, 1.9, .32, .42, "g5", "g3", "g2")                         # the console, its buttons along the front
     for i in range(7):
         light(-.78 + i * .26, w / 2 - .56, .67, .12, .1, .02, "cyanw" if i % 3 == 0 else "teal")
-    box(-w / 2 + .38, -.3, .25, .3, 1.1, .5, "g5", "g3", "g2"); light(-w / 2 + .38, -.3, .75, .2, .9, .02, "teal")   # a reading desk
+    box(w / 2 - .3, 0, .25, .3, .9, .5, "g5", "g3", "g2"); light(w / 2 - .3, 0, .75, .2, .7, .02, "teal")   # a reading desk
     render("b-review-hall-open", 256, 288, 80)
 
 

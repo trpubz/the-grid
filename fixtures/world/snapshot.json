@@ -79,7 +79,7 @@
       "state": "Running",
       "rawStatus": "",
       "workspace": "Personal",
-      "activity": "editing",
+      "activity": "reading",
       "prNumber": 0,
       "stateSince": 1794000004000,
       "subagents": []
@@ -187,9 +187,27 @@
       "state": "Running",
       "rawStatus": "",
       "workspace": "Personal",
-      "activity": "working",
+      "activity": "reading",
       "prNumber": 0,
       "stateSince": 1794000017000,
+      "subagents": []
+    },
+    {
+      "sessionId": "00000000-0000-4000-8000-000000000018",
+      "name": "alpha-11",
+      "account": "two",
+      "app": "cli",
+      "repoRoot": "/work/alpha",
+      "repoName": "alpha",
+      "branch": "feature/demo-11-example",
+      "ticket": "DEMO-11",
+      "prUrl": "",
+      "state": "Running",
+      "rawStatus": "",
+      "workspace": "Personal",
+      "activity": "reviewing",
+      "prNumber": 0,
+      "stateSince": 1794000018000,
       "subagents": []
     },
     {
