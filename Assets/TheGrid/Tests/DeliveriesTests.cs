@@ -109,16 +109,15 @@ namespace TheGrid.Core.Tests
         [TestCase(0, 0, 1, 0)]     // side by side: one straight run
         [TestCase(0, 0, 0, 1)]
         [TestCase(-1, 2, 3, -2)]
-        public void ARouteRunsAlongLanesFromBehindOneRelayToBehindTheOther(int ax, int ay, int bx, int by)
+        public void ARouteRunsAlongLanesFromOneSectorsCrossingToTheOthers(int ax, int ay, int bx, int by)
         {
             Vector2Int a = new Vector2Int(ax, ay), b = new Vector2Int(bx, by);
             var route = Iso.Route(a, b);
             Assert.GreaterOrEqual(route.Count, 2);
-            // behind a relay: on the lane at the back of its sector, level with the relay
-            RectInt relay = Iso.Footprint(Structure.Relay);
+            // at a sector's crossing: on the lane along its front, where no building of its own stands in the way
             Vector2Int oa = Iso.PlotOrigin(a), ob = Iso.PlotOrigin(b);
-            Assert.AreEqual(new Vector2(oa.x + relay.xMax - 1, oa.y - 1), route[0]);
-            Assert.AreEqual(new Vector2(ob.x + relay.xMax - 1, ob.y - 1), route[route.Count - 1]);
+            Assert.AreEqual(new Vector2(oa.x + Iso.Crossing, oa.y + Iso.PlotTiles), route[0]);
+            Assert.AreEqual(new Vector2(ob.x + Iso.Crossing, ob.y + Iso.PlotTiles), route[route.Count - 1]);
             for (int i = 1; i < route.Count; i++)
             {
                 Assert.AreNotEqual(route[i - 1], route[i], "a leg of no length");

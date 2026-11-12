@@ -11,7 +11,7 @@ namespace TheGrid
     // A bot moves only when its agent's place changes. Badges are not here: the window draws them over the names.
     public sealed class WorldStage
     {
-        const float WalkPixelsPerSecond = 4f * 36f;   // four tiles a second
+        static readonly float WalkPixelsPerSecond = 4f * Iso.TileStep;   // four tiles a second
         const float StepSeconds = .2f;
         const int OutlandRing = 3;   // plot-sized cells of city kept beyond the sectors, enough to reach the edge of the overview
         const int MaxSmall = 3;      // subagents drawn beside a bot; its name carries the full count
@@ -53,6 +53,7 @@ namespace TheGrid
         readonly HashSet<int> painted = new HashSet<int>();
         readonly Dictionary<Vector2Int, GameObject> outlands = new Dictionary<Vector2Int, GameObject>();
         readonly List<string> accounts = new List<string>();
+        readonly Dictionary<string, float> signals = new Dictionary<string, float>();   // bot key: signalling until this time
         readonly float[] tops = new float[StructureArt.Length];
         int outlandsFor = -1;
 
@@ -86,8 +87,18 @@ namespace TheGrid
         // How far above its ground point a structure's highest pixel is: where its name goes.
         public float Top(Structure s) => tops[(int)s];
 
+        // A bot holds a hand to its helmet until then: a message is on its way to it, or has just left it.
+        public void Signal(string botKey, float until)
+        {
+            if (!signals.TryGetValue(botKey, out var already) || until > already) signals[botKey] = until;
+        }
+
+        // A picture in the colourway of a bot's account: the courier's bike is its sender's. Plain if the bot has gone.
+        public Sprite BotArt(string botKey, string name) =>
+            bots.TryGetValue(botKey, out var b) ? Lit(name, Mathf.Max(0, accounts.IndexOf(b.data.account))) : Art(name);
+
         // A sprite that is missing is said once, by name, and the world is drawn without it.
-        Sprite Art(string name)
+        public Sprite Art(string name)
         {
             if (sprites.TryGetValue(name, out var s)) return s;
             s = Resources.Load<Sprite>("Art/" + name);
@@ -186,6 +197,11 @@ namespace TheGrid
                     pose = (int)((now - b.started) / StepSeconds) % 2 == 0 ? "walk-a" : "walk-b";
                     facing = d.x >= 0 ? (d.y < 0 ? "se" : "ne") : (d.y >= 0 ? "nw" : "sw");
                 }
+                else if (signals.TryGetValue(b.data.key, out var until) && now < until && b.data.stance != Stance.Off)
+                {
+                    pose = "signal";
+                    facing = "se";   // toward us, so the raised hand shows
+                }
                 else
                 {
                     pose = StanceArt[(int)b.data.stance];
@@ -268,7 +284,7 @@ namespace TheGrid
             if (alongColumns && alongRows) return "tile-lane";
             if (alongColumns)
             {
-                if (row >= Iso.PlotTiles && (col == 5 || col == 6)) return "tile-crossing-a";
+                if (row >= Iso.PlotTiles && (col == Iso.Crossing || col == Iso.Crossing + 1)) return "tile-crossing-a";
                 return (row == -1 || row == Iso.PlotTiles) && col % 4 == 1 ? "tile-lane-chevron-a" : "tile-lane";
             }
             return (col == -1 || col == Iso.PlotTiles) && row % 4 == 1 ? "tile-lane-chevron-b" : "tile-lane";
@@ -368,7 +384,7 @@ namespace TheGrid
             foreach (var s in b.small) s.sprite = small;
         }
 
-        static void Kill(GameObject go)
+        public static void Kill(GameObject go)
         {
             // Destroy only takes effect at the end of the frame, and the map may be drawn into its picture before then. Switched
             // off, the object is out of that drawing at once; otherwise it would stay in the picture until something else changed.

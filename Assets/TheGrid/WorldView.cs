@@ -19,6 +19,7 @@ namespace TheGrid
         Camera cam;
         Transform holder;
         WorldStage stage;
+        WorldTraffic traffic;
         readonly Sprite[] badges = new Sprite[5];   // in the order of Badge; none for Badge.None
 
         WorldModel model = new WorldModel();
@@ -122,6 +123,12 @@ namespace TheGrid
             centre = at;
         }
 
+        // Shows a message arriving: a courier between sectors, a pulse under the recipient.
+        public void Deliver(Delivery d)
+        {
+            if (traffic != null) traffic.Add(d, Time.unscaledTime);
+        }
+
         // Selects a bot as a click on it does. A key no bot has selects nothing.
         public void Select(string botKey)
         {
@@ -190,6 +197,7 @@ namespace TheGrid
             cam.transparencySortAxis = new Vector3(0, 1, .001f);
 
             stage = new WorldStage(holder);
+            traffic = new WorldTraffic(holder, stage);
             string[] art = { "", "badge-question", "badge-approve", "badge-fault", "badge-done" };
             for (int i = 1; i < art.Length; i++) badges[i] = Resources.Load<Sprite>("Art/" + art[i]);
         }
@@ -198,8 +206,9 @@ namespace TheGrid
         {
             if (holder == null || !holder.gameObject.activeSelf) return;
             float now = Time.unscaledTime;
-            stale |= stage.Tick(now);
-            if (stage.Walking) fastUntil = now + .2f;
+            bool riding = traffic.Tick(now);
+            stale |= stage.Tick(now) | riding;
+            if (stage.Walking || riding) fastUntil = now + .2f;
             // Ten frames a second is plenty for a lens that sits open all day; a walk or a drag gets sixty while it lasts.
             Application.targetFrameRate = now < fastUntil ? 60 : 10;
         }
