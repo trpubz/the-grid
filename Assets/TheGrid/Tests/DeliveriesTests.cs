@@ -46,10 +46,66 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(1794000095000, between.receivedAt);
             var within = got.Single(d => d.key == "m-0002");
             Assert.AreEqual(within.fromAt, within.toAt);
-            // between two sectors a courier rides; within one there is nowhere to ride, only the pulse
+            // between two sectors a courier rides the lanes and a road; within one there are none to ride
             Assert.Greater(Iso.Route(between.way).Count, 1);
             CollectionAssert.AreEqual(new[] { within.fromAt }, within.way);
             Assert.AreEqual(0, Iso.Route(within.way).Count);
+        }
+
+        [Test]
+        public void ACourierRidesFromTheSenderToTheRecipientAlsoWithinOneSector()
+        {
+            var got = new Deliveries(Opened).New(pile, world);
+            Delivery between = got.Single(d => d.key == "m-0001"), within = got.Single(d => d.key == "m-0002");
+            Vector2 from = new Vector2(-40, 12), to = new Vector2(900, -300);   // where the two bots stand, in art pixels
+            // between two sectors: from beside the sender, by its sector's crossing, the lanes and the road, to the recipient
+            var ride = Iso.Ride(from, between.way, to);
+            Assert.AreEqual(from, ride[0]);
+            Assert.AreEqual(to, ride[ride.Count - 1]);
+            CollectionAssert.AreEqual(Iso.Route(between.way).Select(c => Iso.Point(c.x, c.y)).ToList(), ride.Skip(1).Take(ride.Count - 2).ToList());
+            // within one sector: straight from the one to the other
+            CollectionAssert.AreEqual(new[] { from, to }, Iso.Ride(from, within.way, to));
+        }
+
+        [Test]
+        public void ARideIsFourTilesASecondAndNeverSoShortThatItIsMissed()
+        {
+            Assert.AreEqual(3f, Iso.RideSeconds(0));
+            Assert.AreEqual(3f, Iso.RideSeconds(11 * Iso.TileStep));
+            Assert.AreEqual(10f, Iso.RideSeconds(40 * Iso.TileStep), .001f);
+        }
+
+        [Test]
+        public void ATrailFadesInFourStepsOverTwoMinutesAndIsThenGone()
+        {
+            Assert.AreEqual(0, Deliveries.Trail(-2f), "while the courier is still on its way");
+            Assert.AreEqual(0, Deliveries.Trail(0f));
+            Assert.AreEqual(0, Deliveries.Trail(29.9f));
+            Assert.AreEqual(1, Deliveries.Trail(30f));
+            Assert.AreEqual(2, Deliveries.Trail(60f));
+            Assert.AreEqual(3, Deliveries.Trail(119.9f));
+            Assert.AreEqual(-1, Deliveries.Trail(120f));
+            Assert.AreEqual(4, Deliveries.TrailSteps);
+        }
+
+        [Test]
+        public void EveryMessageThatArrivesIsSaidOnceWithItsCourierOrWhyItHasNone()
+        {
+            var said = new List<string>();
+            var d = new Deliveries(Opened);
+            d.New(pile, world, said);
+            CollectionAssert.AreEqual(new[] { "courier: alpha-04 to beta-01, through 2 sectors", "courier: alpha-02 to alpha-03, within one sector" }, said);
+            // once: looked at again, nothing more is said
+            said.Clear();
+            d.New(pile, world, said);
+            Assert.AreEqual(0, said.Count);
+            // old mail is not news, and is not spoken of
+            new Deliveries(Opened + 100000).New(pile, world, said);
+            Assert.AreEqual(0, said.Count);
+            // a message that cannot be placed: why
+            d.New(Only(Row("alpha-04", "nobody", "two", Opened + 5, "x1")), world, said);
+            d.New(Only(Row("nobody", "beta-01", "two", Opened + 6, "x2")), world, said);
+            CollectionAssert.AreEqual(new[] { "no courier: alpha-04 to nobody: the recipient is not one bot on the map", "no courier: nobody to beta-01: the sender is not one bot on the map" }, said);
         }
 
         [Test]

@@ -212,6 +212,21 @@ namespace TheGrid.Core
             return new List<Vector2Int>(tiles);
         }
 
+        // The whole of a courier's ride, in art pixels: from where the sender stands, by the crossings, lanes and roads of
+        // the sectors on its way (Route), to where the recipient stands. Within one sector, straight from the one to the
+        // other.
+        public static List<Vector2> Ride(Vector2 from, IReadOnlyList<Vector2Int> way, Vector2 to)
+        {
+            var ride = new List<Vector2> { from };
+            foreach (var corner in Route(way)) ride.Add(Point(corner.x, corner.y));
+            ride.Add(to);
+            return ride;
+        }
+
+        // How long a courier takes over so many art pixels: four tiles a second, and never under three seconds, or a short
+        // ride is over before anyone has looked.
+        public static float RideSeconds(float pixels) => Mathf.Max(3f, pixels / (4f * TileStep));
+
         // The way a courier rides through the sectors at these origins, first to last: corner points, in tiles (column,
         // row). It leaves from the crossing in front of the first, goes round each sector's lane to the side the next one
         // is on and along the road to it, and ends at the last one's crossing. Empty for fewer than two.

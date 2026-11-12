@@ -46,7 +46,7 @@ namespace TheGrid
         Task<string> where;
         Deliveries deliveries;      // made when the world is first opened: only what arrives after that is shown
         PileSnapshot deliveredFrom; // the pile snapshot last looked through for deliveries
-        string lastRecipient = "";  // picture mode: the recipient of the longest ride, how long that ride is and when it ends
+        string lastSender = "", lastRecipient = "";  // picture mode: the sender and the recipient of the longest ride, how long that ride is and when it ends
         float longestRide = -1f, rideEnds;
         bool showArrivals;          // picture mode with -messages: there are deliveries to take pictures of
         bool leftWorld;             // the world has been closed since it was last drawn
@@ -131,8 +131,12 @@ namespace TheGrid
             world.LookAtAll();
             if (showArrivals)
             {
-                // The courier is caught three fifths of its way, where in the sample world it comes off the road between two
-                // regions onto the recipient's lane; its recipient pulses for nine tenths of a second once it arrives.
+                // The courier is caught as it leaves its sender, a short trail behind it; in the sample world a second one is
+                // then on its way between two bots of that sector. Then three fifths of its way, where it comes off the road
+                // between two regions onto the recipient's lane; its recipient pulses for nine tenths of a second once it arrives.
+                world.LookAt(lastSender);
+                yield return new WaitForSecondsRealtime(Mathf.Max(0f, rideEnds - longestRide * .86f - Time.unscaledTime));
+                yield return Shot("start.png");
                 world.LookAt(lastRecipient);   // close enough to make out the bike
                 yield return new WaitForSecondsRealtime(Mathf.Max(0f, rideEnds - longestRide * .4f - Time.unscaledTime));
                 yield return Shot("courier.png");
@@ -342,14 +346,18 @@ namespace TheGrid
                 if (!ReferenceEquals(pileDrawn, deliveredFrom))
                 {
                     deliveredFrom = pileDrawn;
-                    foreach (var d in deliveries.New(pileDrawn, worldDrawn))
+                    var said = new List<string>();
+                    foreach (var d in deliveries.New(pileDrawn, worldDrawn, said))
                     {
                         float ride = world.Deliver(d);
                         if (ride <= longestRide) continue;
                         longestRide = ride;
                         rideEnds = Time.unscaledTime + ride;
+                        lastSender = d.fromBot;
                         lastRecipient = d.toBot;
                     }
+                    // One line for each message that arrived: its courier, or why it has none.
+                    foreach (var line in said) Debug.Log("[mail] " + line);
                 }
             }
             var depotOf = depotOpen < 0 ? null : worldDrawn.sectors.Find(s => s.plot == depotOpen);
