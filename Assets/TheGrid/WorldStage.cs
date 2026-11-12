@@ -211,7 +211,7 @@ namespace TheGrid
                 foreach (var b in sector.bots)
                 {
                     seen.Add(b.key);
-                    PutBot(b, Iso.BotSpot(sector.cell, sector.layout, b.place, b.slot));
+                    PutBot(b, Iso.BotSpot(sector.origin, sector.layout, b.place, b.slot));
                 }
             var gone = new List<string>();
             foreach (var kv in bots) if (!seen.Contains(kv.Key)) gone.Add(kv.Key);
@@ -329,7 +329,7 @@ namespace TheGrid
             // The sector's paving, and its own lane round it. Beyond the lane the ground stays open: a sector stands apart.
             for (int col = First; col < Ring; col++)
                 for (int row = First; row < Ring; row++)
-                    ground.SetTile(At(o.x + col, o.y + row), Iso.OnLane(sector.cell, o.x + col, o.y + row) ? T(Lane(col, row), light) : T(Paving(col, row)));
+                    ground.SetTile(At(o.x + col, o.y + row), Iso.OnLane(o, o.x + col, o.y + row) ? T(Lane(col, row), light) : T(Paving(col, row)));
 
             // A line of light down each edge of the lane. line-a runs along a tile's far edge one way, line-b the other; the
             // lane's outer edge is the far edge of the tile beyond it.
@@ -349,7 +349,7 @@ namespace TheGrid
 
             // Every sector has the same buildings; where each stands and how it is lit is the sector's own.
             foreach (Structure s in Enum.GetValues(typeof(Structure)))
-                NewSprite(ArtNames.Structures[(int)s], InLight(ArtNames.Structures[(int)s], sector.layout.Light(s)), built).transform.localPosition = Iso.StructureSpot(sector.cell, sector.layout, s);
+                NewSprite(ArtNames.Structures[(int)s], InLight(ArtNames.Structures[(int)s], sector.layout.Light(s)), built).transform.localPosition = Iso.StructureSpot(sector.origin, sector.layout, s);
         }
 
         // The road across the open ground from one sector's lane to another's: to a sector on its right, or to one in

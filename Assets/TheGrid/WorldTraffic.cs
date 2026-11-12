@@ -36,7 +36,7 @@ namespace TheGrid
         {
             var trip = new Trip { d = d, started = now };
             // By the roads when there is a way by road; straight across the map when there is none.
-            foreach (var corner in d.way.Count > 1 ? Iso.Route(d.way) : Iso.Route(d.fromCell, d.toCell)) trip.route.Add(Iso.Point(corner.x, corner.y));
+            foreach (var corner in Iso.Route(d.way.Count > 1 ? d.way : new List<Vector2Int> { d.fromAt, d.toAt })) trip.route.Add(Iso.Point(corner.x, corner.y));
             for (int i = 1; i < trip.route.Count; i++) trip.length += (trip.route[i] - trip.route[i - 1]).magnitude;
             if (trip.route.Count > 1) trip.rides = Mathf.Max(LeastRide, trip.length / (TilesPerSecond * Iso.TileStep));
             trips.Add(trip);

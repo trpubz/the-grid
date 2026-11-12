@@ -26,12 +26,12 @@ namespace TheGrid.Core
                         foreach (var t in world.sectors)
                         {
                             if (s.region != a || t.region != b) continue;
-                            var d = t.cell - s.cell;
+                            var d = t.cell - s.cell;   // on the one grid all sectors still share
                             int along = step.x == 1 ? d.x : d.y, across = step.x == 1 ? d.y : d.x;
                             if (across != 0 || along <= 0 || along >= nearest) continue;
                             nearest = along;
-                            from = s.cell;
-                            to = t.cell;
+                            from = s.origin;
+                            to = t.origin;
                         }
                     if (nearest != int.MaxValue) roads.Add((from, to));
                 }
@@ -43,11 +43,11 @@ namespace TheGrid.Core
         public static List<Vector2Int> Hops(WorldModel world, Vector2Int from, Vector2Int to)
         {
             var next = new Dictionary<Vector2Int, List<Vector2Int>>();
-            foreach (var s in world.sectors) next[s.cell] = new List<Vector2Int>();
+            foreach (var s in world.sectors) next[s.origin] = new List<Vector2Int>();
             if (!next.ContainsKey(from) || !next.ContainsKey(to)) return null;
             foreach (var s in world.sectors)
                 foreach (var side in Sides)
-                    if (next.ContainsKey(s.cell + side)) next[s.cell].Add(s.cell + side);
+                    if (next.ContainsKey(s.origin + side * Iso.Pitch)) next[s.origin].Add(s.origin + side * Iso.Pitch);
             foreach (var (a, b) in Between(world))
             {
                 next[a].Add(b);

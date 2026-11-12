@@ -109,12 +109,12 @@ namespace TheGrid
         {
             var sector = World.Opening(model);
             if (sector == null) return false;
-            LookAtSector(sector.cell);
+            LookAtSector(sector.origin);
             // In a window too small for the whole sector, the first bot that needs the owner must still be in view: the
             // view moves off the sector's middle only as far as that takes.
             var waiting = sector.bots.Find(b => b.needsOwner);
             if (waiting == null) return true;
-            var at = Iso.BotSpot(sector.cell, sector.layout, waiting.place, waiting.slot) + new Vector2(0, 16);
+            var at = Iso.BotSpot(sector.origin, sector.layout, waiting.place, waiting.slot) + new Vector2(0, 16);
             float zoom = Iso.Zoom[level], reachX = Mathf.Max(0, pixelW / (2 * zoom) - 48), reachY = Mathf.Max(0, pixelH / (2 * zoom) - 48);
             centre.x = Mathf.Clamp(centre.x, at.x - reachX, at.x + reachX);
             centre.y = Mathf.Clamp(centre.y, at.y - reachY, at.y + reachY);
@@ -123,9 +123,9 @@ namespace TheGrid
 
         // One sector and its lane, at the closest level that fits: near enough to follow a bot from a doorway to a workstation.
         // Never so far out that bots cannot be made out: in a small window the sector is cut off at its edges instead.
-        public void LookAtSector(Vector2Int cell)
+        public void LookAtSector(Vector2Int origin)
         {
-            Fit(Iso.Bounds(new[] { cell }));
+            Fit(Iso.Bounds(new[] { origin }));
             while (Far && level < Iso.Zoom.Length - 1) level++;
         }
 
@@ -176,7 +176,7 @@ namespace TheGrid
             {
                 model = world;
                 var cells = new List<Vector2Int>();
-                foreach (var s in model.sectors) cells.Add(s.cell);
+                foreach (var s in model.sectors) cells.Add(s.origin);
                 bounds = Iso.Bounds(cells);
                 // Opened once, and not before there is someone to open on: the first roster may arrive after the first click.
                 if (!opened) opened = LookAtOpening();
@@ -286,12 +286,12 @@ namespace TheGrid
                         }
             foreach (var sector in model.sectors)
             {
-                var o = Iso.PlotOrigin(sector.cell);
+                var o = sector.origin;
                 if (Far)
                 {
                     // Too far to make out bots: the sector's name, how many of its bots need the owner and how many are done.
                     // Only a sector that needs the owner is loud and gets a badge.
-                    var at = ToView(Iso.Bounds(new[] { sector.cell }).center);
+                    var at = ToView(Iso.Bounds(new[] { sector.origin }).center);
                     Text(at, sector.name, label);
                     var summary = World.Summary(sector);
                     if (summary != "") Text(at + new Vector2(0, 16), summary, sector.needOwner > 0 ? loud : label);
@@ -305,7 +305,7 @@ namespace TheGrid
                 foreach (Structure s in Enum.GetValues(typeof(Structure)))
                 {
                     if (WorldStage.StructureNames[(int)s] == "") continue;
-                    var at = ToView(Iso.StructureSpot(sector.cell, sector.layout, s) + new Vector2(0, stage.Top(s) + 3)) - new Vector2(0, 18);
+                    var at = ToView(Iso.StructureSpot(sector.origin, sector.layout, s) + new Vector2(0, stage.Top(s) + 3)) - new Vector2(0, 18);
                     var plate = Plate(at, WorldStage.StructureNames[(int)s], label);
                     plate = new Rect(plate.x + 6, plate.y + 3, plate.width - 12, plate.height - 6);   // plates that only touch both stay
                     bool taken = false;
@@ -319,7 +319,7 @@ namespace TheGrid
                 for (int r = 0; r < model.regions.Count; r++)
                 {
                     var cells = new List<Vector2Int>();
-                    foreach (var sector in model.sectors) if (sector.region == r) cells.Add(sector.cell);
+                    foreach (var sector in model.sectors) if (sector.region == r) cells.Add(sector.origin);
                     var ground = Iso.Bounds(cells);
                     var at = ToView(new Vector2(ground.center.x, ground.yMax + Skyline)) - new Vector2(0, 20);
                     regionNames.Add(Plate(at, model.regions[r].name, loud));

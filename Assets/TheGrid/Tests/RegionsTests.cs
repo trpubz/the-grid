@@ -162,7 +162,7 @@ namespace TheGrid.Core.Tests
             var tiles = new HashSet<Vector2Int>();
             foreach (var (from, to) in Roads.Between(w))
             {
-                Vector2Int a = Iso.PlotOrigin(from), b = Iso.PlotOrigin(to);
+                Vector2Int a = from, b = to;
                 Assert.IsTrue((from.y == to.y && from.x < to.x) || (from.x == to.x && from.y < to.y), "a road runs straight, from the nearer sector: " + from + " to " + to);
                 for (int k = 0; k < 2; k++)
                     if (from.y == to.y) for (int c = a.x + Iso.PlotTiles + Iso.LaneTiles; c < b.x - Iso.LaneTiles; c++) tiles.Add(new Vector2Int(c, a.y + Iso.Crossing + k));
@@ -182,11 +182,11 @@ namespace TheGrid.Core.Tests
             {
                 Assert.AreNotEqual(Sector(w, from).region, Sector(w, to).region);
                 var step = from.y == to.y ? Vector2Int.right : Vector2Int.up;
-                for (var c = from + step; c != to; c += step) Assert.IsFalse(cells.Contains(c), "a road runs through the sector at " + c);
+                for (var c = from + step * Iso.Pitch; c != to; c += step * Iso.Pitch) Assert.IsFalse(w.sectors.Any(s => s.origin == c), "a road runs through the sector at " + c);
             }
         }
 
-        static WorldSector Sector(WorldModel w, Vector2Int cell) => w.sectors.Single(s => s.cell == cell);
+        static WorldSector Sector(WorldModel w, Vector2Int origin) => w.sectors.Single(s => s.origin == origin);
 
         [Test]
         public void ACourierBetweenAnyTwoSectorsKeepsToLanesLinksAndRoads()
@@ -198,11 +198,11 @@ namespace TheGrid.Core.Tests
                 foreach (var b in w.sectors)
                 {
                     if (a == b) continue;
-                    var hops = Roads.Hops(w, a.cell, b.cell);
+                    var hops = Roads.Hops(w, a.origin, b.origin);
                     Assert.IsNotNull(hops, "no way from " + a.repoRoot + " to " + b.repoRoot);
-                    Assert.AreEqual(a.cell, hops[0]);
-                    Assert.AreEqual(b.cell, hops[hops.Count - 1]);
-                    Assert.IsTrue(hops.All(cells.Contains), "a hop where no sector stands");
+                    Assert.AreEqual(a.origin, hops[0]);
+                    Assert.AreEqual(b.origin, hops[hops.Count - 1]);
+                    Assert.IsTrue(hops.All(h => w.sectors.Any(s => s.origin == h)), "a hop where no sector stands");
                     var route = Iso.Route(hops);
                     Vector2Int oa = Iso.PlotOrigin(a.cell), ob = Iso.PlotOrigin(b.cell);
                     Assert.AreEqual(new Vector2(oa.x + Iso.Crossing, oa.y + Iso.PlotTiles), route[0]);
@@ -216,7 +216,7 @@ namespace TheGrid.Core.Tests
                         {
                             int col = (int)(p.x + Math.Sign(q.x - p.x) * k), row = (int)(p.y + Math.Sign(q.y - p.y) * k);
                             var cell = new Vector2Int(Mathf.FloorToInt((col + Iso.LaneTiles) / (float)Iso.Pitch), Mathf.FloorToInt((row + Iso.LaneTiles) / (float)Iso.Pitch));
-                            bool lane = cells.Contains(cell) && Iso.OnLane(cell, col, row);
+                            bool lane = cells.Contains(cell) && Iso.OnLane(Iso.PlotOrigin(cell), col, row);
                             // a link is laid only between two sectors that stand side by side
                             bool link = cells.Contains(cell) && Iso.OnLink(col, row) && Linked(cells, cell, col, row);
                             Assert.IsTrue(lane || link || roads.Contains(new Vector2Int(col, row)), a.repoRoot + " to " + b.repoRoot + ": tile " + col + ", " + row + " is no lane, link or road");
@@ -237,7 +237,7 @@ namespace TheGrid.Core.Tests
         public void WhereNoRoadJoinsTwoSectorsThereIsNoWay()
         {
             var w = World.Build(Of("home/a"), new Plots());
-            Assert.IsNull(Roads.Hops(w, Vector2Int.zero, new Vector2Int(5, 5)));
+            Assert.IsNull(Roads.Hops(w, Vector2Int.zero, new Vector2Int(95, 95)));
             CollectionAssert.AreEqual(new[] { Vector2Int.zero }, Roads.Hops(w, Vector2Int.zero, Vector2Int.zero));
         }
 
@@ -248,7 +248,7 @@ namespace TheGrid.Core.Tests
             var pile = new PileSnapshot();
             pile.rows.Add(new PileRow { key = "k", account = "one", from = "home/a", to = "work/a", receivedAt = 10 });
             var d = new Deliveries(5).New(pile, w).Single();
-            CollectionAssert.AreEqual(Roads.Hops(w, d.fromCell, d.toCell), d.way);
+            CollectionAssert.AreEqual(Roads.Hops(w, d.fromAt, d.toAt), d.way);
             Assert.AreEqual(2, d.way.Count);
         }
     }

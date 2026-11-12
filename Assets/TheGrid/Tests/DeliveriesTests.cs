@@ -40,11 +40,11 @@ namespace TheGrid.Core.Tests
             var between = got.Single(d => d.key == "m-0001");
             Assert.AreEqual("two|00000000-0000-4000-8000-000000000004", between.fromBot);   // alpha-04
             Assert.AreEqual("two|00000000-0000-4000-8000-000000000008", between.toBot);     // beta-01
-            Assert.AreEqual(world.sectors[0].cell, between.fromCell);
-            Assert.AreEqual(world.sectors[1].cell, between.toCell);
+            Assert.AreEqual(world.sectors[0].origin, between.fromAt);
+            Assert.AreEqual(world.sectors[1].origin, between.toAt);
             Assert.AreEqual(1794000095000, between.receivedAt);
             var within = got.Single(d => d.key == "m-0002");
-            Assert.AreEqual(within.fromCell, within.toCell);
+            Assert.AreEqual(within.fromAt, within.toAt);
         }
 
         [Test]
@@ -160,7 +160,7 @@ namespace TheGrid.Core.Tests
                     bool road = Iso.OnLink(col, row);
                     for (int cx = Mathf.FloorToInt((float)col / Iso.Pitch) - 1; cx <= Mathf.FloorToInt((float)col / Iso.Pitch) + 1; cx++)
                         for (int cy = Mathf.FloorToInt((float)row / Iso.Pitch) - 1; cy <= Mathf.FloorToInt((float)row / Iso.Pitch) + 1; cy++)
-                            road |= Iso.OnLane(new Vector2Int(cx, cy), col, row);
+                            road |= Iso.OnLane(Iso.PlotOrigin(new Vector2Int(cx, cy)), col, row);
                     Assert.IsTrue(road, "tile " + col + ", " + row + " is neither lane nor link");
                 });
             }

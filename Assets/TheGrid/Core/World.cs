@@ -34,7 +34,8 @@ namespace TheGrid.Core
         public string repoRoot = "", name = "", workspace = "";
         public int plot;
         public int region;   // which of the world's regions it stands in
-        public Vector2Int cell;
+        public Vector2Int cell;     // its place on its region's own grid
+        public Vector2Int origin;   // where it stands on the map: the tile of its plot's north corner
         public int needOwner, done, running;
         public List<WorldBot> bots = new List<WorldBot>();
         [NonSerialized] public Layout layout = Layout.Of(0);   // how this sector is arranged and lit: follows from its plot
@@ -176,7 +177,7 @@ namespace TheGrid.Core
                 var cell = region.at * (side + 1) + Plots.Cell(place[i]);
                 world.sectors.Add(new WorldSector
                 {
-                    repoRoot = root, plot = i, region = regionOf[workspace[i]], workspace = workspace[i], cell = cell, layout = Layout.For(i, cell, region.look),
+                    repoRoot = root, plot = i, region = regionOf[workspace[i]], workspace = workspace[i], cell = cell, origin = Iso.PlotOrigin(cell), layout = Layout.For(i, cell, region.look),
                     name = root == "" ? NoProject : Path.GetFileName(root.TrimEnd('/')),
                 });
             }

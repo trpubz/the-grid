@@ -9,7 +9,7 @@ namespace TheGrid.Core
     public sealed class Delivery
     {
         public string key = "", fromBot = "", toBot = "";
-        public Vector2Int fromCell, toCell;
+        public Vector2Int fromAt, toAt;   // the origins of the sender's sector and the recipient's
         public long receivedAt;
         public List<Vector2Int> way = new List<Vector2Int>();   // the sectors its courier passes, first to last; empty when no road joins the two
     }
@@ -43,19 +43,19 @@ namespace TheGrid.Core
                 bool byArrival = settled.Add("at " + row.receivedAt + " " + row.account + "|" + row.from + "|" + row.to);
                 if (!byKey || !byArrival) continue;
                 if (row.receivedAt <= openedAt) continue;     // history, not news
-                if (!One(world, row.account, row.from, out var from, out var fromCell)) continue;
-                if (!One(world, row.account, row.to, out var to, out var toCell)) continue;
-                found.Add(new Delivery { key = row.key, fromBot = from, toBot = to, fromCell = fromCell, toCell = toCell, receivedAt = row.receivedAt, way = Roads.Hops(world, fromCell, toCell) ?? new List<Vector2Int>() });
+                if (!One(world, row.account, row.from, out var from, out var fromAt)) continue;
+                if (!One(world, row.account, row.to, out var to, out var toAt)) continue;
+                found.Add(new Delivery { key = row.key, fromBot = from, toBot = to, fromAt = fromAt, toAt = toAt, receivedAt = row.receivedAt, way = Roads.Hops(world, fromAt, toAt) ?? new List<Vector2Int>() });
             }
             return found;
         }
 
         // The one bot of that name on that account. An ended session stays on the map for hours as an offline bot, and a
         // session restarted under the same name is a second bot called the same: among namesakes, only the live ones count.
-        static bool One(WorldModel world, string account, string name, out string key, out Vector2Int cell)
+        static bool One(WorldModel world, string account, string name, out string key, out Vector2Int at)
         {
             key = "";
-            cell = default;
+            at = default;
             if (account == "" || name == "") return false;
             int live = 0, ended = 0;
             foreach (var sector in world.sectors)
@@ -67,7 +67,7 @@ namespace TheGrid.Core
                     if (isLive || live == 0)
                     {
                         key = b.key;
-                        cell = sector.cell;
+                        at = sector.origin;
                     }
                 }
             return live == 1 || (live == 0 && ended == 1);

@@ -22,12 +22,14 @@ namespace TheGrid.Core
         // Screen pixels per art pixel. Each level doubles the last, so pixels stay whole.
         public static readonly float[] Zoom = { .25f, .5f, 1f, 2f, 4f };
 
+        // Where a sector stands is its origin: the tile of its plot's north corner. The sectors of one region stand on a
+        // grid of their own, Pitch tiles apart; this is how far from the region's origin the sector on a cell of it stands.
         public static Vector2Int PlotOrigin(Vector2Int cell) => new Vector2Int(cell.x * Pitch, cell.y * Pitch);
 
-        // True for a tile of the lane round the plot at this cell: the strip beyond each of its four sides, corners included.
-        public static bool OnLane(Vector2Int cell, int col, int row)
+        // True for a tile of the lane round the plot at this origin: the strip beyond each of its four sides, corners included.
+        public static bool OnLane(Vector2Int origin, int col, int row)
         {
-            var o = PlotOrigin(cell);
+            var o = origin;
             int c = col - o.x, r = row - o.y;
             bool inPlot = c >= 0 && r >= 0 && c < PlotTiles && r < PlotTiles;
             return !inPlot && c >= -LaneTiles && r >= -LaneTiles && c < PlotTiles + LaneTiles && r < PlotTiles + LaneTiles;
@@ -56,17 +58,17 @@ namespace TheGrid.Core
         public static Vector2 Point(float col, float row) => new Vector2((col - row) * (TileW / 2), -(col + row) * (TileH / 2));
 
         // The centre of a structure's footprint, in a sector arranged as `layout`.
-        public static Vector2 StructureSpot(Vector2Int cell, Layout layout, Structure s)
+        public static Vector2 StructureSpot(Vector2Int origin, Layout layout, Structure s)
         {
-            var o = PlotOrigin(cell);
+            var o = origin;
             var f = layout.Footprint(s);
             return Point(o.x + f.x + (f.width - 1) / 2f, o.y + f.y + (f.height - 1) / 2f);
         }
 
         // Where a bot stands, in a sector arranged as `layout`.
-        public static Vector2 BotSpot(Vector2Int cell, Layout layout, Place place, int slot)
+        public static Vector2 BotSpot(Vector2Int origin, Layout layout, Place place, int slot)
         {
-            var o = PlotOrigin(cell);
+            var o = origin;
             var at = layout.Spot(place, slot);
             return Point(o.x + at.x, o.y + at.y);
         }
@@ -90,11 +92,11 @@ namespace TheGrid.Core
         // then it rides over open ground. That takes a region broken in two by repos moved out of its middle.
         public static List<Vector2> Route(Vector2Int fromCell, Vector2Int toCell)
         {
-            var hops = new List<Vector2Int> { fromCell };
+            var hops = new List<Vector2Int> { PlotOrigin(fromCell) };
             for (var c = fromCell; c != toCell;)
             {
                 c += c.x < toCell.x ? Vector2Int.right : c.x > toCell.x ? Vector2Int.left : c.y < toCell.y ? Vector2Int.up : Vector2Int.down;
-                hops.Add(c);
+                hops.Add(PlotOrigin(c));
             }
             return Route(hops);
         }
@@ -108,9 +110,8 @@ namespace TheGrid.Core
         {
             var route = new List<Vector2>();
             if (hops == null || hops.Count < 2) return route;
-            void Add(Vector2Int cell, int node)
+            void Add(Vector2Int o, int node)
             {
-                var o = PlotOrigin(cell);
                 var p = new Vector2(o.x + Ring[node].x, o.y + Ring[node].y);
                 if (route.Count == 0 || route[route.Count - 1] != p) route.Add(p);
             }
@@ -141,13 +142,12 @@ namespace TheGrid.Core
         }
 
         // The pixel rectangle that covers these plots' ground and the lanes round them.
-        public static Rect Bounds(IEnumerable<Vector2Int> cells)
+        public static Rect Bounds(IEnumerable<Vector2Int> origins)
         {
             bool any = false;
             float xMin = 0, xMax = 0, yMin = 0, yMax = 0;
-            foreach (var cell in cells)
+            foreach (var o in origins)
             {
-                var o = PlotOrigin(cell);
                 int first = -LaneTiles, last = PlotTiles + LaneTiles - 1;
                 float l = (o.x - o.y + first - last) * (TileW / 2) - TileW / 2, r = (o.x - o.y + last - first) * (TileW / 2) + TileW / 2;
                 float top = -(o.x + o.y + 2 * first) * (TileH / 2) + TileH / 2, bottom = -(o.x + o.y + 2 * last) * (TileH / 2) - TileH / 2;

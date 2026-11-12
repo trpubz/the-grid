@@ -43,12 +43,12 @@ namespace TheGrid.Core.Tests
             int far = Iso.PlotTiles + Iso.LaneTiles - 1;   // the last lane tile beyond the plot
             foreach (var t in new[] { new Vector2Int(5, -1), new Vector2Int(5, Iso.PlotTiles), new Vector2Int(-1, 5), new Vector2Int(Iso.PlotTiles, 5),      // beside each side
                                       new Vector2Int(-Iso.LaneTiles, -Iso.LaneTiles), new Vector2Int(far, far), new Vector2Int(-Iso.LaneTiles, far) })                  // corners
-                Assert.IsTrue(Iso.OnLane(cell, o.x + t.x, o.y + t.y), t + " should be lane");
+                Assert.IsTrue(Iso.OnLane(Iso.PlotOrigin(cell), o.x + t.x, o.y + t.y), t + " should be lane");
             foreach (var t in new[] { new Vector2Int(0, 0), new Vector2Int(11, 11), new Vector2Int(5, 5), new Vector2Int(-Iso.LaneTiles - 1, 5), new Vector2Int(5, far + 1) })
-                Assert.IsFalse(Iso.OnLane(cell, o.x + t.x, o.y + t.y), t + " should not be lane");
+                Assert.IsFalse(Iso.OnLane(Iso.PlotOrigin(cell), o.x + t.x, o.y + t.y), t + " should not be lane");
             // the lane is as wide as LaneTiles all the way round: a 16 by 16 square less the 12 by 12 plot
             int count = 0;
-            for (int c = -5; c < 20; c++) for (int r = -5; r < 20; r++) if (Iso.OnLane(cell, o.x + c, o.y + r)) count++;
+            for (int c = -5; c < 20; c++) for (int r = -5; r < 20; r++) if (Iso.OnLane(Iso.PlotOrigin(cell), o.x + c, o.y + r)) count++;
             Assert.AreEqual(16 * 16 - 12 * 12, count);
         }
 
@@ -61,8 +61,8 @@ namespace TheGrid.Core.Tests
             for (int gap = 0; gap < Iso.GapTiles; gap++)
                 for (int i = -Iso.LaneTiles; i < ring; i++)
                 {
-                    Assert.IsFalse(Iso.OnLane(a, ring + gap, i) || Iso.OnLane(right, ring + gap, i), "open ground beside a sector");
-                    Assert.IsFalse(Iso.OnLane(a, i, ring + gap) || Iso.OnLane(below, i, ring + gap), "open ground in front of a sector");
+                    Assert.IsFalse(Iso.OnLane(Iso.PlotOrigin(a), ring + gap, i) || Iso.OnLane(Iso.PlotOrigin(right), ring + gap, i), "open ground beside a sector");
+                    Assert.IsFalse(Iso.OnLane(Iso.PlotOrigin(a), i, ring + gap) || Iso.OnLane(Iso.PlotOrigin(below), i, ring + gap), "open ground in front of a sector");
                     // and one link across it each way, two tiles wide: at the crossing in front, at the same count down the side
                     bool link = i == Iso.Crossing || i == Iso.Crossing + 1;
                     Assert.AreEqual(link, Iso.OnLink(ring + gap, i), "beside, tile " + i);
@@ -83,7 +83,7 @@ namespace TheGrid.Core.Tests
                     for (int r = -Iso.LaneTiles; r < ring; r++)
                     {
                         var t = new Vector2Int(o.x + c, o.y + r);
-                        if (!Iso.OnLane(cell, t.x, t.y)) continue;
+                        if (!Iso.OnLane(Iso.PlotOrigin(cell), t.x, t.y)) continue;
                         Assert.IsFalse(plots.Contains(t), "a lane runs through a plot at " + t);
                         Assert.IsTrue(lanes.Add(t), "two sectors share the lane tile " + t);
                         Assert.IsFalse(Iso.OnLink(t.x, t.y), "a lane tile is also a link at " + t);
@@ -99,7 +99,7 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(1024f, one.width, .01f);
             Assert.AreEqual(512f, one.height, .01f);
             Assert.AreEqual(0f, one.center.x, .01f);                      // plot 0 is centred under its north corner
-            var two = Iso.Bounds(new[] { new Vector2Int(0, 0), new Vector2Int(1, 0) });
+            var two = Iso.Bounds(new[] { new Vector2Int(0, 0), new Vector2Int(Iso.Pitch, 0) });
             Assert.AreEqual(1024f + 608f, two.width, .01f);               // the neighbour sits one pitch along: 19 tiles, half a tile's width across each
             Assert.AreEqual(512f + 304f, two.height, .01f);
             Assert.AreEqual(0f, Iso.Bounds(new Vector2Int[0]).width);
