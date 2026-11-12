@@ -157,6 +157,16 @@ namespace TheGrid
                 workspaceAt = new Vector2(Screen.width * .3f, Screen.height * .3f);
             }
             yield return Shot("near.png");
+            // A picture of the map after that sector's repo was given a workspace, as a click in the list does.
+            if (listed != null && Arg("-give") != "")
+            {
+                GiveWorkspace(listed.repoRoot, Arg("-give"));
+                workspaceFor = "";
+                yield return null;
+                yield return null;
+                world.LookAtAll();
+                yield return Shot("given.png");
+            }
             // A picture of bots on their way: the snapshot is swapped for a later one, in which some have gone to work on
             // another floor, and every one of them is put three fifths of its way there.
             if (Arg("-then") != "")
@@ -497,7 +507,10 @@ namespace TheGrid
         {
             var row = drawn.agents.Find(a => a.repoRoot == workspaceFor);
             string current = row != null ? row.workspace : settings.WorkspaceFor(workspaceFor);
+            // Every workspace the settings know, and any other that is in use: a snapshot brings its own.
             var names = new List<string>(settings.workspaces);
+            foreach (var a in drawn.agents)
+                if (a.workspace != "" && !names.Contains(a.workspace)) names.Add(a.workspace);
             if (!names.Contains(current)) names.Add(current);
             string repo = row != null ? row.repoName : Path.GetFileName(workspaceFor.TrimEnd('/'));
             panels.Workspaces(window, GUIUtility.ScreenToGUIPoint(workspaceAt), repo, current, names, detail, title,
@@ -510,6 +523,9 @@ namespace TheGrid
             // On a snapshot the repo changes workspace for as long as the app is open: there is no settings file to keep it in.
             if (fixedSnap == null) settings.Reload(settingsPath); // pick up what was changed by hand since the app started
             pullReader?.Wake();                                   // and the pull request setting: off stops the asking, on starts it
+            // Every workspace in use is in the list first, so that a new one comes after them all and takes the next light.
+            foreach (var a in drawn.agents)
+                if (a.workspace != "" && !settings.workspaces.Contains(a.workspace)) settings.workspaces.Add(a.workspace);
             string given = settings.SetWorkspace(repoRoot, name);
             if (fixedSnap == null) TrySave();
             // The lists and the card show it at once; the collector's next pass will say the same.
