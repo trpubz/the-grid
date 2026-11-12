@@ -10,7 +10,7 @@ namespace TheGrid
     public sealed class WorldTraffic
     {
         const float TilesPerSecond = 8f, LeastRide = 1.5f, PulseStep = .3f, SenderSignals = .9f;
-        const int PulseSteps = 3;
+        const int PulseSteps = ArtNames.PulseSteps;
 
         sealed class Trip
         {
@@ -70,7 +70,7 @@ namespace TheGrid
                     continue;
                 }
                 if (t.pulse == null) t.pulse = New("pulse");
-                t.pulse.sprite = stage.Art("pulse-" + step);
+                t.pulse.sprite = WorldStage.Art(ArtNames.Pulse(step));
                 t.pulse.transform.localPosition = new Vector3(at.x, at.y, -.5f);   // on the ground, under the bot's feet
             }
             return true;
@@ -98,7 +98,7 @@ namespace TheGrid
                 }
                 // It faces the way it rides, and carries its sender's colours.
                 string facing = b.x >= a.x ? (b.y < a.y ? "se" : "ne") : (b.y >= a.y ? "nw" : "sw");
-                t.bike.sprite = stage.BotArt(t.d.fromBot, "bike-" + facing);
+                t.bike.sprite = stage.BotArt(t.d.fromBot, ArtNames.Bike(facing));
                 t.bike.transform.localPosition = new Vector3(Mathf.Round(p.x), Mathf.Round(p.y), -1);
                 return;
             }

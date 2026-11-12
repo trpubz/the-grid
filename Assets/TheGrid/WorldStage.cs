@@ -17,9 +17,7 @@ namespace TheGrid
         const int MaxSmall = 3;      // subagents drawn beside a bot; its name carries the full count
 
         // In the order of Structure.
-        static readonly string[] StructureArt = { "b-server-tower", "b-review-hall", "b-relay", "b-works", "b-assembly-bay", "fountain", "b-test-workshop" };
         public static readonly string[] StructureNames = { "Server tower", "Review hall", "Relay", "Works", "Assembly bay", "", "Test workshop" };
-        static readonly string[] StanceArt = { "stand", "type", "inspect", "off" };                                    // in the order of Stance
         // A bot's light is drawn in three marker colours: the light, its highlight, its dim partner. They become one of
         // these colourways, one an account: blue, white, orange. All from the art palette, and none of them amber: amber
         // is for badges.
@@ -47,14 +45,15 @@ namespace TheGrid
 
         readonly Transform root;
         readonly Tilemap ground, lines;
-        readonly Dictionary<string, Sprite> sprites = new Dictionary<string, Sprite>();
+        static readonly Dictionary<string, Sprite> plain = new Dictionary<string, Sprite>();   // pictures as drawn, by name
+        readonly Dictionary<string, Sprite> sprites = new Dictionary<string, Sprite>();          // pictures in an account's colours
         readonly Dictionary<string, Tile> tiles = new Dictionary<string, Tile>();
         readonly Dictionary<string, Bot> bots = new Dictionary<string, Bot>();
         readonly HashSet<int> painted = new HashSet<int>();
         readonly Dictionary<Vector2Int, GameObject> outlands = new Dictionary<Vector2Int, GameObject>();
         readonly List<string> accounts = new List<string>();
         readonly Dictionary<string, float> signals = new Dictionary<string, float>();   // bot key: signalling until this time
-        readonly float[] tops = new float[StructureArt.Length];
+        readonly float[] tops = new float[ArtNames.Structures.Length];
         int outlandsFor = -1;
 
         // True while any bot is walking: the window draws faster while it lasts.
@@ -71,7 +70,7 @@ namespace TheGrid
             grid.transform.localPosition = new Vector3(0, -Iso.TileH / 2, 0);   // so a cell's centre is Iso.TileCentre
             ground = Layer(grid, "Tiles", -10);
             lines = Layer(grid, "Light", -9);   // lines of light lie over the ground, never in it
-            for (int i = 0; i < tops.Length; i++) tops[i] = Top(Art(StructureArt[i]));
+            for (int i = 0; i < tops.Length; i++) tops[i] = Top(Art(ArtNames.Structures[i]));
         }
 
         static Tilemap Layer(Grid grid, string name, int order)
@@ -97,13 +96,14 @@ namespace TheGrid
         public Sprite BotArt(string botKey, string name) =>
             bots.TryGetValue(botKey, out var b) ? Lit(name, Mathf.Max(0, accounts.IndexOf(b.data.account))) : Art(name);
 
-        // A sprite that is missing is said once, by name, and the world is drawn without it.
-        public Sprite Art(string name)
+        // Every picture the world, its panels and its traffic draw comes through here. One that is missing is said once,
+        // by name, and the world is drawn without it.
+        public static Sprite Art(string name)
         {
-            if (sprites.TryGetValue(name, out var s)) return s;
+            if (plain.TryGetValue(name, out var s)) return s;
             s = Resources.Load<Sprite>("Art/" + name);
             if (s == null) Debug.LogError("[world] missing sprite Art/" + name + "; run tools/art/make_sprites.py");
-            return sprites[name] = s;
+            return plain[name] = s;
         }
 
         Tile T(string name)
@@ -119,17 +119,17 @@ namespace TheGrid
         {
             string key = name + "#" + account;
             if (sprites.TryGetValue(key, out var s)) return s;
-            var plain = Art(name);
-            if (plain == null) return sprites[key] = null;
-            var px = plain.texture.GetPixels32();
+            var drawn = Art(name);
+            if (drawn == null) return sprites[key] = null;
+            var px = drawn.texture.GetPixels32();
             var way = Colourways[account % Colourways.Length];
             for (int i = 0; i < px.Length; i++)
                 for (int k = 0; k < Markers.Length; k++)
                     if (px[i].Equals(Markers[k])) { px[i] = way[k]; break; }
-            var copy = new Texture2D(plain.texture.width, plain.texture.height, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
+            var copy = new Texture2D(drawn.texture.width, drawn.texture.height, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
             copy.SetPixels32(px);
             copy.Apply(false, true);
-            var pivot = new Vector2(plain.pivot.x / plain.rect.width, plain.pivot.y / plain.rect.height);
+            var pivot = new Vector2(drawn.pivot.x / drawn.rect.width, drawn.pivot.y / drawn.rect.height);
             return sprites[key] = Sprite.Create(copy, new Rect(0, 0, copy.width, copy.height), pivot, 1f, 0, SpriteMeshType.FullRect);
         }
 
@@ -194,26 +194,26 @@ namespace TheGrid
                 {
                     Walking = true;
                     var d = b.to - b.from;
-                    pose = (int)((now - b.started) / StepSeconds) % 2 == 0 ? "walk-a" : "walk-b";
+                    pose = (int)((now - b.started) / StepSeconds) % 2 == 0 ? ArtNames.WalkA : ArtNames.WalkB;
                     facing = d.x >= 0 ? (d.y < 0 ? "se" : "ne") : (d.y >= 0 ? "nw" : "sw");
                 }
                 else if (signals.TryGetValue(b.data.key, out var until) && now < until && b.data.stance != Stance.Off)
                 {
-                    pose = "signal";
+                    pose = ArtNames.Signal;
                     facing = "se";   // toward us, so the raised hand shows
                 }
                 else
                 {
-                    pose = StanceArt[(int)b.data.stance];
+                    pose = ArtNames.Stances[(int)b.data.stance];
                     // At a building a bot faces it; in the open it faces us.
                     facing = b.data.place <= Place.Workshop ? "ne" : "se";
                 }
                 int account = Mathf.Max(0, accounts.IndexOf(b.data.account));
-                string shown = "bot-" + pose + "-" + facing + "#" + account;
+                string shown = ArtNames.Bot(pose, facing) + "#" + account;
                 if (shown != b.shown || b.at.localPosition != at)
                 {
                     b.at.localPosition = at;
-                    if (shown != b.shown) b.body.sprite = Lit("bot-" + pose + "-" + facing, account);
+                    if (shown != b.shown) b.body.sprite = Lit(ArtNames.Bot(pose, facing), account);
                     b.shown = shown;
                     stale = true;
                 }
@@ -259,35 +259,35 @@ namespace TheGrid
             for (int i = -Iso.LaneTiles; i <= last; i++)
             {
                 bool inner = i >= 0 && i < Iso.PlotTiles;
-                lines.SetTile(At(o.x + i, o.y - Iso.LaneTiles), T("line-a"));
-                lines.SetTile(At(o.x + i, o.y + last + 1), T("line-a"));
-                lines.SetTile(At(o.x - Iso.LaneTiles - 1, o.y + i), T("line-b"));
-                lines.SetTile(At(o.x + last, o.y + i), T("line-b"));
+                lines.SetTile(At(o.x + i, o.y - Iso.LaneTiles), T(ArtNames.LineA));
+                lines.SetTile(At(o.x + i, o.y + last + 1), T(ArtNames.LineA));
+                lines.SetTile(At(o.x - Iso.LaneTiles - 1, o.y + i), T(ArtNames.LineB));
+                lines.SetTile(At(o.x + last, o.y + i), T(ArtNames.LineB));
                 if (!inner) continue;
-                lines.SetTile(At(o.x + i, o.y), T("line-a"));
-                lines.SetTile(At(o.x + i, o.y + Iso.PlotTiles), T("line-a"));
-                lines.SetTile(At(o.x - 1, o.y + i), T("line-b"));
-                lines.SetTile(At(o.x + Iso.PlotTiles - 1, o.y + i), T("line-b"));
+                lines.SetTile(At(o.x + i, o.y), T(ArtNames.LineA));
+                lines.SetTile(At(o.x + i, o.y + Iso.PlotTiles), T(ArtNames.LineA));
+                lines.SetTile(At(o.x - 1, o.y + i), T(ArtNames.LineB));
+                lines.SetTile(At(o.x + Iso.PlotTiles - 1, o.y + i), T(ArtNames.LineB));
             }
 
             foreach (Structure s in Enum.GetValues(typeof(Structure)))
-                NewSprite(StructureArt[(int)s], Art(StructureArt[(int)s]), root).transform.localPosition = Iso.StructureSpot(sector.cell, s);
+                NewSprite(ArtNames.Structures[(int)s], Art(ArtNames.Structures[(int)s]), root).transform.localPosition = Iso.StructureSpot(sector.cell, s);
         }
 
         // Paving is plain, with a joint every third tile each way.
-        static string Paving(int col, int row) => row % 3 == 0 ? "tile-paving-joint-a" : col % 3 == 2 ? "tile-paving-joint-b" : "tile-paving";
+        static string Paving(int col, int row) => row % 3 == 0 ? ArtNames.PavingJointA : col % 3 == 2 ? ArtNames.PavingJointB : ArtNames.Paving;
 
         // The lane: two tiles across, chevrons on its inner side every fourth tile, a crossing opposite the forecourt.
         static string Lane(int col, int row)
         {
             bool alongColumns = row < 0 || row >= Iso.PlotTiles, alongRows = col < 0 || col >= Iso.PlotTiles;
-            if (alongColumns && alongRows) return "tile-lane";
+            if (alongColumns && alongRows) return ArtNames.Lane;
             if (alongColumns)
             {
-                if (row >= Iso.PlotTiles && (col == Iso.Crossing || col == Iso.Crossing + 1)) return "tile-crossing-a";
-                return (row == -1 || row == Iso.PlotTiles) && col % 4 == 1 ? "tile-lane-chevron-a" : "tile-lane";
+                if (row >= Iso.PlotTiles && (col == Iso.Crossing || col == Iso.Crossing + 1)) return ArtNames.Crossing;
+                return (row == -1 || row == Iso.PlotTiles) && col % 4 == 1 ? ArtNames.ChevronA : ArtNames.Lane;
             }
-            return (col == -1 || col == Iso.PlotTiles) && row % 4 == 1 ? "tile-lane-chevron-b" : "tile-lane";
+            return (col == -1 || col == Iso.PlotTiles) && row % 4 == 1 ? ArtNames.ChevronB : ArtNames.Lane;
         }
 
         // Beyond the sectors the city goes on: dark blocks on dark ground, out to the edge of the view. It is scenery: it says
@@ -326,7 +326,7 @@ namespace TheGrid
             var o = Iso.PlotOrigin(cell);
             for (int col = 0; col < Iso.PlotTiles; col++)
                 for (int row = 0; row < Iso.PlotTiles; row++)
-                    ground.SetTile(At(o.x + col, o.y + row), T("tile-void"));
+                    ground.SetTile(At(o.x + col, o.y + row), T(ArtNames.Void));
             var rng = new System.Random(cell.x * 73856093 ^ cell.y * 19349663);
             for (int i = 0; i < 7; i++)
             {
@@ -334,7 +334,7 @@ namespace TheGrid
                 // The tallest block hides what stands behind it, so it keeps to the middle of its cell, clear of any sector next door.
                 int col = kind < 9 ? rng.Next(0, 11) : rng.Next(3, 8), row = kind < 9 ? rng.Next(0, 11) : rng.Next(3, 8);
                 var at = (Iso.TileCentre(o.x + col, o.y + row) + Iso.TileCentre(o.x + col + 1, o.y + row + 1)) / 2;
-                NewSprite("block", Art(kind < 5 ? "block-a" : kind < 9 ? "block-b" : "block-c"), holder).transform.localPosition = at;
+                NewSprite("block", Art(ArtNames.Blocks[kind < 5 ? 0 : kind < 9 ? 1 : 2]), holder).transform.localPosition = at;
             }
             return holder.gameObject;
         }
@@ -380,7 +380,7 @@ namespace TheGrid
             }
             // Every time, not only when one is made: which colourway an account has can change when another account's
             // sessions come or go, and a bot's subagents must change with it.
-            var small = Lit("bot-small", Mathf.Max(0, accounts.IndexOf(data.account)));
+            var small = Lit(ArtNames.SmallBot, Mathf.Max(0, accounts.IndexOf(data.account)));
             foreach (var s in b.small) s.sprite = small;
         }
 

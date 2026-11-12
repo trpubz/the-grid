@@ -57,9 +57,15 @@ namespace TheGrid
             RenderTexture.active = old;
         }
 
-        void OnDestroy()
+        void OnDestroy() => Drop(picture);
+
+        // Releasing a picture frees its memory on the graphics card; the object itself has to be destroyed as well, or
+        // every size a window is dragged through leaves one behind.
+        static void Drop(RenderTexture old)
         {
-            if (picture != null) picture.Release();
+            if (old == null) return;
+            old.Release();
+            if (Application.isPlaying) Destroy(old); else DestroyImmediate(old);
         }
 
         public void Hide()
@@ -197,8 +203,7 @@ namespace TheGrid
 
             stage = new WorldStage(holder);
             traffic = new WorldTraffic(holder, stage);
-            string[] art = { "", "badge-question", "badge-approve", "badge-fault", "badge-done" };
-            for (int i = 1; i < art.Length; i++) badges[i] = Resources.Load<Sprite>("Art/" + art[i]);
+            for (int i = 1; i < badges.Length; i++) badges[i] = WorldStage.Art(ArtNames.Badges[i]);
         }
 
         void Update()
@@ -222,7 +227,7 @@ namespace TheGrid
             }
             if (picture == null || picture.width != pixelW || picture.height != pixelH)
             {
-                if (picture != null) picture.Release();
+                Drop(picture);
                 picture = new RenderTexture(pixelW, pixelH, 16) { filterMode = FilterMode.Point };
                 cam.targetTexture = picture;
                 stale = true;

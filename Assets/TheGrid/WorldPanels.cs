@@ -105,11 +105,10 @@ namespace TheGrid
 
         Texture2D Badge(Badge b)
         {
-            string[] art = { "", "badge-question", "badge-approve", "badge-fault", "badge-done" };
             if (b == Core.Badge.None) return null;
             if (badges[(int)b] == null)
             {
-                var s = Resources.Load<Sprite>("Art/" + art[(int)b]);
+                var s = WorldStage.Art(ArtNames.Badges[(int)b]);   // which says so, once, if the picture is missing
                 if (s != null) badges[(int)b] = s.texture;
             }
             return badges[(int)b];
