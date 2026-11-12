@@ -96,14 +96,14 @@ Every sector has a depot, and in front of it one crate for each open pull reques
 | Crate | The pull request is |
 |---|---|
 | Amber band and lid | **for you**: ready to merge, or your review is asked for |
-| A band in the depot's light | **in review**: checks running or failed, a reviewer or a review bot at work, changes asked for, conflicts |
+| A band in the depot's light | **in review**: checks running or failed, a reviewer or a review bot at work, changes asked for, conflicts, or GitHub still working out whether it merges |
 | No light | a **draft** |
 
 Those for you stand nearest the door. The depot's name says how many are open, and far out a sector's line adds how many are for you. Click the depot for the list: every open pull request with the reason it is where it is, in words. Click a row to open it in your browser.
 
 ![The depot's list](docs/art/world-depot.png)
 
-"Ready to merge" means nothing is left to wait for: not a draft, no conflicts, checks passed or none, no review asked of anyone, and either approved or no approval required. A review bot is read from its reactions on the pull request's description: eyes while it reviews, a thumbs-up when it found nothing.
+"Ready to merge" means nothing is left to wait for: not a draft, GitHub has confirmed it merges without conflicts, checks passed or none, no review asked of anyone, and either approved or no approval required. A review bot is read from its reactions on the pull request's description: eyes while it reviews, a thumbs-up when it found nothing.
 
 **This is the one place The Grid reaches the network, and it does so through your own `gh`.** Every three minutes, and at once when a repo is new to the map, it runs `gh api graphql` in each repo's folder with one query: the repo's open pull requests, with their draft flag, review decision, requested reviewers, merge conflicts, check status and reactions, and your GitHub login. `gh` works out which repo from the folder's git remote and signs the request with the login you gave it; The Grid never sees or stores a token. Nothing is written to GitHub. If `gh` is not installed or not signed in, or a repo has no GitHub remote, its depot is empty and the list says why. Set `pullRequests` to `false` in `settings.json` and nothing is asked at all.
 

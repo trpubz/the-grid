@@ -395,16 +395,11 @@ namespace TheGrid
             GUI.color = old;
         }
 
-        // The plot of the sector whose depot stands at this point of the map, crates included; -1 for none.
+        // The plot of the sector whose depot, or one of whose crates, is at this point of the map; -1 for none.
         int DepotAt(Vector2 world)
         {
             foreach (var sector in model.sectors)
-            {
-                var foot = Iso.StructureSpot(sector.origin, sector.layout, Structure.Depot);
-                var d = world - (foot + new Vector2(0, 20));
-                // The depot is four tiles by three and some sixty pixels high, with its crates in front of it.
-                if (Mathf.Abs(d.x) < 100 && d.y < 70 && d.y > -80) return sector.plot;
-            }
+                if (Iso.OnDepot(sector.origin, sector.layout, sector.pulls.Count, world)) return sector.plot;
             return -1;
         }
 

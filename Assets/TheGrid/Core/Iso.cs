@@ -78,6 +78,22 @@ namespace TheGrid.Core
             return Point(o.x + at.x, o.y + at.y);
         }
 
+        // True for a point of the map, in art pixels, that is on a sector's depot or on one of the crates shown in front
+        // of it: where a click is for the depot. `crates` is how many open pull requests the repo has.
+        public static bool OnDepot(Vector2Int origin, Layout layout, int crates, Vector2 point)
+        {
+            // The building: four tiles by three on the ground, its roof some sixty pixels up.
+            var d = point - StructureSpot(origin, layout, Structure.Depot);
+            if (Mathf.Abs(d.x) < 104 && d.y > -44 && d.y < 96) return true;
+            // A crate: a box about a tile across and half as high, standing on its spot.
+            for (int slot = 0; slot < Mathf.Min(crates, Layout.Crates); slot++)
+            {
+                var c = point - CrateSpot(origin, layout, slot);
+                if (Mathf.Abs(c.x) < 20 && c.y > -10 && c.y < 26) return true;
+            }
+            return false;
+        }
+
         // Where a crate of the depot stands, in a sector arranged as `layout`.
         public static Vector2 CrateSpot(Vector2Int origin, Layout layout, int slot)
         {

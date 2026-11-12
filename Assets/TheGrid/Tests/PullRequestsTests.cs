@@ -32,6 +32,8 @@ namespace TheGrid.Core.Tests
                 { 11, "InReview: Waits for a review" },
                 { 12, "ForOwner: Ready to merge" },                                       // nothing asked, nothing running, nobody to wait for
                 { 13, "InReview: reviewers is asked to review" },
+                // GitHub works out whether a pull request merges only when asked, and says so until it has: not ready yet
+                { 14, "InReview: GitHub is checking whether it merges" },
             };
             CollectionAssert.AreEquivalent(want.Select(kv => kv.Key + " " + kv.Value), got.Select(kv => kv.Key + " " + kv.Value));
             Assert.AreEqual("https://github.com/example/alpha/pull/4", pulls.Single(p => p.number == 4).url);
@@ -42,7 +44,7 @@ namespace TheGrid.Core.Tests
         public void TheOnesForTheOwnerComeFirstThenThoseInReviewThenDrafts()
         {
             PullRequests.TryParse(Fixture("pulls.json"), out var pulls, out _);
-            CollectionAssert.AreEqual(new[] { 2, 4, 9, 12, 3, 5, 6, 7, 8, 10, 11, 13, 1 }, pulls.Select(p => p.number).ToArray());
+            CollectionAssert.AreEqual(new[] { 2, 4, 9, 12, 3, 5, 6, 7, 8, 10, 11, 13, 14, 1 }, pulls.Select(p => p.number).ToArray());
         }
 
         [TestCase("{ broken", "GitHub's answer could not be read")]
@@ -79,7 +81,7 @@ namespace TheGrid.Core.Tests
             reader.Refresh(new[] { "/work/alpha", "/work/beta", "" });   // sessions with no repo have none to ask about
             CollectionAssert.AreEqual(new[] { "/work/alpha", "/work/beta" }, asked);
             var first = reader.Latest;
-            Assert.AreEqual(13, first.For("/work/alpha").open.Count);
+            Assert.AreEqual(14, first.For("/work/alpha").open.Count);
             Assert.AreEqual("", first.For("/work/alpha").problem);
             Assert.AreEqual(0, first.For("/work/beta").open.Count);
             Assert.AreEqual("gh: not a GitHub repo", first.For("/work/beta").problem);
@@ -88,7 +90,7 @@ namespace TheGrid.Core.Tests
             fail = true;
             reader.Refresh(new[] { "/work/alpha" });
             Assert.AreNotSame(first, reader.Latest);
-            Assert.AreEqual(13, reader.Latest.For("/work/alpha").open.Count, "the list from before the failure");
+            Assert.AreEqual(14, reader.Latest.For("/work/alpha").open.Count, "the list from before the failure");
             Assert.AreEqual("gh did not answer", reader.Latest.For("/work/alpha").problem);
             Assert.IsNull(reader.Latest.For("/work/beta"), "a repo no longer on the map is dropped");
         }

@@ -423,6 +423,39 @@
       "reactions": {
        "nodes": []
       }
+     },
+     {
+      "number": 14,
+      "title": "GitHub has not worked out whether it merges",
+      "url": "https://github.com/example/alpha/pull/14",
+      "isDraft": false,
+      "reviewDecision": null,
+      "mergeable": "UNKNOWN",
+      "author": {
+       "login": "owner"
+      },
+      "reviewRequests": {
+       "nodes": []
+      },
+      "commits": {
+       "nodes": [
+        {
+         "commit": {
+          "statusCheckRollup": null
+         }
+        }
+       ]
+      },
+      "reactions": {
+       "nodes": [
+        {
+         "content": "THUMBS_UP",
+         "user": {
+          "login": "review-bot[bot]"
+         }
+        }
+       ]
+      }
      }
     ]
    }

@@ -134,6 +134,9 @@ namespace TheGrid.Core
             if (n.reviewDecision == "CHANGES_REQUESTED") { status = "Changes are asked for"; return; }
             if (asked != "") { status = asked + " is asked to review"; return; }
             if (n.reviewDecision == "REVIEW_REQUIRED") { status = "Waits for a review"; return; }
+            // GitHub works out whether a pull request merges only once it is asked, and answers UNKNOWN until it has.
+            // That is not a yes: the next asking has the answer.
+            if (n.mergeable != "MERGEABLE") { status = "GitHub is checking whether it merges"; return; }
             state = PullState.ForOwner;
             status = n.reviewDecision == "APPROVED" ? "Approved: ready to merge" : botClean ? "The review bot found nothing: ready to merge" : "Ready to merge";
         }

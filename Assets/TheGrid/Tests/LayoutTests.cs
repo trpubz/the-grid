@@ -149,6 +149,30 @@ namespace TheGrid.Core.Tests
             }
         }
 
+        [Test]
+        public void AClickOnTheDepotOrOnAnyCrateShownIsAClickOnTheDepot()
+        {
+            var origin = new Vector2Int(24, -7);
+            foreach (int a in All)
+            {
+                var l = Layout.Of(a);
+                string which = "arrangement " + a + ": ";
+                var foot = Iso.StructureSpot(origin, l, Structure.Depot);
+                Assert.IsTrue(Iso.OnDepot(origin, l, 0, foot + new Vector2(0, 40)), which + "the middle of the building");
+                Assert.IsTrue(Iso.OnDepot(origin, l, 0, foot + new Vector2(-80, 30)) && Iso.OnDepot(origin, l, 0, foot + new Vector2(80, 30)), which + "its two ends");
+                for (int crates = 1; crates <= Layout.Crates; crates++)
+                    for (int slot = 0; slot < crates; slot++)
+                        Assert.IsTrue(Iso.OnDepot(origin, l, crates, Iso.CrateSpot(origin, l, slot) + new Vector2(0, 10)), which + "crate " + slot + " of " + crates);
+                // a crate that is not there is not clicked: with two shown, the place of the ninth is open ground
+                Assert.IsFalse(Iso.OnDepot(origin, l, 2, Iso.CrateSpot(origin, l, 8) + new Vector2(0, 10)), which + "the place of a crate not shown");
+                // and nothing else of the sector is the depot
+                foreach (Structure s in Structures)
+                    if (s != Structure.Depot) Assert.IsFalse(Iso.OnDepot(origin, l, Layout.Crates, Iso.StructureSpot(origin, l, s) + new Vector2(0, 20)), which + s);
+                for (int slot = 0; slot < 12; slot++)
+                    Assert.IsFalse(Iso.OnDepot(origin, l, Layout.Crates, Iso.BotSpot(origin, l, Place.Forecourt, slot) + new Vector2(0, 16)), which + "a bot that needs the owner, slot " + slot);
+            }
+        }
+
         // How many pixels of a bot's height a sector's structures cover, where the bot stands at `at` (art pixels).
         // A structure covers a bot only when it is drawn after it: when its own ground point is lower on the screen.
         static float Covered(Vector2 at, Layout l, Vector2Int cell, bool own)
