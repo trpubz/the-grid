@@ -53,7 +53,8 @@ namespace TheGrid
             // screen it is drawn as if it stood (a bot in a room is drawn over the room).
             public List<Vector3> path = new List<Vector3>();
             public float started = -100f, seconds = 1f;
-            public Building leaving;   // the building it was in when it set off, kept opened until it has arrived
+            // The buildings it was in, or on its way into, each time it was sent somewhere new: kept opened until it has arrived.
+            public readonly List<Building> leaving = new List<Building>();
             public WorldBot data;
             public string shown = "";
         }
@@ -440,14 +441,16 @@ namespace TheGrid
             return path[0];
         }
 
-        // Lets go of the building a bot was leaving. True if that changed the building's picture.
+        // Lets go of the buildings a bot was leaving. True if it held any: their pictures may have changed.
         bool Release(Bot b)
         {
-            var room = b.leaving;
-            if (room == null) return false;
-            b.leaving = null;
-            room.held--;
-            room.picture.sprite = Shown(room);
+            if (b.leaving.Count == 0) return false;
+            foreach (var room in b.leaving)
+            {
+                room.held--;
+                room.picture.sprite = Shown(room);
+            }
+            b.leaving.Clear();
             return true;
         }
 
@@ -634,11 +637,12 @@ namespace TheGrid
                 var walk = Iso.Walk(sector.origin, sector.layout, b.data.place, b.data.slot, data.place, data.slot);
                 if ((walk[0] - path[path.Count - 1]).sqrMagnitude < 1f) path.AddRange(walk.GetRange(1, walk.Count - 1));
                 else path.Add(stands);   // it was not where this sector's arrangement has that place: straight there
-                // The building it is in stays opened until it has arrived, though nobody may be working there now.
-                if (b.leaving == null && sector.layout.IsInside(b.data.place, b.data.slot) && World.StructureOf(b.data.place) is Structure kind
-                    && buildings.TryGetValue((sector.plot, kind), out var room))
+                // The building it is in, or was on its way into, stays opened until it has arrived, though nobody may be
+                // working there now: what is left of its walk still goes through it. Sent on twice, it holds both.
+                if (sector.layout.IsInside(b.data.place, b.data.slot) && World.StructureOf(b.data.place) is Structure kind
+                    && buildings.TryGetValue((sector.plot, kind), out var room) && !b.leaving.Contains(room))
                 {
-                    b.leaving = room;
+                    b.leaving.Add(room);
                     room.held++;
                     room.picture.sprite = Shown(room);
                 }
