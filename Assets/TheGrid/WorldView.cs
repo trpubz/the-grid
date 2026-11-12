@@ -21,7 +21,13 @@ namespace TheGrid
         WorldStage stage;
         WorldTraffic traffic;
         readonly List<Rect> botNames = new List<Rect>();
-        readonly List<Rect> regionNames = new List<Rect>();   // where each region's name was last drawn, in the order of the model's regions
+        // The names the owner can take hold of, where each was last drawn: a region's (its workspace's name) and a sector's
+        // (its plot). A press on one and a drag moves the region, or the sector within its region.
+        readonly List<(Rect plate, string region, int plot)> handles = new List<(Rect, string, int)>();
+        string heldRegion = "";   // the region the owner is dragging, by name
+        int heldPlot = -1;        // or the sector, by plot
+        Vector2 heldAt;           // where on the map the press was
+        Vector2Int heldBy;        // how far it has been dragged: tiles for a region, cells of its region's grid for a sector
         readonly Sprite[] badges = new Sprite[5];   // in the order of Badge; none for Badge.None
 
         WorldModel model = new WorldModel();
@@ -40,6 +46,13 @@ namespace TheGrid
         // The region whose name was clicked in this pass of Gui, as its number among the model's regions; else -1. The owner
         // wants it in the next light.
         public int RegionClicked { get; private set; } = -1;
+
+        // What the owner let go of in this pass of Gui after dragging it to a place it may stand: a region, as its number
+        // among the model's regions, moved MovedBy tiles; or a sector, as its plot, moved MovedBy cells of its region's
+        // grid. Else -1.
+        public int MovedRegion { get; private set; } = -1;
+        public int MovedPlot { get; private set; } = -1;
+        public Vector2Int MovedBy { get; private set; }
 
         // True when one art pixel is smaller than a point: too small for names, so each sector is summed up instead.
         bool Far => Iso.Zoom[level] < pointScale;
@@ -109,12 +122,12 @@ namespace TheGrid
         {
             var sector = World.Opening(model);
             if (sector == null) return false;
-            LookAtSector(sector.cell);
+            LookAtSector(sector.origin);
             // In a window too small for the whole sector, the first bot that needs the owner must still be in view: the
             // view moves off the sector's middle only as far as that takes.
             var waiting = sector.bots.Find(b => b.needsOwner);
             if (waiting == null) return true;
-            var at = Iso.BotSpot(sector.cell, sector.layout, waiting.place, waiting.slot) + new Vector2(0, 16);
+            var at = Iso.BotSpot(sector.origin, sector.layout, waiting.place, waiting.slot) + new Vector2(0, 16);
             float zoom = Iso.Zoom[level], reachX = Mathf.Max(0, pixelW / (2 * zoom) - 48), reachY = Mathf.Max(0, pixelH / (2 * zoom) - 48);
             centre.x = Mathf.Clamp(centre.x, at.x - reachX, at.x + reachX);
             centre.y = Mathf.Clamp(centre.y, at.y - reachY, at.y + reachY);
@@ -123,9 +136,9 @@ namespace TheGrid
 
         // One sector and its lane, at the closest level that fits: near enough to follow a bot from a doorway to a workstation.
         // Never so far out that bots cannot be made out: in a small window the sector is cut off at its edges instead.
-        public void LookAtSector(Vector2Int cell)
+        public void LookAtSector(Vector2Int origin)
         {
-            Fit(Iso.Bounds(new[] { cell }));
+            Fit(Iso.Bounds(new[] { origin }));
             while (Far && level < Iso.Zoom.Length - 1) level++;
         }
 
@@ -176,7 +189,7 @@ namespace TheGrid
             {
                 model = world;
                 var cells = new List<Vector2Int>();
-                foreach (var s in model.sectors) cells.Add(s.cell);
+                foreach (var s in model.sectors) cells.Add(s.origin);
                 bounds = Iso.Bounds(cells);
                 // Opened once, and not before there is someone to open on: the first roster may arrive after the first click.
                 if (!opened) opened = LookAtOpening();
@@ -266,7 +279,7 @@ namespace TheGrid
         {
             if (holder == null) return;
             var e = Event.current;
-            RegionClicked = -1;
+            RegionClicked = MovedRegion = MovedPlot = -1;
             Handle(e, covered);
             if (e.type != EventType.Repaint) return;
 
@@ -276,6 +289,7 @@ namespace TheGrid
             bool up = (int)(Time.unscaledTime / BounceSeconds) % 2 == 0;
             // Where the bots' names will go: a building's name gives way to them.
             botNames.Clear();
+            handles.Clear();
             if (!Far)
                 foreach (var sector in model.sectors)
                     foreach (var b in sector.bots)
@@ -286,13 +300,14 @@ namespace TheGrid
                         }
             foreach (var sector in model.sectors)
             {
-                var o = Iso.PlotOrigin(sector.cell);
+                var o = sector.origin;
                 if (Far)
                 {
                     // Too far to make out bots: the sector's name, how many of its bots need the owner and how many are done.
                     // Only a sector that needs the owner is loud and gets a badge.
-                    var at = ToView(Iso.Bounds(new[] { sector.cell }).center);
+                    var at = ToView(Iso.Bounds(new[] { sector.origin }).center);
                     Text(at, sector.name, label);
+                    handles.Add((Plate(at, sector.name, label), "", sector.plot));
                     var summary = World.Summary(sector);
                     if (summary != "") Text(at + new Vector2(0, 16), summary, sector.needOwner > 0 ? loud : label);
                     if (sector.needOwner > 0 && badges[(int)Badge.Question] != null)
@@ -301,11 +316,13 @@ namespace TheGrid
                 }
                 // The sector's name lies on the lane along its front. A building's name floats over its roof. A bot at a
                 // door behind a low building has its name there too: then the building goes unnamed, and is known by sight.
-                Text(ToView(Iso.Point(o.x + 5.5f, o.y + Iso.PlotTiles + .5f)) - new Vector2(0, 9), sector.name, loud);
+                var onLane = ToView(Iso.Point(o.x + 5.5f, o.y + Iso.PlotTiles + .5f)) - new Vector2(0, 9);
+                Text(onLane, sector.name, loud);
+                handles.Add((Plate(onLane, sector.name, loud), "", sector.plot));
                 foreach (Structure s in Enum.GetValues(typeof(Structure)))
                 {
                     if (WorldStage.StructureNames[(int)s] == "") continue;
-                    var at = ToView(Iso.StructureSpot(sector.cell, sector.layout, s) + new Vector2(0, stage.Top(s) + 3)) - new Vector2(0, 18);
+                    var at = ToView(Iso.StructureSpot(sector.origin, sector.layout, s) + new Vector2(0, stage.Top(s) + 3)) - new Vector2(0, 18);
                     var plate = Plate(at, WorldStage.StructureNames[(int)s], label);
                     plate = new Rect(plate.x + 6, plate.y + 3, plate.width - 12, plate.height - 6);   // plates that only touch both stay
                     bool taken = false;
@@ -314,15 +331,14 @@ namespace TheGrid
                 }
             }
             // Far out, and with more than one region, each region is named after its workspace, over the back of its ground.
-            regionNames.Clear();
             if (Far && model.regions.Count > 1)
                 for (int r = 0; r < model.regions.Count; r++)
                 {
                     var cells = new List<Vector2Int>();
-                    foreach (var sector in model.sectors) if (sector.region == r) cells.Add(sector.cell);
+                    foreach (var sector in model.sectors) if (sector.region == r) cells.Add(sector.origin);
                     var ground = Iso.Bounds(cells);
                     var at = ToView(new Vector2(ground.center.x, ground.yMax + Skyline)) - new Vector2(0, 20);
-                    regionNames.Add(Plate(at, model.regions[r].name, loud));
+                    handles.Add((Plate(at, model.regions[r].name, loud), model.regions[r].name, -1));
                     Text(at, model.regions[r].name, loud);
                 }
             // Bots are named last, over everything: where two sectors meet, a bot's name matters more than a roof's.
@@ -342,7 +358,45 @@ namespace TheGrid
                             var foot = ToView(at + new Vector2(0, BadgeHeight + (b.needsOwner && up ? 2 : 0)));
                             GUI.DrawTexture(new Rect(Mathf.Round(foot.x - 8 * k), Mathf.Round(foot.y - 18 * k), 16 * k, 20 * k), badges[(int)b.badge].texture);
                         }
+            Outline();
             GUI.EndGroup();
+        }
+
+        // While the owner drags a region or a sector: a dotted outline of where each sector would stand, plot and lane.
+        // In the colour of a fault where it may not stand.
+        void Outline()
+        {
+            if (!moved || heldBy == Vector2Int.zero || !Held(out int region, out var sector)) return;
+            bool may = sector != null ? World.CanMoveSector(model, sector, sector.cell + heldBy) : World.CanMoveRegion(model, region, heldBy);
+            var old = GUI.color;
+            GUI.color = may ? Color.white : new Color32(0xff, 0x4d, 0x4d, 255);
+            float a = -Iso.LaneTiles - .5f, b = Iso.PlotTiles + Iso.LaneTiles - .5f;   // a tile's centre is at whole numbers, its edge half a tile off
+            foreach (var s in model.sectors)
+            {
+                if (sector != null ? s != sector : s.region != region) continue;
+                var o = s.origin + (sector != null ? Iso.PlotOrigin(heldBy) : heldBy);
+                var corners = new[] { ToView(Iso.Point(o.x + a, o.y + a)), ToView(Iso.Point(o.x + b, o.y + a)), ToView(Iso.Point(o.x + b, o.y + b)), ToView(Iso.Point(o.x + a, o.y + b)) };
+                for (int i = 0; i < 4; i++)
+                {
+                    Vector2 from = corners[i], to = corners[(i + 1) % 4];
+                    int dots = Mathf.Max(1, Mathf.RoundToInt((to - from).magnitude / 8f));
+                    for (int k = 0; k < dots; k++)
+                    {
+                        var at = Vector2.Lerp(from, to, k / (float)dots);
+                        GUI.DrawTexture(new Rect(Mathf.Round(at.x) - 1, Mathf.Round(at.y) - 1, 3, 3), Texture2D.whiteTexture);
+                    }
+                }
+            }
+            GUI.color = old;
+        }
+
+        // What the owner has hold of, in the model as it is now: the region's number, or the sector. False when it has
+        // gone from the map since the press.
+        bool Held(out int region, out WorldSector sector)
+        {
+            region = heldRegion == "" ? -1 : model.regions.FindIndex(r => r.name == heldRegion);
+            sector = heldPlot < 0 ? null : model.sectors.Find(s => s.plot == heldPlot);
+            return region >= 0 || sector != null;
         }
 
         static string BotName(WorldBot b) => b.subagents > 0 ? b.name + " +" + b.subagents : b.name;
@@ -379,19 +433,35 @@ namespace TheGrid
                     dragging = true;
                     moved = false;
                     pressed = last = e.mousePosition;
+                    // A press on a name takes hold of what it names; anywhere else, of the map.
+                    var held = handles.Find(h => h.plate.Contains(e.mousePosition - view.position));
+                    heldRegion = held.region ?? "";
+                    heldPlot = held.plate.width > 0 ? held.plot : -1;
+                    heldAt = ToWorld(e.mousePosition - view.position);
+                    heldBy = Vector2Int.zero;
                     e.Use();
                     break;
                 case EventType.MouseDrag when dragging:
                 case EventType.MouseUp when dragging:
                     // The map follows where the pointer is, not the movement the event reports: a scripted or remote pointer leaves
                     // that empty. A press that never strays three points is a click.
+                    bool holding = heldRegion != "" || heldPlot >= 0;
                     if (moved || (e.mousePosition - pressed).sqrMagnitude > 9)
                     {
                         moved = true;
-                        var step = e.mousePosition - last;
+                        if (holding)
+                        {
+                            // A region goes anywhere, tile by tile. A sector goes from cell to cell of its region's grid.
+                            var tiles = Iso.Tiles(ToWorld(e.mousePosition - view.position) - heldAt);
+                            heldBy = heldPlot < 0 ? tiles : new Vector2Int(Mathf.RoundToInt(tiles.x / (float)Iso.Pitch), Mathf.RoundToInt(tiles.y / (float)Iso.Pitch));
+                        }
+                        else
+                        {
+                            var step = e.mousePosition - last;
+                            centre += new Vector2(-step.x, step.y) / k;
+                            PlaceCamera();
+                        }
                         last = e.mousePosition;
-                        centre += new Vector2(-step.x, step.y) / k;
-                        PlaceCamera();
                         fastUntil = Time.unscaledTime + .5f;
                     }
                     if (e.type == EventType.MouseUp)
@@ -400,9 +470,20 @@ namespace TheGrid
                         if (!moved)
                         {
                             // A click on a region's name is for the region; anywhere else, for the bot under it.
-                            RegionClicked = regionNames.FindIndex(plate => plate.Contains(e.mousePosition - view.position));
+                            RegionClicked = heldRegion == "" ? -1 : model.regions.FindIndex(r => r.name == heldRegion);
                             if (RegionClicked < 0) Selected = stage.Pick(ToWorld(e.mousePosition - view.position));
                         }
+                        else if (holding && heldBy != Vector2Int.zero && Held(out int region, out var sector))
+                        {
+                            // Let go where it may stand: it is moved. Anywhere else, it stays where it was.
+                            bool may = sector != null ? World.CanMoveSector(model, sector, sector.cell + heldBy) : World.CanMoveRegion(model, region, heldBy);
+                            if (may && sector != null) MovedPlot = sector.plot;
+                            if (may && sector == null) MovedRegion = region;
+                            MovedBy = heldBy;
+                        }
+                        heldRegion = "";
+                        heldPlot = -1;
+                        heldBy = Vector2Int.zero;
                     }
                     e.Use();
                     break;
