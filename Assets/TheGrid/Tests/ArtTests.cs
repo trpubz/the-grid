@@ -297,9 +297,9 @@ namespace TheGrid.Core.Tests
         [Test]
         public void LargeFacesArePanelledRoofsIncluded()
         {
-            // Across the middle of the assembly bay's roof, seams cross the row again and again.
-            var t = Load("b-assembly-bay").texture;
-            int y = Find("b-assembly-bay").groundY + 60, changes = 0;
+            // Across the middle of the depot's roof, seams cross the row again and again.
+            var t = Load("b-depot").texture;
+            int y = Find("b-depot").groundY + 60, changes = 0;
             for (int x = 100; x < 188; x++)
                 if (!((Color32)t.GetPixel(x, y)).Equals((Color32)t.GetPixel(x + 1, y))) changes++;
             Assert.GreaterOrEqual(changes, 8);

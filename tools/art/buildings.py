@@ -151,8 +151,9 @@ def relay():
     render("b-relay", 192, 256, 64)
 
 
-def assembly_bay():
-    """Editing. Told by: a wide low hall, one large lit door, a gantry across the roof."""
+def depot():
+    """Where the repo's open pull requests are queued. Told by: a wide low hall, one large lit door, a gantry across the
+    roof, and the crates the game stands in front of it."""
     w, d, h, lit = 3.4, 2.4, 1.4, "cyanw"
     z = footing(w, d, lit)
     shaft(0, 0, w, d, z, h - z, lit, sides=0)
@@ -168,7 +169,20 @@ def assembly_bay():
         box(x, 0, top, .12, .12, .55, "g5", "g4", "g3")
     box(0, 0, top + .55, 3.12, .16, .1, "c0", "g5", "g3")
     box(.5, 0, top + .33, .26, .26, .22, "g5", "g4", "g3"); box(.5, 0, top + .2, .04, .04, .13, "c1")
-    render("b-assembly-bay", 288, 224, 88)
+    render("b-depot", 288, 224, 88)
+
+
+def crate(name, band=None, lid=None):
+    """One open pull request, queued at the depot. A graphite box; what it is waiting for is its light. None: a draft.
+    A band in the building's light, which the game swaps for the depot's: in review. Amber, band and lid: for the owner."""
+    s, h = .56, .4
+    box(0, 0, 0, s, s, h, "c0", "g5", "g3")
+    box(0, 0, h, s * .78, s * .78, .03, "c1", "g5", "g4")                               # the lid
+    if band:
+        light(0, -s / 2 - .012, h * .38, s, .02, .1, band); light(s / 2 + .012, 0, h * .38, .02, s, .1, band)
+    if lid:
+        light(0, 0, h + .03, s * .4, s * .4, .012, lid)
+    render(name, 48, 48, 14)
 
 
 def test_workshop():
@@ -197,4 +211,5 @@ def test_workshop():
 
 
 def make():
-    server_tower(); review_hall(); works(); relay(); assembly_bay(); test_workshop()
+    server_tower(); review_hall(); works(); relay(); depot(); test_workshop()
+    crate("crate-draft"); crate("crate-review", band="cyanw"); crate("crate-ready", band="amber", lid="amber")

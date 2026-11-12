@@ -7,11 +7,12 @@ namespace TheGrid.Core
     // comes to draw it.
     public static class ArtNames
     {
-        public static readonly string[] Structures = { "b-server-tower", "b-review-hall", "b-relay", "b-works", "b-assembly-bay", "fountain", "b-test-workshop" };   // in the order of Structure
+        public static readonly string[] Structures = { "b-server-tower", "b-review-hall", "b-relay", "b-works", "b-depot", "fountain", "b-test-workshop" };   // in the order of Structure
         public static readonly string[] Badges = { "", "badge-question", "badge-approve", "badge-fault", "badge-done" };   // in the order of Badge; none for Badge.None
         public static readonly string[] Stances = { "stand", "type", "inspect", "off" };                                    // in the order of Stance
         public static readonly string[] Facings = { "se", "ne", "nw", "sw" };
         public static readonly string[] Blocks = { "block-a", "block-b", "block-c" };
+        public static readonly string[] Crates = { "crate-draft", "crate-review", "crate-ready" };   // in the order of PullState
         public const string WalkA = "walk-a", WalkB = "walk-b", Signal = "signal";
         public const string SmallBot = "bot-small";
         public const string Paving = "tile-paving", PavingJointA = "tile-paving-joint-a", PavingJointB = "tile-paving-joint-b";
@@ -28,6 +29,7 @@ namespace TheGrid.Core
             foreach (var s in Structures) yield return s;
             foreach (var b in Badges) if (b != "") yield return b;
             foreach (var b in Blocks) yield return b;
+            foreach (var c in Crates) yield return c;
             foreach (var f in Facings)
             {
                 foreach (var pose in Stances) yield return Bot(pose, f);

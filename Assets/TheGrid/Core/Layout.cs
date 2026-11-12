@@ -70,7 +70,7 @@ namespace TheGrid.Core
 
         readonly Template template;
         readonly int[] order;      // which tall position the server tower, the review hall and the works stand in
-        readonly int swap;         // 0: the assembly bay in the first low position and the workshop in the second; 1: the other way round
+        readonly int swap;         // 0: the depot in the first low position and the workshop in the second; 1: the other way round
         readonly int plot, look;
 
         public int Arrangement { get; }
@@ -103,6 +103,13 @@ namespace TheGrid.Core
         // The same for a map of one region in the first look, where a plot's cell is its place on the one spiral.
         public static Layout For(int plot) => For(plot, Plots.Cell(plot), 0);
 
+        // How many crates the depot shows: one for each open pull request, as far as there is room in front of it. The
+        // depot's list has them all.
+        public const int Crates = 9;
+
+        // Where a crate stands, in tiles from the plot's first tile: in rows in front of the depot's door.
+        public Vector2 Crate(int slot) => template.midDoor[swap].Spot(slot);
+
         static int Tall(Structure s) => s == Structure.ServerTower ? 0 : s == Structure.ReviewHall ? 1 : 2;
 
         public RectInt Footprint(Structure s)
@@ -111,7 +118,7 @@ namespace TheGrid.Core
             {
                 case Structure.Relay: return new RectInt(template.relay, new Vector2Int(2, 2));
                 case Structure.Fountain: return new RectInt(template.fountain, new Vector2Int(2, 2));
-                case Structure.AssemblyBay: return new RectInt(template.mid[swap], new Vector2Int(4, 3));
+                case Structure.Depot: return new RectInt(template.mid[swap], new Vector2Int(4, 3));
                 case Structure.Workshop: return new RectInt(template.mid[1 - swap], new Vector2Int(4, 3));
                 default: return new RectInt(template.tall[order[Tall(s)]], new Vector2Int(3, 3));
             }
@@ -125,7 +132,6 @@ namespace TheGrid.Core
                 case Place.ServerTower: return template.tallDoor[order[0]].Spot(slot);
                 case Place.ReviewHall: return template.tallDoor[order[1]].Spot(slot);
                 case Place.Works: return template.tallDoor[order[2]].Spot(slot);
-                case Place.AssemblyBay: return template.midDoor[swap].Spot(slot);
                 case Place.Workshop:
                     if (slot < InTheWorkshop.Length) return (Vector2)template.mid[1 - swap] + InTheWorkshop[slot];
                     // shortcut: a fifth bot waits outside in front, shown whole but not at a terminal. Give the workshop a
@@ -160,7 +166,7 @@ namespace TheGrid.Core
                 case Structure.ReviewHall: return 136;
                 case Structure.Works: return 70;
                 case Structure.Relay: return 56;
-                case Structure.AssemblyBay: return 60;
+                case Structure.Depot: return 60;
                 case Structure.Workshop: return 47;
                 default: return 8;
             }

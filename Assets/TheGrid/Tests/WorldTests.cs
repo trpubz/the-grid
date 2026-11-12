@@ -91,9 +91,44 @@ namespace TheGrid.Core.Tests
         public void ASectorSeenFromFarSaysHowManyNeedTheOwnerAndHowManyAreDone(int need, int done, string expected) =>
             Assert.AreEqual(expected, World.Summary(new WorldSector { needOwner = need, done = done }));
 
+        [TestCase(0, 0, 3, "3 PRs for you")]
+        [TestCase(2, 1, 1, "2 need you · 1 done · 1 PR for you")]
+        public void ASectorSeenFromFarAlsoSaysHowManyPullRequestsAreForTheOwner(int need, int done, int pulls, string expected) =>
+            Assert.AreEqual(expected, World.Summary(new WorldSector { needOwner = need, done = done, pullsForOwner = pulls }));
+
+        [Test]
+        public void ASectorHasItsReposOpenPullRequestsAsLastHeardFromGitHub()
+        {
+            var pulls = new PullsSnapshot();
+            pulls.repos.Add(new RepoPulls
+            {
+                repoRoot = "/work/alpha",
+                open =
+                {
+                    new PullRequest { number = 7, state = PullState.ForOwner, status = "Ready to merge" },
+                    new PullRequest { number = 9, state = PullState.ForOwner, status = "Your review is asked for" },
+                    new PullRequest { number = 8, state = PullState.Draft, status = "Draft" },
+                },
+            });
+            pulls.repos.Add(new RepoPulls { repoRoot = "/work/beta", problem = "gh: not signed in" });
+            var w = World.Build(snap, new Plots(), null, pulls);
+            var alpha = w.sectors.Single(s => s.name == "alpha");
+            CollectionAssert.AreEqual(new[] { 7, 9, 8 }, alpha.pulls.Select(p => p.number).ToArray());
+            Assert.AreEqual(2, alpha.pullsForOwner);
+            Assert.AreEqual("", alpha.pullsProblem);
+            var beta = w.sectors.Single(s => s.name == "beta");
+            Assert.AreEqual(0, beta.pulls.Count);
+            Assert.AreEqual("gh: not signed in", beta.pullsProblem);
+            // not asked about, or not asked yet: nothing, and nothing wrong
+            var loose = w.sectors.Single(s => s.name == World.NoProject);
+            Assert.AreEqual(0, loose.pulls.Count);
+            Assert.AreEqual("", loose.pullsProblem);
+            Assert.AreEqual(0, World.Build(snap, new Plots()).sectors[0].pulls.Count);
+        }
+
         // State is on the bot: a building stands for a kind of work, and everything else is where the bot stands, how, and its badge.
         [TestCase("Running", "reading", Place.ServerTower, Stance.Inspect, Badge.None)]
-        [TestCase("Running", "editing", Place.AssemblyBay, Stance.Type, Badge.None)]
+        [TestCase("Running", "editing", Place.Works, Stance.Type, Badge.None)]       // the depot is for pull requests; editing is done at the works
         [TestCase("Running", "testing", Place.Workshop, Stance.Type, Badge.None)]
         [TestCase("Running", "reviewing", Place.ReviewHall, Stance.Inspect, Badge.None)]
         [TestCase("Running", "working", Place.Works, Stance.Stand, Badge.None)]

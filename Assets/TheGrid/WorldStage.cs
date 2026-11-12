@@ -17,7 +17,7 @@ namespace TheGrid
         const int MaxSmall = 3;      // subagents drawn beside a bot; its name carries the full count
 
         // In the order of Structure.
-        public static readonly string[] StructureNames = { "Server tower", "Review hall", "Relay", "Works", "Assembly bay", "", "Test workshop" };
+        public static readonly string[] StructureNames = { "Server tower", "Review hall", "Relay", "Works", "PR depot", "", "Test workshop" };
         // A bot's light is drawn in three marker colours: the light, its highlight, its dim partner. They become one of
         // these colourways: blue, white, orange. Which one is the account's number, kept in the world's file, so an account
         // keeps its colour. All from the art palette, and none of them amber: amber is for badges.
