@@ -267,7 +267,7 @@ namespace TheGrid
                     }
                 }
             }
-            panels.Place(map, needsYou.Count, card != null);
+            panels.Place(map, needsYou.Count, card);
             world.Gui(detail, title, panels.Covers);
             if (drawn.errors.Count > 0) GUI.Label(new Rect(map.x + 4, map.y + 4, map.width - 8, 32), string.Join(" | ", drawn.errors), error);
             string clicked = panels.Draw(map, needsYou, card, detail, title);
@@ -276,6 +276,7 @@ namespace TheGrid
                 world.Select(clicked);
                 world.LookAt(clicked);
             }
+            if (panels.WorkspaceClicked && card != null && card.repoRoot != "") CycleWorkspace(card.repoRoot);
         }
 
         void DrawRoster(Rect area, RosterSnapshot snap, long now)

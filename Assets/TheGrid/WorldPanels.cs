@@ -9,7 +9,8 @@ namespace TheGrid
     // Flat plates in palette colours. They say only what Panels made from the roster snapshot.
     public sealed class WorldPanels
     {
-        const float Wide = 220, CardWide = 260, Margin = 8, TitleHigh = 26, RowHigh = 38, CardHigh = 92;
+        const float Wide = 220, CardWide = 260, Margin = 8, TitleHigh = 26, RowHigh = 38, CardHigh = 92, LineHigh = 18;
+        const int SubagentLines = 4, SubagentLinesWhenShort = 1;
         const int MostRows = 6, RowsWhenShort = 2;
         static readonly Color Plate = new Color32(0x0c, 0x10, 0x24, 255), Edge = new Color32(0x3a, 0x41, 0x78, 255), Lit = new Color32(0x35, 0xf2, 0xff, 255);
         static readonly Color Dim = new Color(1, 1, 1, .6f);
@@ -18,11 +19,16 @@ namespace TheGrid
         bool folded, foldChosen;
         Vector2 scroll;
         Rect needs, card;   // where the panels are; zero when not drawn
+        List<string> subagents = new List<string>();   // the card's lines about subagents, as many as this map has room for
+
+        // True when the last Draw saw a click on the card's workspace: the owner wants the repo in its next workspace.
+        public bool WorkspaceClicked { get; private set; }
 
         // Works out where the panels go. Call on every event before the map handles input, so that what is drawn, what is
         // clicked and what the map leaves alone are the same rectangles.
-        public void Place(Rect map, int rows, bool hasCard)
+        public void Place(Rect map, int rows, BotCard about)
         {
+            bool hasCard = about != null;
             bool narrow = map.width < 520;
             if (!foldChosen)
             {
@@ -33,7 +39,10 @@ namespace TheGrid
             if (hasCard)
             {
                 float w = narrow ? map.width - 2 * Margin : CardWide;
-                card = new Rect(map.xMax - Margin - w, map.yMax - Margin - CardHigh, w, CardHigh);
+                // A short map has room for one line about subagents, so that the card never takes most of it.
+                subagents = Panels.SubagentLines(about, map.height < 300 ? SubagentLinesWhenShort : SubagentLines);
+                float h = CardHigh + subagents.Count * LineHigh;
+                card = new Rect(map.xMax - Margin - w, map.yMax - Margin - h, w, h);
             }
             if (rows > 0)
             {
@@ -53,6 +62,7 @@ namespace TheGrid
         public string Draw(Rect map, List<NeedsYouRow> rows, BotCard about, GUIStyle text, GUIStyle strong)
         {
             string clicked = "";
+            WorkspaceClicked = false;
             if (needs.width > 0)
             {
                 Back(needs);
@@ -91,7 +101,23 @@ namespace TheGrid
                 GUI.Label(new Rect(card.x + 10, card.y + 6, card.width - 20, 22), about.title, strong);
                 GUI.Label(new Rect(card.x + 10, card.y + 27, card.width - 20, 20), about.who, text);
                 Faint(new Rect(card.x + 10, card.y + 45, card.width - 20, 20), about.doing, text);
-                Faint(new Rect(card.x + 10, card.y + 63, card.width - 100, 20), about.since, text);
+                Faint(new Rect(card.x + 10, card.y + 63, 70, 20), about.since, text);
+                // The workspace: a button that moves the repo to its next workspace, as in the lists. A session with no
+                // repo has none to move.
+                if (about.workspace != "")
+                {
+                    bool pr = about.prNumber > 0 && about.prUrl != "";
+                    var ws = new Rect(card.x + 84, card.y + 60, Mathf.Min(110, card.width - 84 - (pr ? 94 : 10)), 22);
+                    if (about.repoRoot == "") Faint(new Rect(ws.x + 8, ws.y + 2, ws.width - 10, 20), about.workspace, text);
+                    else
+                    {
+                        Fill(ws, Edge);
+                        GUI.Label(new Rect(ws.x + 8, ws.y + 1, ws.width - 10, 20), about.workspace, text);
+                        if (GUI.Button(ws, GUIContent.none, GUIStyle.none)) WorkspaceClicked = true;
+                    }
+                }
+                for (int i = 0; i < subagents.Count; i++)
+                    Faint(new Rect(card.x + 10, card.y + 86 + i * LineHigh, card.width - 20, 20), subagents[i], text);
                 if (about.prNumber > 0 && about.prUrl != "")
                 {
                     var pr = new Rect(card.xMax - 84, card.y + 60, 74, 22);
