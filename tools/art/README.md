@@ -21,7 +21,7 @@ This rewrites every PNG, `sprites.json` beside them, and `docs/art/contact-sheet
 | `kit.py` | The camera, the palette, the building blocks (`box`, `light`, `disc`, `ball`, `limb`, `glow`), and `render`, which also gives what stands its depth |
 | `ground.py` | Paving, the lane, the void, lines of light, the fountain, city blocks |
 | `buildings.py` | The six buildings, the opened pictures of the three a bot works in (with the floors and stairs of the two tall ones), and the crates that stand at the depot |
-| `bots.py` | Bots in every pose and facing, the courier's bike, badges, the pulse |
+| `bots.py` | Bots in every pose and facing (the six poses of a bot at work among them), the courier's bike, badges, the pulse |
 | `make_sprites.py` | The entry point |
 
 ## How it stays pixel art
@@ -74,4 +74,4 @@ The game stands bots on the floors of an opened tall building and walks them up 
 
 ## Add a pose
 
-In `bots.py`, add the name to `POSES` and handle it in `bot()`, which is modelled facing +x. Every pose is rendered in four facings by turning the model, so say which arm acts with `near`, the side the camera sees, or the pose will be hidden from behind. The tests fail if two pictures of a bot come out the same.
+In `bots.py`, add the name to `POSES` and handle it in `bot()`, which is modelled facing +x. The game asks for poses by name (`Assets/TheGrid/Core/ArtNames.cs`), and a bot at work is given its poses by `Assets/TheGrid/Core/Jobs.cs`: a new pose for a job goes in all three. Every pose is rendered in four facings by turning the model, so say which arm acts with `near`, the side the camera sees, or the pose will be hidden from behind. The tests fail if two pictures of a bot come out the same.
