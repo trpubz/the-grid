@@ -116,6 +116,8 @@ namespace TheGrid.Core.Tests
                         Assert.IsTrue(t.x >= -.5f && t.y >= -.5f && t.x <= Iso.PlotTiles - .5f && t.y <= Iso.PlotTiles - .5f, who + " is off the plot");
                         // the workshop's walls are cut away so that its first four can be seen inside it
                         if (place == Place.Workshop && slot < 4) Assert.IsTrue(workshop.Contains(tile), who + " should be inside the workshop");
+                        // and a building a bot works in is opened the same way: its first six stand inside
+                        else if (World.StructureOf(place) is Structure own && own != Structure.Workshop) Assert.IsTrue(l.Footprint(own).Contains(tile), who + " should be inside the " + own);
                         else Assert.IsFalse(built.Contains(tile), who + " stands on a structure");
                     }
             }
@@ -173,6 +175,29 @@ namespace TheGrid.Core.Tests
             }
         }
 
+        [Test]
+        public void SixWorkInsideABuildingAndTheSeventhWaitsAtItsDoor()
+        {
+            Assert.AreEqual(6, Layout.Inside);
+            foreach (int a in All)
+            {
+                var l = Layout.Of(a);
+                foreach (var place in new[] { Place.ServerTower, Place.ReviewHall, Place.Works })
+                {
+                    var f = l.Footprint(World.StructureOf(place).Value);
+                    for (int slot = 0; slot < Layout.Inside + 6; slot++)
+                    {
+                        var t = l.Spot(place, slot);
+                        string who = "arrangement " + a + ": " + place + " slot " + slot + " at " + t;
+                        // inside: on the floor, clear of the walls and of the racks along the two far ones
+                        bool inside = t.x > f.xMin - .5f + .7f && t.x < f.xMax - .5f - .3f && t.y > f.yMin - .5f + .9f && t.y < f.yMax - .5f - .3f;
+                        if (slot < Layout.Inside) Assert.IsTrue(inside, who + " should be inside");
+                        else Assert.Greater(t.y, f.yMax - .5f, who + " should wait in front of the door");
+                    }
+                }
+            }
+        }
+
         // How many pixels of a bot's height a sector's structures cover, where the bot stands at `at` (art pixels).
         // A structure covers a bot only when it is drawn after it: when its own ground point is lower on the screen.
         static float Covered(Vector2 at, Layout l, Vector2Int cell, bool own)
@@ -184,7 +209,7 @@ namespace TheGrid.Core.Tests
             foreach (var s in Structures)
             {
                 var f = l.Footprint(s);
-                if (own && s == Structure.Workshop && local.x > f.xMin - .5f && local.x < f.xMax - .5f && local.y > f.yMin - .5f && local.y < f.yMax - .5f) continue;   // standing inside it
+                if (own && local.x > f.xMin - .5f && local.x < f.xMax - .5f && local.y > f.yMin - .5f && local.y < f.yMax - .5f) continue;   // standing inside it: it is opened
                 if (!(at.y > Iso.StructureSpot(Iso.PlotOrigin(cell), l, s).y)) continue;
                 Vector2 back = Iso.Point(o.x + f.xMin - .5f, o.y + f.yMin - .5f), left = Iso.Point(o.x + f.xMin - .5f, o.y + f.yMax - .5f),
                         right = Iso.Point(o.x + f.xMax - .5f, o.y + f.yMin - .5f), front = Iso.Point(o.x + f.xMax - .5f, o.y + f.yMax - .5f);

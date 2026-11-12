@@ -27,7 +27,7 @@ namespace TheGrid.EditorTools
             AssetDatabase.SaveAssets();
         }
 
-        // Draws the world from the synthetic fixture into Logs/world-far.png and Logs/world-near.png, without a window or any agent
+        // Draws the world from the synthetic fixture into Logs/world-far.png, world-near.png and world-near-dim.png, without a window or any agent
         // data: a quick look at new sprites standing where the game puts them. Names, counts and badges are drawn by the window and are not in these pictures.
         [MenuItem("The Grid/Render World Pictures")]
         public static void WorldPictures()
@@ -35,7 +35,9 @@ namespace TheGrid.EditorTools
             var snap = JsonUtility.FromJson<RosterSnapshot>(File.ReadAllText("fixtures/world/snapshot.json"));
             var view = new GameObject("World pictures").AddComponent<WorldView>();
             foreach (var far in new[] { true, false })
-                File.WriteAllBytes("Logs/world-" + (far ? "far" : "near") + ".png", view.Picture(World.Build(snap, new Plots()), 2000, 1250, far).EncodeToPNG());
+                File.WriteAllBytes("Logs/world-" + (far ? "far" : "near") + ".png", view.Picture(World.Build(snap, new Plots()), 2000, 1250, far, 0f).EncodeToPNG());
+            // And the same sector a beat later: the lights of the buildings bots are working in at the dim half of their pulse.
+            File.WriteAllBytes("Logs/world-near-dim.png", view.Picture(World.Build(snap, new Plots()), 2000, 1250, false, 1f).EncodeToPNG());
             UnityEngine.Object.DestroyImmediate(view.gameObject);
         }
 

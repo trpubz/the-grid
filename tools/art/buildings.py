@@ -135,6 +135,104 @@ def works():
     render("b-works", 256, 224, 80)
 
 
+def opened(w, d, h, lit):
+    """A building while a bot works in it, opened the way the test workshop always is: its footing, a lit floor, its two
+    far walls standing to their full height, its two near ones cut to a kerb, and a line of light up each cut edge and
+    along the top of each far wall. What it is for goes inside, along the far walls; the middle of the floor is the bots'."""
+    glow(0, 0, w + .16, d + .16, "cyan")
+    box(0, 0, 0, w + .16, d + .16, .1, "g3", "g1", "g0")
+    light(0, -d / 2 - .08, .1, w + .16, .03, .07, lit); light(w / 2 + .08, 0, .1, .03, d + .16, .07, lit)
+    box(0, 0, .17, w + .2, d + .2, .08, *TRIM)
+    light(0, 0, .25, w - .1, d - .1, .003, "pv2")                                     # the floor inside, lit
+    kit.SHADOWLESS = True       # we look into this room: its walls cast no shadow, only what stands inside does
+    box(-w / 2 + .07, 0, .25, .14, d, h - .25, *WALL)
+    kit.SHADOWLESS = False
+    light(-w / 2 + .15, -d / 2 + .1, .25, .03, .04, h - .25, lit); light(-w / 2 + .15, 0, h, .03, d, .05, lit)
+    box(0, -d / 2 + .06, .25, w, .12, .22, *TRIM); box(w / 2 - .06, 0, .25, .12, d, .22, *TRIM)  # the near ones are cut to a kerb
+    light(0, -d / 2 + .06, .47, w, .12, .01, "c0"); light(w / 2 - .06, 0, .47, .12, d, .01, "c0")
+
+
+def back_wall(cx, w, d, h, lit, right_edge=True):
+    """A length of an opened building's back wall, with the line of light along its top and, where it ends the wall, up
+    its cut edge."""
+    kit.SHADOWLESS = True
+    box(cx, d / 2 - .07, .25, w, .14, h - .25, *WALL)
+    kit.SHADOWLESS = False
+    light(cx, d / 2 - .15, h, w, .03, .05, lit)
+    if right_edge:
+        light(cx + w / 2 - .035, d / 2 - .15, .25, .07, .04, h - .25, lit)
+
+
+def rack(x, y, along_back):
+    """A rack of drives against a far wall, lit down its front: where a bot swaps a drive or plugs in a cable."""
+    if along_back:
+        box(x, y, .25, .52, .36, .95, "g5", "g3", "g2")
+        for i in range(4):
+            light(x, y - .19, .42 + i * .19, .38, .012, .07, "cyan" if (i + int(x * 2)) % 2 else "teal")
+    else:
+        box(x, y, .25, .36, .52, .95, "g5", "g3", "g2")
+        for i in range(4):
+            light(x + .19, y, .42 + i * .19, .012, .38, .07, "teal" if i % 2 else "cyan")
+
+
+def server_tower_open():
+    """The server tower with a bot at work in it. Told by: racks along both far walls, storey on storey of them up the
+    inside, and two of its roof fans on a ledge over the back wall."""
+    w, h, lit = 2.5, 5.0, "cyanw"
+    opened(w, w, h, lit)
+    back_wall(0, w, w, h, lit)
+    for floor in range(1, 10):                          # the inside of the far walls: a line at every storey, panes lit here and there
+        z = .82 + floor * .43
+        light(0, w / 2 - .15, z, w - .3, .012, .03, "g5"); light(-w / 2 + .15, 0, z, .012, w - .3, .03, "g5")
+        for i in range(5):
+            if (floor * 7 + i * 3) % 4 == 0:
+                light(-.9 + i * .45, w / 2 - .152, z + .1, .3, .012, .22, "teal")
+            if (floor * 5 + i * 2) % 4 == 1:
+                light(-w / 2 + .152, -.9 + i * .45, z + .1, .012, .3, .22, "teal")
+    for x in (-.75, -.05, .65):
+        rack(x, w / 2 - .42, True)
+    for y in (-.6, .15):
+        rack(-w / 2 + .42, y, False)
+    box(0, w / 2 - .5, h, w + .12, 1.1, .14, *TRIM); fan(-.6, w / 2 - .55, h + .14); fan(.6, w / 2 - .55, h + .14)
+    render("b-server-tower-open", 256, 352, 80)
+
+
+def review_hall_open():
+    """The review hall with a bot at work in it. Told by: its back wall in two with the bridge across the top, two wall
+    screens side by side to compare, and a console of buttons under them."""
+    w, h, lit = 2.5, 3.4, "cyanw"
+    opened(w, w, h, lit)
+    back_wall(-.8, .9, w, h, lit, right_edge=True); back_wall(.8, .9, w, h, lit, right_edge=True)
+    box(0, w / 2 - .2, 2.5, .72, .4, .5, *TRIM)                                       # the bridge
+    light(0, w / 2 - .41, 2.5, .72, .02, .05, lit); light(0, w / 2 - .41, 2.95, .72, .02, .05, lit)
+    for x in (-.8, .8):                                                               # a screen on each half of the wall
+        box(x, w / 2 - .18, .75, .78, .05, .62, "k1"); light(x, w / 2 - .21, .8, .68, .02, .52, "teal")
+        for i in range(3):
+            light(x - .12 + (i % 2) * .16, w / 2 - .225, .88 + i * .15, .34, .012, .05, "cyanw" if i == 1 else "cyan")
+    box(0, w / 2 - .52, .25, 1.9, .32, .42, "g5", "g3", "g2")                         # the console, its buttons along the front
+    for i in range(7):
+        light(-.78 + i * .26, w / 2 - .56, .67, .12, .1, .02, "cyanw" if i % 3 == 0 else "teal")
+    box(-w / 2 + .38, -.3, .25, .3, 1.1, .5, "g5", "g3", "g2"); light(-w / 2 + .38, -.3, .75, .2, .9, .02, "teal")   # a reading desk
+    render("b-review-hall-open", 256, 288, 80)
+
+
+def works_open():
+    """The works with a bot at work in it. Told by: two reactors with a lit core each, a panel of levers on the wall, and
+    its stack rising from the floor."""
+    w, h, lit = 2.4, 1.5, "cyanw"
+    opened(w, w, h, lit)
+    back_wall(0, w, w, h, lit)
+    for x in (-.15, .7):                                                              # the reactors, along the back wall
+        disc(x, w / 2 - .42, .25, .24, .8, "g5", "g3"); disc(x, w / 2 - .42, 1.05, .18, .06, "c0", "g4")
+        light(x, w / 2 - .665, .5, .22, .012, .3, "cyanw" if x < 0 else "cyan")       # the core, seen through its window
+    box(-w / 2 + .3, -.35, .25, .22, .9, .85, "g5", "g3", "g2")                       # the panel of levers, on the left wall
+    for i in range(3):
+        light(-w / 2 + .415, -.65 + i * .3, .78, .012, .08, .2, "c1"); light(-w / 2 + .42, -.65 + i * .3, .98, .03, .1, .06, "cyanw" if i == 1 else "teal")
+    disc(-w / 2 + .42, .62, .25, .13, 1.9, "g5", "g3"); disc(-w / 2 + .42, .62, 2.15, .16, .05, "c0", "g4")   # the stack
+    light(-w / 2 + .42, .62, 2.2, .1, .1, .04, "cyan")
+    render("b-works-open", 256, 224, 80)
+
+
 def relay():
     """Where couriers leave from and arrive. Told by: a kiosk under a mast with three rings."""
     w, h, lit = 1.5, 1.0, "cyanw"
@@ -212,4 +310,5 @@ def test_workshop():
 
 def make():
     server_tower(); review_hall(); works(); relay(); depot(); test_workshop()
+    server_tower_open(); review_hall_open(); works_open()
     crate("crate-draft"); crate("crate-review", band="cyanw"); crate("crate-ready", band="amber", lid="amber")

@@ -97,14 +97,15 @@ namespace TheGrid
         }
 
         // The world as a picture, without a window: what the camera sees, no text. far shows every sector; otherwise the view the world opens on.
-        public Texture2D Picture(WorldModel world, int width, int height, bool far)
+        // at: the moment to show, in seconds, for what changes with time (the pulse of a busy building's lights); now, if left out.
+        public Texture2D Picture(WorldModel world, int width, int height, bool far, float at = -1f)
         {
             pointScale = 2f;   // as on the screens the window is drawn for, where a point is two pixels
             opened = false;
             Lay(world, width, height);
             if (far) LookAtAll();
             Lay(world, width, height);   // again: far or near may have changed with the level
-            stage.Tick(Time.unscaledTime);
+            stage.Tick(at >= 0 ? at : Time.unscaledTime);
             stale = true;
             Draw();
             var old = RenderTexture.active;

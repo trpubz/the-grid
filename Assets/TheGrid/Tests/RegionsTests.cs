@@ -211,6 +211,20 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
+        public void APulseTakesEveryLightOfABuildingAStepDownWithinItsOwnFamily()
+        {
+            for (int light = 0; light < Lights.Count; light++)
+            {
+                int[] full = Lights.Family(light), dim = Lights.Dimmed(light);
+                Assert.AreEqual(Lights.Parts, dim.Length);
+                foreach (int c in dim) CollectionAssert.Contains(full, c, "light " + light + " pulses to a colour of another family");
+                Assert.AreEqual(full[1], dim[0], "the bright line goes down to the dimmer line's colour");
+                Assert.AreNotEqual(full[0], dim[0]);
+                Assert.AreEqual(full[3], dim[5], "the glow nearest the wall goes down to the farthest's");
+            }
+        }
+
+        [Test]
         public void InASectorMostLightsAreTheRegionsPrimaryAndSomeAreAccents()
         {
             var buildings = ((Structure[])Enum.GetValues(typeof(Structure))).Where(s => s != Structure.Fountain).ToList();

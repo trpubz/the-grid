@@ -20,7 +20,7 @@ This rewrites every PNG, `sprites.json` beside them, and `docs/art/contact-sheet
 |---|---|
 | `kit.py` | The camera, the palette, the building blocks (`box`, `light`, `disc`, `ball`, `limb`, `glow`), and `render`, which also gives what stands its depth |
 | `ground.py` | Paving, the lane, the void, lines of light, the fountain, city blocks |
-| `buildings.py` | The six buildings, and the crates that stand at the depot |
+| `buildings.py` | The six buildings, the opened pictures of the three a bot works in, and the crates that stand at the depot |
 | `bots.py` | Bots in every pose and facing, the courier's bike, badges, the pulse |
 | `make_sprites.py` | The entry point |
 

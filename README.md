@@ -77,6 +77,12 @@ A building stands for a kind of work:
 
 The sixth building, the relay, is where offline bots wait. The fifth is the PR depot: no bot works there.
 
+A bot at work goes inside. While anyone works in a building it is drawn opened, the way the test workshop always is: its two far walls stand, its two near ones are cut down to a kerb, and you see the bot at the racks of the server tower, the screens of the review hall or the reactors of the works. Six fit inside; a seventh waits at the door. When the last one leaves, the building closes again.
+
+**The lights of a building someone is working in pulse**: its lines, windows and glow go a step dimmer and back, about once every second and a half. A sector where lights are pulsing has agents at work; one that is still has none. Nothing else on the map moves for it.
+
+![Bots at work inside the server tower, the review hall and the works](docs/art/world-working.png)
+
 Anything else is shown on the bot itself, wherever it stands:
 
 | On the bot | Its agent is |

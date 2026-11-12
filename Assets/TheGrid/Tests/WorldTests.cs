@@ -126,6 +126,26 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(0, World.Build(snap, new Plots()).sectors[0].pulls.Count);
         }
 
+        [Test]
+        public void ABuildingHasSomeoneWorkingInItWhenABotIsAtItsPlace()
+        {
+            Assert.AreEqual(Structure.ServerTower, World.StructureOf(Place.ServerTower));
+            Assert.AreEqual(Structure.ReviewHall, World.StructureOf(Place.ReviewHall));
+            Assert.AreEqual(Structure.Works, World.StructureOf(Place.Works));
+            Assert.AreEqual(Structure.Workshop, World.StructureOf(Place.Workshop));
+            foreach (var open in new[] { Place.Plaza, Place.Forecourt, Place.Dock }) Assert.IsNull(World.StructureOf(open), open.ToString());
+
+            var sector = new WorldSector();
+            void Bot(string state, string activity) => sector.bots.Add(new WorldBot { place = World.PlaceFor(state, activity), state = state });
+            Bot("Running", "reading"); Bot("Running", "reviewing"); Bot("Running", "reviewing"); Bot("BlockedOnQuestion", ""); Bot("Finished", ""); Bot("Offline", "");
+            Assert.AreEqual(1, World.Working(sector, Structure.ServerTower));
+            Assert.AreEqual(2, World.Working(sector, Structure.ReviewHall));
+            Assert.AreEqual(0, World.Working(sector, Structure.Works));
+            Assert.AreEqual(0, World.Working(sector, Structure.Workshop));
+            // nobody works at the depot, the relay or the fountain, whoever stands near them
+            foreach (var s in new[] { Structure.Depot, Structure.Relay, Structure.Fountain }) Assert.AreEqual(0, World.Working(sector, s), s.ToString());
+        }
+
         // State is on the bot: a building stands for a kind of work, and everything else is where the bot stands, how, and its badge.
         [TestCase("Running", "reading", Place.ServerTower, Stance.Inspect, Badge.None)]
         [TestCase("Running", "editing", Place.Works, Stance.Type, Badge.None)]       // the depot is for pull requests; editing is done at the works

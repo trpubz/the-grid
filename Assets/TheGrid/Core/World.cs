@@ -88,6 +88,28 @@ namespace TheGrid.Core
             }
         }
 
+        // The building a place is: where a bot at that place works. Null for the open ground.
+        public static Structure? StructureOf(Place place)
+        {
+            switch (place)
+            {
+                case Place.ServerTower: return Structure.ServerTower;
+                case Place.ReviewHall: return Structure.ReviewHall;
+                case Place.Works: return Structure.Works;
+                case Place.Workshop: return Structure.Workshop;
+                default: return null;
+            }
+        }
+
+        // How many of a sector's bots are at work in a building. Only a running agent's bot is at a building at all; the
+        // rest stand in the open. A building with someone at work in it is drawn opened, and its lights pulse.
+        public static int Working(WorldSector sector, Structure building)
+        {
+            int n = 0;
+            foreach (var b in sector.bots) if (StructureOf(b.place) == building) n++;
+            return n;
+        }
+
         public static Stance StanceFor(string state, string activity)
         {
             if (state == "Offline") return Stance.Off;

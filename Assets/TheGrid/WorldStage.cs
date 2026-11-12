@@ -13,6 +13,7 @@ namespace TheGrid
     {
         static readonly float WalkPixelsPerSecond = 4f * Iso.TileStep;   // four tiles a second
         const float StepSeconds = .2f;
+        const float BeatSeconds = .7f;   // how long the lights of a building someone works in stay at each of their two levels
         const int OutlandRing = 3;   // plot-sized cells of city kept beyond the sectors of a small map; more for a wide one
         const int MaxSmall = 3;      // subagents drawn beside a bot; its name carries the full count
 
@@ -31,6 +32,16 @@ namespace TheGrid
         };
 
         static Color32 Hex(int rgb) => new Color32((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb, 255);
+
+        // One building of one sector: its picture, which kind it is and which light it carries, and whether a bot is at
+        // work in it. While one is, it is drawn opened and its lights pulse.
+        sealed class Building
+        {
+            public SpriteRenderer picture;
+            public Structure kind;
+            public int light;
+            public bool busy;
+        }
 
         sealed class Bot
         {
@@ -55,6 +66,8 @@ namespace TheGrid
         readonly Dictionary<int, (Vector2Int origin, int arrangement, int look)> painted = new Dictionary<int, (Vector2Int, int, int)>();
         readonly HashSet<(Vector2Int, Vector2Int)> roads = new HashSet<(Vector2Int, Vector2Int)>();
         readonly HashSet<Vector2Int> opened = new HashSet<Vector2Int>();
+        readonly Dictionary<(int plot, Structure kind), Building> buildings = new Dictionary<(int, Structure), Building>();
+        int beat;   // 0 or 1: which of the two levels the lights of busy buildings are at
         // The crates at each sector's depot, by its plot: what they show, and the object that holds them.
         readonly Dictionary<int, (string shown, GameObject holder)> crates = new Dictionary<int, (string, GameObject)>();
         readonly Dictionary<Vector2Int, GameObject> outlands = new Dictionary<Vector2Int, GameObject>();
@@ -152,6 +165,28 @@ namespace TheGrid
             return Recoloured(name + "@" + light, name, from, to);
         }
 
+        // The same picture with its light a step down: the dim half of a pulse.
+        Sprite Dimmed(string name, int light)
+        {
+            var from = new Color32[Lights.Parts];
+            var to = new Color32[Lights.Parts];
+            int[] dim = Lights.Dimmed(Mathf.Max(light, 0));
+            for (int i = 0; i < Lights.Parts; i++)
+            {
+                from[i] = Hex(Lights.Drawn[i]);
+                to[i] = Hex(dim[i]);
+            }
+            return Recoloured(name + "~" + light, name, from, to);
+        }
+
+        // A building's picture as it is to be seen now: opened if a bot works in it and it has an opened picture, and at
+        // the dim level if its lights are in the dim half of their pulse.
+        Sprite Shown(Building b)
+        {
+            string name = b.busy && ArtNames.Opened[(int)b.kind] != "" ? ArtNames.Opened[(int)b.kind] : ArtNames.Structures[(int)b.kind];
+            return b.busy && beat == 1 ? Dimmed(name, b.light) : InLight(name, b.light);
+        }
+
         // A copy of a picture with some colours swapped for others. Made once and kept.
         Sprite Recoloured(string key, string name, Color32[] from, Color32[] to)
         {
@@ -213,6 +248,16 @@ namespace TheGrid
                 if (roads.Add(road)) Road(road.from, road.to, at[road.from].region == at[road.to].region ? Lights.Primary(at[road.from].layout.Look) : 0);
 
             foreach (var sector in model.sectors) PutCrates(sector);
+            // A building a bot has come to work in is opened; one the last has left is closed again.
+            foreach (var sector in model.sectors)
+                foreach (Structure s in Enum.GetValues(typeof(Structure)))
+                {
+                    if (!buildings.TryGetValue((sector.plot, s), out var b)) continue;
+                    bool busy = World.Working(sector, s) > 0;
+                    if (busy == b.busy) continue;
+                    b.busy = busy;
+                    b.picture.sprite = Shown(b);
+                }
 
             var seen = new HashSet<string>();
             foreach (var sector in model.sectors)
@@ -268,6 +313,7 @@ namespace TheGrid
             foreach (var b in bots.Values) Kill(b.at.gameObject);
             foreach (var c in crates.Values) Kill(c.holder);
             crates.Clear();
+            buildings.Clear();
             outlands.Clear();
             bots.Clear();
             painted.Clear();
@@ -281,6 +327,19 @@ namespace TheGrid
         {
             bool stale = false;
             Walking = false;
+            // The lights of every building someone works in go a step down and back, together. Nothing else in the map
+            // moves for it: two pictures, swapped, and the map drawn again at each swap.
+            int now2 = (int)(now / BeatSeconds) % 2;
+            if (now2 != beat)
+            {
+                beat = now2;
+                foreach (var b in buildings.Values)
+                    if (b.busy)
+                    {
+                        b.picture.sprite = Shown(b);
+                        stale = true;
+                    }
+            }
             foreach (var b in bots.Values)
             {
                 float t = Mathf.Clamp01((now - b.started) / b.seconds);
@@ -384,7 +443,12 @@ namespace TheGrid
 
             // Every sector has the same buildings; where each stands and how it is lit is the sector's own.
             foreach (Structure s in Enum.GetValues(typeof(Structure)))
-                NewSprite(ArtNames.Structures[(int)s], InLight(ArtNames.Structures[(int)s], sector.layout.Light(s)), built).transform.localPosition = Iso.StructureSpot(sector.origin, sector.layout, s);
+            {
+                var b = new Building { kind = s, light = sector.layout.Light(s) };
+                b.picture = NewSprite(ArtNames.Structures[(int)s], Shown(b), built);
+                b.picture.transform.localPosition = Iso.StructureSpot(sector.origin, sector.layout, s);
+                buildings[(sector.plot, s)] = b;
+            }
         }
 
         // The road across the open ground from one sector's lane to another's: lane tiles where Iso.RoadTiles says, and a

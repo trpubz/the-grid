@@ -148,6 +148,27 @@
    "groundY": 88
   },
   {
+   "name": "b-server-tower-open",
+   "width": 256,
+   "height": 352,
+   "groundX": 128,
+   "groundY": 80
+  },
+  {
+   "name": "b-review-hall-open",
+   "width": 256,
+   "height": 288,
+   "groundX": 128,
+   "groundY": 80
+  },
+  {
+   "name": "b-works-open",
+   "width": 256,
+   "height": 224,
+   "groundX": 128,
+   "groundY": 80
+  },
+  {
    "name": "crate-draft",
    "width": 48,
    "height": 48,

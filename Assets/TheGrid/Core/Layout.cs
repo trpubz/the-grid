@@ -105,6 +105,19 @@ namespace TheGrid.Core
 
         // How many crates the depot shows: one for each open pull request, as far as there is room in front of it. The
         // depot's list has them all.
+        // How many bots work inside the server tower, the review hall or the works; the next waits at the door.
+        public const int Inside = 6;
+
+        // Where those six stand, from the corner of the building's footprint: on the floor, clear of the racks along its
+        // two far walls. None stands in the far right of the room: the building next along the back row, a tile away,
+        // would hide it behind its corner.
+        static readonly Vector2[] InATall =
+        {
+            new Vector2(1.25f, .85f), new Vector2(.6f, 1.45f), new Vector2(1.9f, 1.45f), new Vector2(.6f, .85f), new Vector2(1.25f, 2f), new Vector2(1.9f, 2f),
+        };
+
+        Vector2 AtATall(int which, int slot) =>
+            slot < Inside ? (Vector2)template.tall[order[which]] + InATall[slot] : template.tallDoor[order[which]].Spot(slot - Inside);
         public const int Crates = 9;
 
         // Where a crate stands, in tiles from the plot's first tile: in rows in front of the depot's door.
@@ -129,9 +142,9 @@ namespace TheGrid.Core
         {
             switch (place)
             {
-                case Place.ServerTower: return template.tallDoor[order[0]].Spot(slot);
-                case Place.ReviewHall: return template.tallDoor[order[1]].Spot(slot);
-                case Place.Works: return template.tallDoor[order[2]].Spot(slot);
+                case Place.ServerTower: return AtATall(0, slot);
+                case Place.ReviewHall: return AtATall(1, slot);
+                case Place.Works: return AtATall(2, slot);
                 case Place.Workshop:
                     if (slot < InTheWorkshop.Length) return (Vector2)template.mid[1 - swap] + InTheWorkshop[slot];
                     // shortcut: a fifth bot waits outside in front, shown whole but not at a terminal. Give the workshop a

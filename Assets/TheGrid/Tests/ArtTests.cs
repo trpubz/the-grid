@@ -153,7 +153,8 @@ namespace TheGrid.Core.Tests
             // Violet is the review hall's no longer: a building's light is its sector's choice. Only the fountain is violet as drawn.
             var violet = new[] { Hex(0xa070ff), Hex(0xd9c8ff), Hex(0x4b4696), Hex(0x6657b8) };
             var drawn = Lights.Drawn.Select(Hex).ToList();
-            foreach (var name in ArtNames.Structures.Where(n => n.StartsWith("b-")))
+            Assert.AreEqual(3, ArtNames.Opened.Count(n => n != ""), "the tower, the hall and the works each have an opened picture");
+            foreach (var name in ArtNames.Structures.Where(n => n.StartsWith("b-")).Concat(ArtNames.Opened.Where(n => n != "")))
             {
                 var px = Load(name).texture.GetPixels32();
                 Assert.AreEqual(0, px.Count(c => violet.Contains(c)), name + " has violet in it");
@@ -169,7 +170,9 @@ namespace TheGrid.Core.Tests
             // A picture's body ends where its width has narrowed to a mast or a stack: under 24 pixels across.
             foreach (Structure s in Enum.GetValues(typeof(Structure)))
             {
-                string name = ArtNames.Structures[(int)s];
+              foreach (string name in new[] { ArtNames.Structures[(int)s], ArtNames.Opened[(int)s] })
+              {
+                if (name == "") continue;   // no opened picture: nobody works in it, or it is always open
                 var t = Load(name).texture;
                 var f = Layout.Of(0).Footprint(s);
                 int ground = Find(name).groundY, back = (f.width + f.height) * Iso.TileH / 4;   // the back corner stands this far above the ground point
@@ -177,6 +180,7 @@ namespace TheGrid.Core.Tests
                 for (int y = ground; y < t.height; y++)
                     if (Enumerable.Range(0, t.width).Count(x => t.GetPixel(x, y).a > 0) >= 24) body = y - ground;
                 Assert.LessOrEqual(body - back, Layout.Wall(s) + 4, name + " stands " + (body - back) + " above its back corner");
+              }
             }
         }
 
@@ -291,6 +295,25 @@ namespace TheGrid.Core.Tests
                 if (IsTile(name)) Assert.AreEqual(0, dark, name + ": ground is flat, edge to edge");
                 else if (name.StartsWith("b-")) Assert.GreaterOrEqual(dark, 80, name);
                 else if (name.StartsWith("bot-") && name != "bot-small") Assert.GreaterOrEqual(dark * 2, edge.Count, name + ": at least half its edge");
+            }
+        }
+
+        [Test]
+        public void AnOpenedBuildingStandsWhereItsClosedPictureDoesAndShowsItsFloor()
+        {
+            for (int s = 0; s < ArtNames.Opened.Length; s++)
+            {
+                if (ArtNames.Opened[s] == "") continue;
+                Entry closed = Find(ArtNames.Structures[s]), open = Find(ArtNames.Opened[s]);
+                Assert.AreEqual(closed.width, open.width, open.name);
+                Assert.AreEqual(closed.height, open.height, open.name);
+                Assert.AreEqual(closed.groundX, open.groundX, open.name);
+                Assert.AreEqual(closed.groundY, open.groundY, open.name);
+                // at the middle of its footprint the closed picture is wall and the opened one is lit floor
+                // (paving, in light or in the soft shadow of what stands in the room)
+                var floor = new[] { Hex(0x3f4780), Hex(0x353d70), Hex(0x2c3360) };
+                CollectionAssert.Contains(floor, (Color32)Load(open.name).texture.GetPixel(open.groundX, open.groundY + 6), open.name + " shows no floor at its middle");
+                CollectionAssert.DoesNotContain(floor, (Color32)Load(closed.name).texture.GetPixel(closed.groundX, closed.groundY + 6), closed.name);
             }
         }
 
