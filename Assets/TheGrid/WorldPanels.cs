@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using TheGrid.Core;
 using UnityEngine;
@@ -211,6 +212,47 @@ namespace TheGrid
         }
 
         // A plate: solid, a one-pixel edge, and a line of light along its top.
+        // The list a repo's workspace is picked from, drawn over everything else, at `at` or as near as fits the window. A
+        // click on a workspace gives it to the repo; a name typed in the last line makes a new one. `give` is called with
+        // the name, `close` when the owner puts the list away. Until one of them is, nothing under the list takes a click.
+        public void Workspaces(Rect window, Vector2 at, string repo, string current, List<string> names, GUIStyle text, GUIStyle strong, Action<string> give, Action close)
+        {
+            float high = TitleHigh + names.Count * ListRow + 34;
+            var list = new Rect(Mathf.Clamp(at.x, window.x, window.xMax - ListWide), Mathf.Clamp(at.y, window.y, window.yMax - high), ListWide, high);
+            GUI.ModalWindow(0x6c697374, list, id =>
+            {
+                var e = Event.current;
+                var all = new Rect(0, 0, list.width, list.height);
+                bool away = e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape || e.type == EventType.MouseDown && !all.Contains(e.mousePosition);
+                // Seen before the text field is drawn, which may take the key for itself.
+                bool enter = e.type == EventType.KeyDown && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter);
+                Back(all);
+                GUI.Label(new Rect(8, 3, all.width - 40, 22), repo + " · workspace", strong);
+                GUI.Label(new Rect(all.width - 22, 3, 16, 22), "×", strong);
+                away |= GUI.Button(new Rect(all.width - 30, 0, 30, TitleHigh), GUIContent.none, GUIStyle.none);
+                string picked = "";
+                for (int i = 0; i < names.Count; i++)
+                {
+                    var row = new Rect(1, TitleHigh + i * ListRow, all.width - 2, ListRow);
+                    if (names[i] == current) Fill(new Rect(10, row.y + 9, 6, 6), Lit);   // the one the repo is in
+                    GUI.Label(new Rect(24, row.y + 2, row.width - 30, 20), names[i], text);
+                    if (GUI.Button(row, GUIContent.none, GUIStyle.none)) picked = names[i];
+                }
+                var field = new Rect(8, TitleHigh + names.Count * ListRow + 5, all.width - 64, 22);
+                typed = GUI.TextField(field, typed, 24);
+                if (typed == "") Faint(new Rect(field.x + 5, field.y + 1, field.width - 6, 20), "New workspace", text);
+                bool add = GUI.Button(new Rect(all.width - 50, field.y, 42, 22), "Add");
+                if ((enter || add) && typed.Trim() != "") picked = typed;
+                if (picked == "" && !away) return;
+                typed = "";
+                if (e.type != EventType.Repaint && e.type != EventType.Layout) e.Use();
+                if (picked != "") give(picked); else close();
+            }, GUIContent.none, GUIStyle.none);
+        }
+
+        const float ListWide = 236, ListRow = 24;
+        string typed = "";   // the name of a new workspace, as far as it has been typed
+
         static void Back(Rect r)
         {
             Fill(r, Edge);

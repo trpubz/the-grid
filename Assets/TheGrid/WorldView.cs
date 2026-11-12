@@ -49,6 +49,8 @@ namespace TheGrid
 
         // The sector whose depot was clicked in this pass of Gui, as its plot; else -1. The owner wants its list.
         public int DepotClicked { get; private set; } = -1;
+        // The plot of the sector whose name was clicked in the last Gui; else -1. Its repo's workspace is the owner's to pick.
+        public int SectorClicked { get; private set; } = -1;
 
         // What the owner let go of in this pass of Gui after dragging it to a place it may stand: a region, as its number
         // among the model's regions, moved MovedBy tiles; or a sector, as its plot, moved MovedBy cells of its region's
@@ -289,7 +291,7 @@ namespace TheGrid
         {
             if (holder == null) return;
             var e = Event.current;
-            RegionClicked = MovedRegion = MovedPlot = DepotClicked = -1;
+            RegionClicked = MovedRegion = MovedPlot = DepotClicked = SectorClicked = -1;
             Handle(e, covered);
             if (e.type != EventType.Repaint) return;
 
@@ -489,13 +491,16 @@ namespace TheGrid
                         dragging = false;
                         if (!moved)
                         {
-                            // A click on a region's name is for the region; anywhere else, for the bot under it.
+                            // A click on a region's name is for the region, one on a sector's name for the sector; anywhere
+                            // else, for the bot under it.
                             RegionClicked = heldRegion == "" ? -1 : model.regions.FindIndex(r => r.name == heldRegion);
+                            SectorClicked = heldPlot;
+                            bool onName = RegionClicked >= 0 || SectorClicked >= 0;
                             var at = ToWorld(e.mousePosition - view.position);
-                            string bot = RegionClicked < 0 ? stage.Pick(at) : "";
-                            if (RegionClicked < 0) Selected = bot;
+                            string bot = onName ? "" : stage.Pick(at);
+                            if (!onName) Selected = bot;
                             // A click on a depot that is on no bot, close enough in to tell buildings apart: its list.
-                            if (RegionClicked < 0 && bot == "" && !Far) DepotClicked = DepotAt(at);
+                            if (!onName && bot == "" && !Far) DepotClicked = DepotAt(at);
                         }
                         else if (holding && heldBy != Vector2Int.zero && Held(out int region, out var sector))
                         {

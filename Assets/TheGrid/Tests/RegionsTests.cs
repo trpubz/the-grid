@@ -182,6 +182,23 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
+        public void OnAFirstRunARepoWithNobodyInItIsGivenANewWorkspaceAndStandsInARegionOfItsOwn()
+        {
+            var plots = new Plots();
+            var settings = new Settings();   // as on a first run: Personal alone
+            World.Build(Of("Personal/a", "Personal/b"), plots, settings);
+            var before = World.Build(Of("Personal/a"), plots, settings);   // the sessions of /Personal/b have all gone
+            Assert.AreEqual(1, before.regions.Count);
+            Assert.AreEqual("Open source", settings.SetWorkspace("/Personal/b", "Open source"));
+            var after = World.Build(Of("Personal/a"), plots, settings);
+            CollectionAssert.AreEqual(new[] { "Personal", "Open source" }, after.regions.Select(r => r.name).ToArray());
+            Assert.AreEqual("Open source", after.regions[Sector(after, "Personal/b").region].name);
+            Assert.AreEqual(1, after.regions[1].look, "the new region has the next light");
+            Assert.AreEqual(Sector(before, "Personal/a").origin, Sector(after, "Personal/a").origin, "and nothing else moved");
+            AssertRegionsStandApart(after);
+        }
+
+        [Test]
         public void ARegionTakesItsWorkspacesPlaceInTheListOfLightsUntilTheOwnerPicksAnother()
         {
             var settings = new Settings { workspaces = new List<string> { "home", "firm", "work" } };

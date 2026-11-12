@@ -109,7 +109,7 @@ namespace TheGrid.Core.Tests
             Directory.CreateDirectory(Path.Combine(repo, ".git"));
             Directory.CreateDirectory(Path.Combine(repo, "src"));
             settings.workspaces = new List<string> { "Personal", "Work" };
-            settings.CycleWorkspace(repo);
+            settings.SetWorkspace(repo, "Work");
             var snap = new RosterBuilder(settings).Build(new[] { Idle("s-9", "gamma-01", Path.Combine(repo, "src")) }, None, Now);
             Assert.AreEqual("alpha", snap.agents[0].repoName);
             Assert.AreEqual(repo, snap.agents[0].repoRoot);

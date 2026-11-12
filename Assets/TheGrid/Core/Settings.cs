@@ -91,15 +91,19 @@ namespace TheGrid.Core
             return DefaultWorkspace;
         }
 
-        // Assigns the next entry of `workspaces` to the repo and returns it. A session with no repo cannot be assigned.
-        public string CycleWorkspace(string repoRoot)
+        // Gives the repo a workspace by name and returns the name it now has. A name there is no workspace of makes one, at
+        // the end of the list; one that differs from a workspace's only by case is that workspace. No name changes nothing.
+        // A session with no repo cannot be given one.
+        public string SetWorkspace(string repoRoot, string name)
         {
-            if (string.IsNullOrEmpty(repoRoot)) return DefaultWorkspace;
-            var next = workspaces[(workspaces.IndexOf(WorkspaceFor(repoRoot)) + 1) % workspaces.Count];
+            name = (name ?? "").Trim();
+            if (string.IsNullOrEmpty(repoRoot) || name == "") return WorkspaceFor(repoRoot);
+            string known = workspaces.Find(w => string.Equals(w, name, StringComparison.OrdinalIgnoreCase));
+            if (known == null) workspaces.Add(known = name);
             var entry = repoWorkspaces.Find(rw => rw.repo == repoRoot);
             if (entry == null) repoWorkspaces.Add(entry = new RepoWorkspace { repo = repoRoot });
-            entry.workspace = next;
-            return next;
+            entry.workspace = known;
+            return known;
         }
 
         // ~/.claude and every ~/.claude-* that holds a projects folder.

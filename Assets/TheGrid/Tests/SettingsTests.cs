@@ -50,18 +50,29 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
-        public void CyclingAssignsTheNextWorkspaceAndSurvivesSaveAndLoad()
+        public void ARepoIsGivenAWorkspaceWhichIsMadeIfItIsNewAndSurvivesSaveAndLoad()
         {
-            var s = Settings.Load(file);
-            s.workspaces = new List<string> { "Personal", "Work" };
-            Assert.AreEqual("Work", s.CycleWorkspace("/work/alpha"));
-            Assert.AreEqual("Personal", s.CycleWorkspace("/work/alpha"));
-            Assert.AreEqual("Work", s.CycleWorkspace("/work/alpha"));
+            var s = Settings.Load(file);   // a first run: Personal alone
+            CollectionAssert.AreEqual(new[] { "Personal" }, s.workspaces);
+            // a new name makes the workspace; what is typed round it does not count
+            Assert.AreEqual("Open source", s.SetWorkspace("/work/alpha", "  Open source "));
+            CollectionAssert.AreEqual(new[] { "Personal", "Open source" }, s.workspaces);
+            Assert.AreEqual("Open source", s.WorkspaceFor("/work/alpha"));
             Assert.AreEqual("Personal", s.WorkspaceFor("/work/beta"));
+            // a name that differs from a workspace's only by case is that workspace
+            Assert.AreEqual("Open source", s.SetWorkspace("/work/beta", "open SOURCE"));
+            CollectionAssert.AreEqual(new[] { "Personal", "Open source" }, s.workspaces);
+            // no name changes nothing
+            Assert.AreEqual("Open source", s.SetWorkspace("/work/alpha", "   "));
+            Assert.AreEqual("Open source", s.SetWorkspace("/work/alpha", null));
+            // and back to one there already is
+            Assert.AreEqual("Personal", s.SetWorkspace("/work/beta", "Personal"));
+            Assert.AreEqual(2, s.repoWorkspaces.Count, "one entry a repo, however often it moves");
             s.Save(file);
             var again = Settings.Load(file);
-            Assert.AreEqual("Work", again.WorkspaceFor("/work/alpha"));
-            CollectionAssert.AreEqual(new[] { "Personal", "Work" }, again.workspaces);
+            Assert.AreEqual("Open source", again.WorkspaceFor("/work/alpha"));
+            Assert.AreEqual("Personal", again.WorkspaceFor("/work/beta"));
+            CollectionAssert.AreEqual(new[] { "Personal", "Open source" }, again.workspaces);
         }
 
         [Test]
@@ -87,8 +98,9 @@ namespace TheGrid.Core.Tests
         {
             var s = Settings.Load(file);
             s.workspaces = new List<string> { "Personal", "Work" };
-            Assert.AreEqual("Personal", s.CycleWorkspace(""));
+            Assert.AreEqual("Personal", s.SetWorkspace("", "Elsewhere"));
             Assert.AreEqual(0, s.repoWorkspaces.Count);
+            CollectionAssert.AreEqual(new[] { "Personal", "Work" }, s.workspaces, "and no workspace is made for it");
         }
 
         [Test]
@@ -132,7 +144,7 @@ namespace TheGrid.Core.Tests
             s.Save(file);
             File.WriteAllText(file, "{\"workspaces\":[\"Personal\",\"Work\"],\"claudePath\":\"/opt/claude\"}");
             s.Reload(file);
-            Assert.AreEqual("Work", s.CycleWorkspace("/work/alpha"));
+            Assert.AreEqual("Work", s.SetWorkspace("/work/alpha", "Work"));
             s.Save(file);
             var again = Settings.Load(file);
             CollectionAssert.AreEqual(new[] { "Personal", "Work" }, again.workspaces);
