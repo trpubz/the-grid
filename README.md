@@ -30,7 +30,7 @@ The first time a build runs, macOS asks whether The Grid can access folders such
 
 Each row shows the state (question, permission, done, running and so on), what a running agent is doing (reading, editing, testing, reviewing, or just working when it cannot be told), the session name, its account, how long it has been in that state, the repo, the ticket read from the branch name, the pull request, and the workspace. Click the pull request to open it. Click the workspace to move the repo to the next one.
 
-Settings live in `~/Library/Application Support/DefaultCompany/The Grid/settings.json`, created on first launch. Edit the file to add workspaces; the app re-reads it the next time you click a workspace.
+Settings live in `~/Library/Application Support/DefaultCompany/The Grid/settings.json`, created on first launch. Edit the file to add workspaces; the app re-reads it the next time you click a workspace or a region's name.
 
 | Field | Meaning |
 |---|---|
@@ -38,6 +38,7 @@ Settings live in `~/Library/Application Support/DefaultCompany/The Grid/settings
 | `claudePath` | Path to the `claude` program. Empty means look in `~/.local/bin`, `/opt/homebrew/bin` and `/usr/local/bin` |
 | `workspaces` | Workspace names, in the order a click cycles through them. Starts as `Personal` |
 | `repoWorkspaces` | Which repo belongs to which workspace. A repo not listed is `Personal` |
+| `workspaceLights` | The light of a workspace's region in the world: `cyan`, `white`, `rose`, `mint`, `violet`, `blue` or `ember`. A workspace not listed takes its place in `workspaces`: the first is cyan, the second white, and so on |
 
 ## The review pile
 
@@ -57,7 +58,9 @@ The shape of the data the window draws is described in [docs/roster-snapshot.md]
 
 **World** shows the same agents as the roster, as bots in a city. Every repo gets a sector on one isometric map, and the map grows as new repos turn up. A bot stands at the building that matches the work its agent is doing, and walks to another when that changes. Nothing else moves, except the badge that bounces over every bot that needs you.
 
-Every sector has the same six buildings and a fountain, but no two beside each other look alike: the buildings stand in a different order, and each is lit in its own colour (white, cyan, blue, mint or violet). A sector's look belongs to its repo and is the same every time. Sectors stand apart, with open ground between them and a short link of road joining each to its neighbours.
+Every sector has the same six buildings and a fountain, but no two beside each other look alike: the buildings stand in a different order. Sectors stand apart, with open ground between them and a short link of road joining each to its neighbours.
+
+Each workspace has a **region** of the map to itself. Its sectors stand together, and a wider stretch of open ground, at least one sector across, lies between one region and the next, with a road over it. A region has a light of its own: its lanes, the lines on its ground and most of its buildings carry it, and a few buildings in every sector carry one of two accent colours instead. The open ground between and beyond the regions is the same everywhere. With one workspace there is one region, and the map is one spiral of sectors.
 
 ![One sector, close up](docs/art/world-near.png)
 
@@ -83,13 +86,13 @@ Anything else is shown on the bot itself, wherever it stands:
 
 Bots that need you stand in the open at the front of their sector, done ones by the fountain, offline ones in front of the relay. The view opens on the first sector with a bot that needs you, close enough to follow one bot from a doorway to a workstation; in a small window it makes sure that bot is in view.
 
-![Every sector, far out](docs/art/world-far.png)
+![Three workspaces, far out: a region each, in its own light](docs/art/world-far.png)
 
-A lane runs round every sector, and links cross the open ground to the lanes of its neighbours, so the roads of the whole map join up. Past the last sector the city carries on to the edge of the window as dark blocks. Lanes, links and blocks are scenery, worked out from where the sectors are; they say nothing about any agent.
+A lane runs round every sector, links cross the open ground to the lanes of its neighbours, and a road joins every two regions that stand side by side, so the roads of the whole map join up. Past the last sector the city carries on to the edge of the window as dark blocks. Lanes, links, roads and blocks are scenery, worked out from where the sectors are; they say nothing about any agent.
 
 - **Move:** drag, or scroll with two fingers.
 - **Zoom:** the **−** and **+** buttons, the `-` and `+` keys, or scroll while holding Command. There are five levels, each double the last.
-- **Far out,** each sector shows its name, how many bots need you and how many are done. **Closer in,** buildings and bots are named; where the two would overlap, the bot's name wins. The colour of a bot's light (blue, white or orange) is its account: an account gets the next colour the first time it is seen, and keeps it. Small bots beside a bot are its subagents.
+- **Far out,** each sector shows its name, how many bots need you and how many are done, and with more than one workspace each region shows its workspace's name. Click a region's name to give it the next light; the choice is kept in `settings.json`. **Closer in,** buildings and bots are named; where the two would overlap, the bot's name wins. The colour of a bot's light (blue, white or orange) is its account: an account gets the next colour the first time it is seen, and keeps it. Small bots beside a bot are its subagents.
 - **Click a bot** to see its card.
 
 Two panels lie over the map, down its right side:
@@ -99,13 +102,13 @@ Two panels lie over the map, down its right side:
 
 ![A narrow window: the list folded, the card across the bottom](docs/art/world-narrow.png)
 
-When a message from one agent reaches another, the world shows it arriving. Between two sectors a courier on a bike, in the sender's colours, rides the lanes and links from the sender's crossing to the recipient's; then a ring of violet light pulses under the recipient. Within one sector there is only the pulse. While it lasts the recipient holds a hand to its helmet. A courier is drawn over buildings, so you can follow it the whole way.
+When a message from one agent reaches another, the world shows it arriving. Between two sectors a courier on a bike, in the sender's colours, rides the lanes, links and roads from the sender's crossing to the recipient's; then a ring of violet light pulses under the recipient. Within one sector there is only the pulse. While it lasts the recipient holds a hand to its helmet. A courier is drawn over buildings, so you can follow it the whole way.
 
-![A courier arriving at a sector](docs/art/world-courier.png)
+![A courier coming off the road between two regions](docs/art/world-courier.png)
 
 The Grid only shows deliveries: it sends nothing and holds nothing back. A message is shown once, if it was received after you opened the world and both its sender and its recipient are bots on the map. The review pile has every message, shown or not.
 
-Which repo has which sector, and which account has which colour, is kept in `world.json` beside `settings.json`. A repo keeps its place and an account its colour for good, also after their sessions are gone; delete the file to start the map again. If its contents are damaged it is kept as `world.json.bad` and the map starts empty.
+Which repo has which sector, where it stands in its region, and which account has which colour, is kept in `world.json` beside `settings.json`. A repo keeps its place in its region and an account its colour for good, also after their sessions are gone; delete the file to start the map again. Move a repo to another workspace and its sector moves to that region, to the first free place there; no other sector changes its place in its region. A whole region shifts only when one of the regions grows past the square it stood in. If its contents are damaged it is kept as `world.json.bad` and the map starts empty.
 
 To look at the world without any agent sessions, start the app on a roster snapshot file. It then reads no agent data and writes nothing:
 

@@ -111,9 +111,10 @@ namespace TheGrid
             world.LookAtAll();
             if (showArrivals)
             {
-                // The courier is caught part of the way; its recipient pulses for nine tenths of a second once it arrives.
+                // The courier is caught near the end of its way, where in the sample world it comes off the road onto the recipient's
+                // lane; its recipient pulses for nine tenths of a second once it arrives.
                 world.LookAt(lastRecipient);   // close enough to make out the bike
-                yield return new WaitForSecondsRealtime(Mathf.Max(0f, rideEnds - longestRide * .2f - Time.unscaledTime));
+                yield return new WaitForSecondsRealtime(Mathf.Max(0f, rideEnds - longestRide * .175f - Time.unscaledTime));
                 yield return Shot("courier.png");
                 yield return new WaitForSecondsRealtime(Mathf.Max(0f, rideEnds + .2f - Time.unscaledTime));   // a picture takes two more frames
                 yield return Shot("pulse.png");
