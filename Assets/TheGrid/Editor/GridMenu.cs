@@ -28,7 +28,7 @@ namespace TheGrid.EditorTools
         }
 
         // Draws the world from the synthetic fixture into Logs/world-far.png and Logs/world-near.png, without a window or any agent
-        // data: a quick look at new sprites standing where the game puts them. Names and counts are text and are not in these pictures.
+        // data: a quick look at new sprites standing where the game puts them. Names, counts and badges are drawn by the window and are not in these pictures.
         [MenuItem("The Grid/Render World Pictures")]
         public static void WorldPictures()
         {
