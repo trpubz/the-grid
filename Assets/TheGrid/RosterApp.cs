@@ -241,7 +241,7 @@ namespace TheGrid
                 if (!ReferenceEquals(drawn, worldFrom))
                 {
                     worldFrom = drawn;
-                    worldDrawn = World.Build(drawn, plots);
+                    worldDrawn = World.Build(drawn, plots, settings);
                     needsYou = Panels.NeedsYou(drawn);
                 }
                 if (fixedSnap == null)
@@ -284,6 +284,7 @@ namespace TheGrid
                 world.LookAt(clicked);
             }
             if (panels.WorkspaceClicked && card != null && card.repoRoot != "") CycleWorkspace(card.repoRoot);
+            if (world.RegionClicked >= 0 && world.RegionClicked < worldDrawn.regions.Count) CycleLight(worldDrawn.regions[world.RegionClicked]);
         }
 
         void DrawRoster(Rect area, RosterSnapshot snap, long now)
@@ -426,6 +427,16 @@ namespace TheGrid
             settings.CycleWorkspace(repoRoot);
             TrySave();
             pile.Refresh(); // the cross-workspace flags follow the new assignment
+        }
+
+        // A click on a region's name: the region takes the next light, and keeps it.
+        void CycleLight(WorldRegion region)
+        {
+            if (fixedSnap != null) return; // a picture of a snapshot changes nothing
+            settings.Reload(settingsPath);
+            settings.CycleLight(region.name, region.look);
+            TrySave();
+            worldFrom = null;   // the same roster, lit otherwise: build the world again
         }
 
         void TrySave()

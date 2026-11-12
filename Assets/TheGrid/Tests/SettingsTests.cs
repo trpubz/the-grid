@@ -50,6 +50,24 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
+        public void ARegionsLightIsItsPlaceInTheListUntilTheOwnerPicksOneAndThePickSurvivesSaveAndLoad()
+        {
+            var s = Settings.Load(file);
+            Assert.AreEqual(1, s.LookFor("Work", 1));
+            Assert.AreEqual(1, s.LookFor("Work", 1 + Lights.LookCount), "past the last light the list starts again");
+            Assert.AreEqual(2, s.CycleLight("Work", 1));
+            Assert.AreEqual(2, s.LookFor("Work", 1));
+            Assert.AreEqual(0, s.LookFor("Personal", 0), "another workspace keeps its own");
+            s.Save(file);
+            var again = Settings.Load(file);
+            Assert.AreEqual(2, again.LookFor("Work", 1));
+            Assert.AreEqual(0, again.CycleLight("Work", Lights.LookCount - 1), "after the last light comes the first");
+            // a light named by hand in the file that is no light at all is ignored
+            again.workspaceLights[0].light = "plaid";
+            Assert.AreEqual(1, again.LookFor("Work", 1));
+        }
+
+        [Test]
         public void ASessionWithNoRepoCannotBeAssigned()
         {
             var s = Settings.Load(file);

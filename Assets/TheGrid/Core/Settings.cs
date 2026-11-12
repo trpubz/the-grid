@@ -7,6 +7,8 @@ namespace TheGrid.Core
 {
     [Serializable] public sealed class RepoWorkspace { public string repo; public string workspace; }
 
+    [Serializable] public sealed class WorkspaceLight { public string workspace; public string light; }
+
     // The owner's settings file. Field names are the JSON keys.
     [Serializable]
     public sealed class Settings
@@ -17,6 +19,7 @@ namespace TheGrid.Core
         public string claudePath = "";                          // empty means: look in the usual places
         public List<string> workspaces = new List<string> { DefaultWorkspace };
         public List<RepoWorkspace> repoWorkspaces = new List<RepoWorkspace>();
+        public List<WorkspaceLight> workspaceLights = new List<WorkspaceLight>();   // a light: one of Lights.LookNames
 
         public static Settings Load(string path)
         {
@@ -32,6 +35,7 @@ namespace TheGrid.Core
             s.configDirs = s.configDirs ?? new List<string>();
             s.claudePath = s.claudePath ?? "";
             s.repoWorkspaces = s.repoWorkspaces ?? new List<RepoWorkspace>();
+            s.workspaceLights = s.workspaceLights ?? new List<WorkspaceLight>();
             if (s.workspaces == null || s.workspaces.Count == 0) s.workspaces = new List<string> { DefaultWorkspace };
             return s;
         }
@@ -44,6 +48,7 @@ namespace TheGrid.Core
             claudePath = fresh.claudePath;
             workspaces = fresh.workspaces;
             repoWorkspaces = fresh.repoWorkspaces;
+            workspaceLights = fresh.workspaceLights;
         }
 
         public void Save(string path)
@@ -52,6 +57,25 @@ namespace TheGrid.Core
             var tmp = path + ".tmp";
             File.WriteAllText(tmp, JsonUtility.ToJson(this, true));
             if (File.Exists(path)) File.Replace(tmp, path, null); else File.Move(tmp, path);
+        }
+
+        // The look of a workspace's region on the map: the one the owner picked, by name; with none picked, or a name
+        // that is no light, `otherwise`, which is the workspace's place among the workspaces.
+        public int LookFor(string workspace, int otherwise)
+        {
+            var picked = workspaceLights.Find(wl => wl.workspace == workspace);
+            int look = picked == null ? -1 : Array.IndexOf(Lights.LookNames, picked.light);
+            return look >= 0 ? look : ((otherwise % Lights.LookCount) + Lights.LookCount) % Lights.LookCount;
+        }
+
+        // Gives the workspace's region the look after `current`, and returns it.
+        public int CycleLight(string workspace, int current)
+        {
+            int next = (current + 1) % Lights.LookCount;
+            var picked = workspaceLights.Find(wl => wl.workspace == workspace);
+            if (picked == null) workspaceLights.Add(picked = new WorkspaceLight { workspace = workspace });
+            picked.light = Lights.LookNames[next];
+            return next;
         }
 
         public string WorkspaceFor(string repoRoot)

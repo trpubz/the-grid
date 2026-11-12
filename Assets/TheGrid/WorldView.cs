@@ -21,6 +21,7 @@ namespace TheGrid
         WorldStage stage;
         WorldTraffic traffic;
         readonly List<Rect> botNames = new List<Rect>();
+        readonly List<Rect> regionNames = new List<Rect>();   // where each region's name was last drawn, in the order of the model's regions
         readonly Sprite[] badges = new Sprite[5];   // in the order of Badge; none for Badge.None
 
         WorldModel model = new WorldModel();
@@ -35,6 +36,10 @@ namespace TheGrid
         float fastUntil;
 
         public string Selected { get; private set; } = "";
+
+        // The region whose name was clicked in this pass of Gui, as its number among the model's regions; else -1. The owner
+        // wants it in the next light.
+        public int RegionClicked { get; private set; } = -1;
 
         // True when one art pixel is smaller than a point: too small for names, so each sector is summed up instead.
         bool Far => Iso.Zoom[level] < pointScale;
@@ -261,6 +266,7 @@ namespace TheGrid
         {
             if (holder == null) return;
             var e = Event.current;
+            RegionClicked = -1;
             Handle(e, covered);
             if (e.type != EventType.Repaint) return;
 
@@ -307,6 +313,18 @@ namespace TheGrid
                     if (!taken) Text(at, WorldStage.StructureNames[(int)s], label);
                 }
             }
+            // Far out, and with more than one region, each region is named after its workspace, over the back of its ground.
+            regionNames.Clear();
+            if (Far && model.regions.Count > 1)
+                for (int r = 0; r < model.regions.Count; r++)
+                {
+                    var cells = new List<Vector2Int>();
+                    foreach (var sector in model.sectors) if (sector.region == r) cells.Add(sector.cell);
+                    var ground = Iso.Bounds(cells);
+                    var at = ToView(new Vector2(ground.center.x, ground.yMax + Skyline)) - new Vector2(0, 20);
+                    regionNames.Add(Plate(at, model.regions[r].name, loud));
+                    Text(at, model.regions[r].name, loud);
+                }
             // Bots are named last, over everything: where two sectors meet, a bot's name matters more than a roof's.
             if (!Far)
                 foreach (var sector in model.sectors)
@@ -379,7 +397,12 @@ namespace TheGrid
                     if (e.type == EventType.MouseUp)
                     {
                         dragging = false;
-                        if (!moved) Selected = stage.Pick(ToWorld(e.mousePosition - view.position));
+                        if (!moved)
+                        {
+                            // A click on a region's name is for the region; anywhere else, for the bot under it.
+                            RegionClicked = regionNames.FindIndex(plate => plate.Contains(e.mousePosition - view.position));
+                            if (RegionClicked < 0) Selected = stage.Pick(ToWorld(e.mousePosition - view.position));
+                        }
                     }
                     e.Use();
                     break;

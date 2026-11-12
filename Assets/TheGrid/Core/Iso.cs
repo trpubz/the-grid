@@ -84,16 +84,30 @@ namespace TheGrid.Core
         };
         const int Behind = 0, Right = 2, InFront = 4, Left = 6;
 
-        // The way a courier rides from one sector to another: corner points, in tiles (column, row), every leg along a lane
-        // or a link. It leaves from the crossing in front of the sender, goes round sectors' lanes and across the links
-        // between them, a column of sectors at a time and then a row, and ends at the recipient's crossing. Empty within
-        // one sector.
-        // shortcut: lanes and links are drawn only for sectors that exist, so across a hole in the map a courier rides over
-        // open ground. Route round holes if maps with them turn out to be common.
+        // The straight way from one sector to another: a column of sectors at a time and then a row, whether or not a
+        // sector stands on each cell passed.
+        // shortcut: this is the way a courier takes only when no road joins the two sectors (Roads.Hops finds none), and
+        // then it rides over open ground. That takes a region broken in two by repos moved out of its middle.
         public static List<Vector2> Route(Vector2Int fromCell, Vector2Int toCell)
         {
+            var hops = new List<Vector2Int> { fromCell };
+            for (var c = fromCell; c != toCell;)
+            {
+                c += c.x < toCell.x ? Vector2Int.right : c.x > toCell.x ? Vector2Int.left : c.y < toCell.y ? Vector2Int.up : Vector2Int.down;
+                hops.Add(c);
+            }
+            return Route(hops);
+        }
+
+        // The way a courier rides through these sectors, first to last: corner points, in tiles (column, row). It leaves
+        // from the crossing in front of the first, goes round each sector's lane to the side the next one is on and
+        // straight across to it, on the link between two that stand side by side or the road between two regions, and
+        // ends at the last one's crossing. Each sector must stand in the same column or the same row as the one before.
+        // Empty for fewer than two.
+        public static List<Vector2> Route(IReadOnlyList<Vector2Int> hops)
+        {
             var route = new List<Vector2>();
-            if (fromCell == toCell) return route;
+            if (hops == null || hops.Count < 2) return route;
             void Add(Vector2Int cell, int node)
             {
                 var o = PlotOrigin(cell);
@@ -110,16 +124,16 @@ namespace TheGrid.Core
                     if (n % 2 == 1 || n == to) Add(cell, n);
                 }
             }
-            var cell0 = fromCell;
+            var cell0 = hops[0];
             int at = InFront;
             Add(cell0, at);
-            while (cell0 != toCell)
+            for (int i = 1; i < hops.Count; i++)
             {
-                int leave = cell0.x < toCell.x ? Right : cell0.x > toCell.x ? Left : cell0.y < toCell.y ? InFront : Behind;
-                var next = cell0 + (leave == Right ? Vector2Int.right : leave == Left ? Vector2Int.left : leave == InFront ? Vector2Int.up : Vector2Int.down);
+                var next = hops[i];
+                int leave = cell0.x < next.x ? Right : cell0.x > next.x ? Left : cell0.y < next.y ? InFront : Behind;
                 Round(cell0, at, leave);
                 cell0 = next;
-                at = (leave + Ring.Length / 2) % Ring.Length;   // a link arrives on the side facing the one it left
+                at = (leave + Ring.Length / 2) % Ring.Length;   // a link or a road arrives on the side facing the one it left
                 Add(cell0, at);
             }
             Round(cell0, at, InFront);

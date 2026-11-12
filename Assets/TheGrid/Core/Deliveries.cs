@@ -11,6 +11,7 @@ namespace TheGrid.Core
         public string key = "", fromBot = "", toBot = "";
         public Vector2Int fromCell, toCell;
         public long receivedAt;
+        public List<Vector2Int> way = new List<Vector2Int>();   // the sectors its courier passes, first to last; empty when no road joins the two
     }
 
     // Picks out of the review pile the messages the world should show arriving. The Grid only shows deliveries: it
@@ -44,7 +45,7 @@ namespace TheGrid.Core
                 if (row.receivedAt <= openedAt) continue;     // history, not news
                 if (!One(world, row.account, row.from, out var from, out var fromCell)) continue;
                 if (!One(world, row.account, row.to, out var to, out var toCell)) continue;
-                found.Add(new Delivery { key = row.key, fromBot = from, toBot = to, fromCell = fromCell, toCell = toCell, receivedAt = row.receivedAt });
+                found.Add(new Delivery { key = row.key, fromBot = from, toBot = to, fromCell = fromCell, toCell = toCell, receivedAt = row.receivedAt, way = Roads.Hops(world, fromCell, toCell) ?? new List<Vector2Int>() });
             }
             return found;
         }

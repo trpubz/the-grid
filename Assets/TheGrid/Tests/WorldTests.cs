@@ -136,7 +136,9 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(snap.generatedAt, w.generatedAt);
             CollectionAssert.AreEqual(new[] { "alpha", "beta", "No project" }, w.sectors.Select(c => c.name).ToArray());
             CollectionAssert.AreEqual(new[] { 0, 1, 2 }, w.sectors.Select(c => c.plot).ToArray());
-            CollectionAssert.AreEqual(new[] { Plots.Cell(0), Plots.Cell(1), Plots.Cell(2) }, w.sectors.Select(c => c.cell).ToArray());
+            // alpha and the sessions with no repo are Personal; beta is Work, so it stands apart, in the second region
+            CollectionAssert.AreEqual(new[] { new Vector2Int(0, 0), new Vector2Int(3, 0), new Vector2Int(1, 0) }, w.sectors.Select(c => c.cell).ToArray());
+            CollectionAssert.AreEqual(new[] { "Personal", "Work" }, w.regions.Select(r => r.name).ToArray());
             Assert.AreEqual(snap.agents.Count, w.sectors.Sum(c => c.bots.Count));
             foreach (var a in snap.agents)
             {

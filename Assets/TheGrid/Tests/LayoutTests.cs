@@ -68,27 +68,6 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
-        public void TheSameKindOfBuildingIsLitDifferentlyFromSectorToSector()
-        {
-            Assert.GreaterOrEqual(Lights.Count, 4);
-            foreach (var s in Structures)
-            {
-                if (s == Structure.Fountain)
-                {
-                    Assert.AreEqual(-1, Layout.For(3).Light(s), "the fountain keeps its own violet everywhere");
-                    continue;
-                }
-                var first8 = Enumerable.Range(0, 8).Select(p => Layout.For(p).Light(s)).ToList();
-                Assert.IsTrue(first8.All(x => x >= 0 && x < Lights.Count), s.ToString());
-                Assert.GreaterOrEqual(first8.Distinct().Count(), 3, s + " across eight sectors");
-                for (int p = 0; p < 40; p++) Assert.AreNotEqual(Layout.For(p).Light(s), Layout.For(p + 1).Light(s), s + " in plots " + p + " and the next");
-            }
-            // within one sector the buildings are not all one colour either
-            for (int p = 0; p < 8; p++)
-                Assert.GreaterOrEqual(Structures.Where(s => s != Structure.Fountain).Select(s => Layout.For(p).Light(s)).Distinct().Count(), 3, "plot " + p);
-        }
-
-        [Test]
         public void AStructureStandsAtTheCentreOfItsFootprint()
         {
             var cell = new Vector2Int(1, -2);
