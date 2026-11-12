@@ -111,7 +111,7 @@ namespace TheGrid.Core.Tests
                     for (int slot = 0; slot < 6; slot++)
                     {
                         // the tile it stands over: a bot on an upper floor is drawn a storey up for each floor
-                        var t = Tile(Iso.BotSpot(Iso.PlotOrigin(cell), l, place, slot) - new Vector2(0, l.Floor(place, slot) * Layout.StoreyPixels));
+                        var t = Tile(Iso.BotSpot(Iso.PlotOrigin(cell), l, place, slot) - new Vector2(0, l.Lift(place, slot)));
                         var tile = new Vector2Int(Mathf.RoundToInt(t.x), Mathf.RoundToInt(t.y));
                         string who = "arrangement " + a + ": " + place + " slot " + slot + " at " + t;
                         Assert.IsTrue(t.x >= -.5f && t.y >= -.5f && t.x <= Iso.PlotTiles - .5f && t.y <= Iso.PlotTiles - .5f, who + " is off the plot");
@@ -221,20 +221,26 @@ namespace TheGrid.Core.Tests
                     for (int floor = 0; floor < floors; floor++)
                         Assert.AreEqual(Layout.Inside / floors, on.Count(f => f == floor), "arrangement " + a + ": " + place + " floor " + floor);
                     Assert.AreEqual(0, l.Floor(place, Layout.Inside), "the one waiting at the door stands on the ground");
+                    Assert.AreEqual(0f, l.Lift(place, Layout.Inside), "and on the paving");
                     var f0 = l.Footprint(World.StructureOf(place).Value);
                     for (int slot = 0; slot < Layout.Inside; slot++)
                     {
                         var origin = new Vector2Int(7, -30);
                         var t = l.Spot(place, slot);
-                        // a floor up is so many pixels up the screen, whatever the floor
-                        Assert.AreEqual(Iso.Point(origin.x + t.x, origin.y + t.y).y + l.Floor(place, slot) * Layout.StoreyPixels, Iso.BotSpot(origin, l, place, slot).y, .01f);
+                        // the floor of the room is a step up from the paving, and a floor up is so many pixels more, whatever the floor
+                        Assert.AreEqual(Layout.FloorPixels + l.Floor(place, slot) * Layout.StoreyPixels, l.Lift(place, slot), .01f);
+                        Assert.AreEqual(Iso.Point(origin.x + t.x, origin.y + t.y).y + l.Lift(place, slot), Iso.BotSpot(origin, l, place, slot).y, .01f);
                         // an upper floor reaches two floor squares out from the back wall: who stands on it stands within them
                         if (l.Floor(place, slot) > 0)
                             Assert.IsTrue(t.y - f0.yMin > -.1f && t.y - f0.yMin < Layout.FloorReach - .1f, "arrangement " + a + ": " + place + " slot " + slot + " at " + t + " is off its floor");
                     }
                 }
                 foreach (var place in Places.Except(Tall))
-                    for (int slot = 0; slot < 8; slot++) Assert.AreEqual(0, l.Floor(place, slot), place.ToString());
+                    for (int slot = 0; slot < 8; slot++)
+                    {
+                        Assert.AreEqual(0, l.Floor(place, slot), place.ToString());
+                        Assert.AreEqual(0f, l.Lift(place, slot), place.ToString());
+                    }
             }
         }
 
@@ -265,8 +271,13 @@ namespace TheGrid.Core.Tests
                             if (i > 1) Assert.IsTrue(Within(p) && Within(q), who + ": leg " + i + " leaves the building");
                             if (p.z == q.z)
                             {
-                                // along a floor; an upper floor is only so deep
-                                if (p.z > 0) Assert.IsTrue(p.y - f.yMin < Layout.FloorReach - .1f && q.y - f.yMin < Layout.FloorReach - .1f, who + ": leg " + i + " walks off the edge of floor " + p.z);
+                                // along a floor; an upper floor is only so deep, and where a stair comes up through it there is
+                                // only a walk along its edge: so up there a bot turns square corners
+                                if (p.z > 0)
+                                {
+                                    Assert.IsTrue(p.y - f.yMin < Layout.FloorReach - .1f && q.y - f.yMin < Layout.FloorReach - .1f, who + ": leg " + i + " walks off the edge of floor " + p.z);
+                                    Assert.IsTrue(p.x == q.x || p.y == q.y, who + ": leg " + i + " cuts a corner on floor " + p.z);
+                                }
                                 continue;
                             }
                             // a stair: one floor up, along a wall, long enough to be a stair
@@ -286,6 +297,12 @@ namespace TheGrid.Core.Tests
                 var points = Iso.Way(origin, l, Place.ServerTower, 2);
                 Assert.AreEqual(l.Way(Place.ServerTower, 2).Count, points.Count);
                 Assert.AreEqual(Iso.BotSpot(origin, l, Place.ServerTower, 2), points[points.Count - 1]);
+                var door = l.Way(Place.ServerTower, 2)[0];
+                Assert.AreEqual(Iso.Point(origin.x + door.x, origin.y + door.y), points[0], "the door is on the paving");
+                // the second floor is reached from the left, where a bot on the stair is not behind the building next along
+                var up = l.Way(Place.ServerTower, 2);
+                var corner = l.Footprint(Structure.ServerTower);
+                foreach (var p in up.Skip(1)) Assert.Less(p.x - corner.xMin - (p.y - corner.yMin), 1f, "arrangement " + a + ": the way up the tower goes behind the next building at " + p);
             }
         }
 

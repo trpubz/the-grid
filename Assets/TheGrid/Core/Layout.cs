@@ -117,28 +117,39 @@ namespace TheGrid.Core
         // How far an upper floor reaches from the back row of the building's footprint, in tiles: its open edge.
         public const float FloorReach = .73f;
 
+        // The floor of a tall building's room is a step up from the paving: this many pixels.
+        public const float FloorPixels = 10f;
+
+        // How far up the screen a bot is drawn from the paving under it: nothing in the open, the step inside a tall
+        // building, and a storey more for each floor up.
+        public float Lift(Place place, int slot) => Tall(place) >= 0 && slot < Inside ? FloorPixels + Floor(place, slot) * StoreyPixels : 0;
+
         public static int Floors(Structure s) => s == Structure.ServerTower ? 3 : s == Structure.ReviewHall ? 2 : 1;
 
         // Where the six stand in each tall building, from the corner of its footprint: column, row and floor. In the order
         // of the slots, which spreads them over the floors. On the ground they are clear of the racks along the far
-        // walls; on a gallery they stand near its open edge, where the floor above does not hide them. None stands in the
-        // far right of a floor: the building next along the back row, a tile away, would hide it behind its corner.
+        // walls. On an upper floor they stand on its walk, near the open edge, where the floor above does not hide them,
+        // and clear of the head of the stair. None stands in the far right of a floor: the building next along the back
+        // row, a tile away, would hide it behind its corner.
         static readonly Vector3[][] InATall =
         {
             // the server tower: two to a floor
-            new[] { new Vector3(1.25f, .9f, 0), new Vector3(.55f, .45f, 1), new Vector3(.4f, .45f, 2), new Vector3(.9f, 1.7f, 0), new Vector3(1.1f, .45f, 1), new Vector3(.95f, .45f, 2) },
+            new[] { new Vector3(1.25f, .9f, 0), new Vector3(.55f, Walk, 1), new Vector3(.4f, Walk, 2), new Vector3(.9f, 1.7f, 0), new Vector3(1.1f, Walk, 1), new Vector3(.95f, Walk, 2) },
             // the review hall: three to a floor
-            new[] { new Vector3(1f, 1.2f, 0), new Vector3(.25f, .45f, 1), new Vector3(.55f, 1.65f, 0), new Vector3(.7f, .45f, 1), new Vector3(1.6f, 1.7f, 0), new Vector3(1.12f, .45f, 1) },
+            new[] { new Vector3(1f, 1.2f, 0), new Vector3(.4f, Walk, 1), new Vector3(.55f, 1.65f, 0), new Vector3(.76f, Walk, 1), new Vector3(1.6f, 1.7f, 0), new Vector3(1.12f, Walk, 1) },
             // the works: one floor
             new[] { new Vector3(1.25f, .85f, 0), new Vector3(.6f, 1.45f, 0), new Vector3(1.9f, 1.45f, 0), new Vector3(.6f, .85f, 0), new Vector3(1.25f, 2f, 0), new Vector3(1.9f, 2f, 0) },
         };
 
-        // The way in and up, the same in every tall building, from the corner of its footprint: the door in the middle of
-        // the front; a stair up the left wall to the first gallery; and from the far end of that gallery a stair along
-        // the back wall to the second.
-        static readonly Vector2 Door = new Vector2(1.25f, 2.9f);
+        // The way in and up, from the corner of the building's footprint. The door is where the closed picture has it. A
+        // stair goes up the left wall to the first floor. From the back of that floor a second goes up along the back wall,
+        // from the left, and comes out through the second floor; a bot steps off it onto the walk along that floor's edge.
+        // The way up keeps to the left of the building: further right it would be behind the building next along.
+        static readonly Vector2[] Door = { new Vector2(.38f, 2.9f), new Vector2(.2f, 2.9f), new Vector2(1.5f, 2.9f) };
         static readonly Vector2 FirstStairFoot = new Vector2(.13f, 1.85f), FirstStairTop = new Vector2(.13f, .6f);
-        static readonly Vector2 SecondStairApproach = new Vector2(1.95f, .45f), SecondStairFoot = new Vector2(1.95f, .13f), SecondStairTop = new Vector2(1.05f, .13f);
+        static readonly Vector2 SecondStairFoot = new Vector2(.13f, .13f), SecondStairTop = new Vector2(1.05f, .13f);
+        // The row a bot walks and stands on, on an upper floor.
+        const float Walk = .45f;
 
         static int Tall(Place place) => place == Place.ServerTower ? 0 : place == Place.ReviewHall ? 1 : place == Place.Works ? 2 : -1;
 
@@ -162,9 +173,10 @@ namespace TheGrid.Core
             var corner = template.tall[order[which]];
             void Add(Vector2 at, int floor) => way.Add(new Vector3(corner.x + at.x, corner.y + at.y, floor));
             var spot = InATall[which][slot];
-            Add(Door, 0);
+            Add(Door[which], 0);
             if (spot.z >= 1) { Add(FirstStairFoot, 0); Add(FirstStairTop, 1); }
-            if (spot.z >= 2) { Add(SecondStairApproach, 1); Add(SecondStairFoot, 1); Add(SecondStairTop, 2); }
+            if (spot.z >= 2) { Add(SecondStairFoot, 1); Add(SecondStairTop, 2); Add(new Vector2(SecondStairTop.x, Walk), 2); }
+            else if (spot.z >= 1) Add(new Vector2(FirstStairTop.x, Walk), 1);
             Add(spot, (int)spot.z);
             return way;
         }

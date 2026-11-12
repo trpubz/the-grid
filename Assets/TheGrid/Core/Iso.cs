@@ -76,7 +76,7 @@ namespace TheGrid.Core
             var o = origin;
             var at = layout.Spot(place, slot);
             // A bot on an upper floor is drawn a storey up the screen for each floor.
-            return Point(o.x + at.x, o.y + at.y) + new Vector2(0, layout.Floor(place, slot) * Layout.StoreyPixels);
+            return Point(o.x + at.x, o.y + at.y) + new Vector2(0, layout.Lift(place, slot));
         }
 
         // True for a point of the map, in art pixels, that is on a sector's depot or on one of the crates shown in front
@@ -99,7 +99,11 @@ namespace TheGrid.Core
         public static List<Vector2> Way(Vector2Int origin, Layout layout, Place place, int slot)
         {
             var points = new List<Vector2>();
-            foreach (var p in layout.Way(place, slot)) points.Add(Point(origin.x + p.x, origin.y + p.y) + new Vector2(0, p.z * Layout.StoreyPixels));
+            var way = layout.Way(place, slot);
+            // The door, where a way of more than one point starts, is on the paving; the rest is on the building's floors.
+            float room = layout.Lift(place, slot) - layout.Floor(place, slot) * Layout.StoreyPixels;
+            for (int i = 0; i < way.Count; i++)
+                points.Add(Point(origin.x + way[i].x, origin.y + way[i].y) + new Vector2(0, i == 0 && way.Count > 1 ? 0 : room + way[i].z * Layout.StoreyPixels));
             return points;
         }
 
