@@ -32,6 +32,21 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual("Personal", s.WorkspaceFor("/work/alpha"));
             Assert.AreEqual("Personal", s.WorkspaceFor(""));
             Assert.AreEqual("", s.claudePath);
+            Assert.IsTrue(s.pullRequests, "GitHub is asked unless the owner says not to");
+            Assert.AreEqual("", s.ghPath);
+        }
+
+        [Test]
+        public void AskingGitHubIsOnUnlessTheFileTurnsItOff()
+        {
+            File.WriteAllText(file, "{\"workspaces\":[\"Personal\"]}");
+            Assert.IsTrue(Settings.Load(file).pullRequests, "a file from before the setting existed");
+            File.WriteAllText(file, "{\"pullRequests\":false,\"ghPath\":\"/opt/gh\"}");
+            var s = Settings.Load(file);
+            Assert.IsFalse(s.pullRequests);
+            Assert.AreEqual("/opt/gh", s.ghPath);
+            s.Save(file);
+            Assert.IsFalse(Settings.Load(file).pullRequests);
         }
 
         [Test]

@@ -57,7 +57,7 @@ The world view is built from the same snapshot (`World.Build`), so the two never
 | `state` | `activity` | Stands at | Stance | Badge | Needs the owner |
 |---|---|---|---|---|---|
 | `Running` | `reading` | the server tower | inspecting | | |
-| `Running` | `editing` | the assembly bay | typing | | |
+| `Running` | `editing` | the works | typing | | |
 | `Running` | `testing` | the test workshop | typing | | |
 | `Running` | `reviewing` | the review hall | inspecting | | |
 | `Running` | anything else | the works | standing | | |

@@ -42,6 +42,7 @@ namespace TheGrid.Core
         public List<PullRequest> pulls = new List<PullRequest>();
         public string pullsProblem = "";   // why they could not be had, in words; empty when they could, or were never asked for
         public int pullsForOwner;          // how many are ready to merge or wait for the owner's review
+        public bool pullsAsked;            // GitHub has been asked about this repo, whatever came of it
         public List<WorldBot> bots = new List<WorldBot>();
         [NonSerialized] public Layout layout = Layout.Of(0);   // how this sector is arranged and lit: follows from its plot
     }
@@ -264,6 +265,7 @@ namespace TheGrid.Core
             {
                 var heard = sector.repoRoot == "" ? null : pulls?.For(sector.repoRoot);
                 if (heard == null) continue;
+                sector.pullsAsked = true;
                 sector.pulls = heard.open;
                 sector.pullsProblem = heard.problem;
                 sector.pullsForOwner = heard.open.FindAll(p => p.state == PullState.ForOwner).Count;

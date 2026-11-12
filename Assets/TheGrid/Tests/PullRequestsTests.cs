@@ -93,6 +93,13 @@ namespace TheGrid.Core.Tests
             Assert.IsNull(reader.Latest.For("/work/beta"), "a repo no longer on the map is dropped");
         }
 
+        [TestCase("error parsing \"owner\" value: failed to run git: fatal: not a git repository (or any of the parent directories): .git", "This folder is not a git repository.")]
+        [TestCase("error parsing \"owner\" value: none of the git remotes configured for this repository point to a known GitHub host. To tell gh about a new GitHub host, please use `gh auth login`", "This repo has no GitHub remote.")]
+        [TestCase("To get started with GitHub CLI, please run:  gh auth login\nAlternatively, populate the GH_TOKEN environment variable", "gh is not signed in to GitHub: run gh auth login in a terminal.")]
+        [TestCase("error connecting to api.github.com\ncheck your internet connection", "gh: error connecting to api.github.com")]
+        [TestCase("", "gh gave no answer.")]
+        public void WhyGhGaveNoAnswerIsSaidInPlainWords(string stderr, string reason) => Assert.AreEqual(reason, Gh.Reason(stderr));
+
         [Test]
         public void GhIsLookedForWhereItIsUsuallyInstalled()
         {

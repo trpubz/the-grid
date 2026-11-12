@@ -22,6 +22,9 @@ namespace TheGrid
         const int MaxMessages = 200;
 
         Collector collector;
+        PullReader pullReader;                 // asks GitHub about open pull requests; null on a snapshot or when turned off
+        PullsSnapshot pullsFixed, pullsFrom;   // a snapshot's pull requests from a file; and the ones worldDrawn was built from
+        int depotOpen = -1;                    // the plot of the sector whose depot list is open
         Pile pile;
         Vector2 scroll, pileScroll;
         RosterSnapshot logged, drawn = new RosterSnapshot();
@@ -79,6 +82,8 @@ namespace TheGrid
                     deliveries = new Deliveries(0);
                     showArrivals = true;
                 }
+                // Pull requests for a picture of the depot come from a file: a snapshot never asks GitHub.
+                if (Arg("-pulls") != "") pullsFixed = JsonUtility.FromJson<PullsSnapshot>(File.ReadAllText(Arg("-pulls")));
                 shotsDir = Arg("-shots");
                 if (shotsDir != "") StartCoroutine(Shots());
                 return;
@@ -90,6 +95,13 @@ namespace TheGrid
             var claude = ClaudeCli.ResolvePath(settings.claudePath, ClaudeCli.UsualPlaces(home));
             collector = new Collector(settings, home, dir => ClaudeCli.AgentsJson(claude, dir, home), SessionFiles.ChangeStamp);
             collector.Start();
+            // The one thing the app asks of the network: GitHub, through the owner's own gh, about the repos on the map.
+            if (settings.pullRequests)
+            {
+                var gh = ClaudeCli.ResolvePath(settings.ghPath, Gh.UsualPlaces());
+                pullReader = new PullReader(root => Gh.Ask(gh, root));
+                pullReader.Start();
+            }
             // The pile's file sits beside settings.json, never under an agent app's folder.
             pile = new Pile(settings, home, Path.Combine(Application.persistentDataPath, "pile.json"));
             pile.Start();
@@ -135,6 +147,8 @@ namespace TheGrid
             }
             world.LookAtOpening();
             world.Select(Arg("-select"));   // a picture with a bot's card in it
+            var depot = worldDrawn.sectors.Find(s => s.name == Arg("-depot"));   // and with that sector's depot list open
+            if (depot != null) depotOpen = depot.plot;
             yield return Shot("near.png");
             Application.Quit();
         }
@@ -151,6 +165,7 @@ namespace TheGrid
         void OnDestroy()
         {
             collector?.Dispose();
+            pullReader?.Dispose();
             pile?.Dispose();
         }
 
@@ -251,10 +266,13 @@ namespace TheGrid
             if (Event.current.type == EventType.Layout)
             {
                 // The same snapshot gives the same world: build it once, so the view can tell that nothing changed.
-                if (!ReferenceEquals(drawn, worldFrom))
+                var pullsNow = pullReader != null ? pullReader.Latest : pullsFixed;
+                if (!ReferenceEquals(drawn, worldFrom) || !ReferenceEquals(pullsNow, pullsFrom))
                 {
                     worldFrom = drawn;
-                    worldDrawn = World.Build(drawn, plots, settings);
+                    pullsFrom = pullsNow;
+                    worldDrawn = World.Build(drawn, plots, settings, pullsNow);
+                    pullReader?.Watch(plots.repos);   // a repo new to the map is asked about at once
                     needsYou = Panels.NeedsYou(drawn);
                 }
                 if (fixedSnap == null)
@@ -287,10 +305,18 @@ namespace TheGrid
                     }
                 }
             }
-            panels.Place(map, needsYou.Count, card);
+            var depotOf = depotOpen < 0 ? null : worldDrawn.sectors.Find(s => s.plot == depotOpen);
+            panels.Place(map, needsYou.Count, card, depotOf);
             world.Gui(detail, title, panels.Covers);
             if (drawn.errors.Count > 0) GUI.Label(new Rect(map.x + 4, map.y + 4, map.width - 8, 32), string.Join(" | ", drawn.errors), error);
-            string clicked = panels.Draw(map, needsYou, card, detail, title);
+            string notAsked = depotOf == null ? "" : depotOf.repoRoot == "" ? "Sessions with no repo have no pull requests."
+                : fixedSnap != null ? "This snapshot has no pull requests for this repo."
+                : pullReader == null ? "Asking GitHub is turned off: pullRequests in settings.json." : "GitHub has not answered yet.";
+            string clicked = panels.Draw(map, needsYou, card, detail, title, depotOf, notAsked);
+            // A click on a depot opens its list, or closes it if it is the open one. A click on a row opens that pull request.
+            if (world.DepotClicked >= 0) depotOpen = depotOpen == world.DepotClicked ? -1 : world.DepotClicked;
+            if (panels.DepotClosed) depotOpen = -1;
+            if (RosterFormat.IsWebLink(panels.PullClicked)) Application.OpenURL(panels.PullClicked);
             if (clicked != "")
             {
                 world.Select(clicked);

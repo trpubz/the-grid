@@ -144,6 +144,16 @@ namespace TheGrid.Core
     {
         public static string[] UsualPlaces() => new[] { "/opt/homebrew/bin/gh", "/usr/local/bin/gh", "/usr/bin/gh" };
 
+        // Why gh gave no answer, from what it wrote: the common cases in plain words, anything else as gh's own first line.
+        public static string Reason(string stderr)
+        {
+            stderr = (stderr ?? "").Trim();
+            if (stderr.Contains("not a git repository")) return "This folder is not a git repository.";
+            if (stderr.Contains("none of the git remotes") || stderr.Contains("no git remotes")) return "This repo has no GitHub remote.";
+            if (stderr.Contains("gh auth login")) return "gh is not signed in to GitHub: run gh auth login in a terminal.";
+            return stderr == "" ? "gh gave no answer." : "gh: " + stderr.Split('\n')[0];
+        }
+
         // GitHub's answer about the open pull requests of the repo in this folder. `gh` works out which repo that is from
         // the folder's git remote. Throws, saying why in words, when there is no answer to be had.
         public static string Ask(string ghPath, string repoRoot, int timeoutMs = 10000)
@@ -168,7 +178,7 @@ namespace TheGrid.Core
                 }
                 p.WaitForExit();   // let the output readers finish
                 // A GraphQL error comes on standard output with a failing exit code: the answer says more than the code.
-                if (p.ExitCode != 0 && stdout.Result.Trim() == "") throw new InvalidOperationException("gh: " + stderr.Result.Trim().Split('\n')[0]);
+                if (p.ExitCode != 0 && stdout.Result.Trim() == "") throw new InvalidOperationException(Reason(stderr.Result));
                 return stdout.Result;
             }
         }
