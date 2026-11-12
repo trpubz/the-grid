@@ -287,12 +287,13 @@ namespace TheGrid
         // Mouse and keys, then the picture of the map and the names over it, drawn as text at the screen's own sharpness.
         // Call inside OnGUI after Show. covered: true for a point that something drawn over the map has taken; a press or a
         // scroll there is not the map's.
-        public void Gui(GUIStyle label, GUIStyle loud, Func<Vector2, bool> covered = null)
+        public void Gui(GUIStyle label, GUIStyle loud, Func<Vector2, bool> covered = null, bool listens = true)
         {
             if (holder == null) return;
             var e = Event.current;
             RegionClicked = MovedRegion = MovedPlot = DepotClicked = SectorClicked = -1;
-            Handle(e, covered);
+            // With something open over the whole window, the map takes no press, scroll or key: they are for what is open.
+            if (listens) Handle(e, covered);
             if (e.type != EventType.Repaint) return;
 
             if (picture != null) GUI.DrawTexture(new Rect(view.x, view.y, pixelW / pointScale, pixelH / pointScale), picture, ScaleMode.StretchToFill, false);
