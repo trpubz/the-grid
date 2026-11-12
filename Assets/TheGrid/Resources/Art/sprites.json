@@ -134,7 +134,7 @@
    "groundY": 64
   },
   {
-   "name": "b-assembly-bay",
+   "name": "b-depot",
    "width": 288,
    "height": 224,
    "groundX": 144,
@@ -146,6 +146,27 @@
    "height": 224,
    "groundX": 144,
    "groundY": 88
+  },
+  {
+   "name": "crate-draft",
+   "width": 48,
+   "height": 48,
+   "groundX": 24,
+   "groundY": 14
+  },
+  {
+   "name": "crate-review",
+   "width": 48,
+   "height": 48,
+   "groundX": 24,
+   "groundY": 14
+  },
+  {
+   "name": "crate-ready",
+   "width": 48,
+   "height": 48,
+   "groundX": 24,
+   "groundY": 14
   },
   {
    "name": "bot-stand-se",

@@ -47,6 +47,9 @@ namespace TheGrid
         // wants it in the next light.
         public int RegionClicked { get; private set; } = -1;
 
+        // The sector whose depot was clicked in this pass of Gui, as its plot; else -1. The owner wants its list.
+        public int DepotClicked { get; private set; } = -1;
+
         // What the owner let go of in this pass of Gui after dragging it to a place it may stand: a region, as its number
         // among the model's regions, moved MovedBy tiles; or a sector, as its plot, moved MovedBy cells of its region's
         // grid. Else -1.
@@ -279,7 +282,7 @@ namespace TheGrid
         {
             if (holder == null) return;
             var e = Event.current;
-            RegionClicked = MovedRegion = MovedPlot = -1;
+            RegionClicked = MovedRegion = MovedPlot = DepotClicked = -1;
             Handle(e, covered);
             if (e.type != EventType.Repaint) return;
 
@@ -322,12 +325,14 @@ namespace TheGrid
                 foreach (Structure s in Enum.GetValues(typeof(Structure)))
                 {
                     if (WorldStage.StructureNames[(int)s] == "") continue;
+                    // The depot says how many pull requests are open, when any are.
+                    string called = WorldStage.StructureNames[(int)s] + (s == Structure.Depot && sector.pulls.Count > 0 ? " · " + sector.pulls.Count : "");
                     var at = ToView(Iso.StructureSpot(sector.origin, sector.layout, s) + new Vector2(0, stage.Top(s) + 3)) - new Vector2(0, 18);
-                    var plate = Plate(at, WorldStage.StructureNames[(int)s], label);
+                    var plate = Plate(at, called, label);
                     plate = new Rect(plate.x + 6, plate.y + 3, plate.width - 12, plate.height - 6);   // plates that only touch both stay
                     bool taken = false;
                     foreach (var name in botNames) taken |= name.Overlaps(plate);
-                    if (!taken) Text(at, WorldStage.StructureNames[(int)s], label);
+                    if (!taken) Text(at, called, label);
                 }
             }
             // Far out, and with more than one region, each region is named after its workspace, over the back of its ground.
@@ -388,6 +393,14 @@ namespace TheGrid
                 }
             }
             GUI.color = old;
+        }
+
+        // The plot of the sector whose depot, or one of whose crates, is at this point of the map; -1 for none.
+        int DepotAt(Vector2 world)
+        {
+            foreach (var sector in model.sectors)
+                if (Iso.OnDepot(sector.origin, sector.layout, sector.pulls.Count, world)) return sector.plot;
+            return -1;
         }
 
         // What the owner has hold of, in the model as it is now: the region's number, or the sector. False when it has
@@ -471,7 +484,11 @@ namespace TheGrid
                         {
                             // A click on a region's name is for the region; anywhere else, for the bot under it.
                             RegionClicked = heldRegion == "" ? -1 : model.regions.FindIndex(r => r.name == heldRegion);
-                            if (RegionClicked < 0) Selected = stage.Pick(ToWorld(e.mousePosition - view.position));
+                            var at = ToWorld(e.mousePosition - view.position);
+                            string bot = RegionClicked < 0 ? stage.Pick(at) : "";
+                            if (RegionClicked < 0) Selected = bot;
+                            // A click on a depot that is on no bot, close enough in to tell buildings apart: its list.
+                            if (RegionClicked < 0 && bot == "" && !Far) DepotClicked = DepotAt(at);
                         }
                         else if (holding && heldBy != Vector2Int.zero && Held(out int region, out var sector))
                         {

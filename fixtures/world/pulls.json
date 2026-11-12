@@ -1,0 +1,65 @@
+{
+ "repos": [
+  {
+   "repoRoot": "/work/alpha",
+   "problem": "",
+   "open": [
+    {
+     "number": 41,
+     "title": "Retry uploads that time out",
+     "url": "https://github.com/example/alpha/pull/41",
+     "status": "The review bot found nothing: ready to merge",
+     "state": 2
+    },
+    {
+     "number": 44,
+     "title": "Show sizes in the file list",
+     "url": "https://github.com/example/alpha/pull/44",
+     "status": "Your review is asked for",
+     "state": 2
+    },
+    {
+     "number": 42,
+     "title": "Move settings to one page",
+     "url": "https://github.com/example/alpha/pull/42",
+     "status": "The review bot is reviewing",
+     "state": 1
+    },
+    {
+     "number": 45,
+     "title": "Faster first load",
+     "url": "https://github.com/example/alpha/pull/45",
+     "status": "Checks are running",
+     "state": 1
+    },
+    {
+     "number": 46,
+     "title": "Keyboard shortcuts for the list",
+     "url": "https://github.com/example/alpha/pull/46",
+     "status": "pat is asked to review",
+     "state": 1
+    },
+    {
+     "number": 43,
+     "title": "Sketch: offline mode",
+     "url": "https://github.com/example/alpha/pull/43",
+     "status": "Draft",
+     "state": 0
+    }
+   ]
+  },
+  {
+   "repoRoot": "/work/beta",
+   "problem": "",
+   "open": [
+    {
+     "number": 12,
+     "title": "Tidy the build script",
+     "url": "https://github.com/example/alpha/pull/12",
+     "status": "Checks failed",
+     "state": 1
+    }
+   ]
+  }
+ ]
+}

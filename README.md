@@ -16,7 +16,7 @@ This is an implementation starter. The included Unity component plays a fixed re
 
 ## The roster
 
-The first working piece: a window that lists your live Claude Code sessions on this Mac, with the one that needs you most on top. It reads what Claude Code already publishes about its own sessions and never writes to an agent app's files. The Grid's own code makes no network calls; it does run the `claude` program to ask for the session list.
+The first working piece: a window that lists your live Claude Code sessions on this Mac, with the one that needs you most on top. It reads what Claude Code already publishes about its own sessions and never writes to an agent app's files. The Grid's own code makes no network calls. It runs two programs of yours: `claude`, to ask for the session list, and `gh`, the GitHub command, to ask GitHub about the open pull requests of the repos on the map (see [The PR depot](#the-pr-depot); it can be turned off).
 
 - **Run it in the editor:** open the project in Unity 6000.4.3f1, open `Assets/TheGrid/Roster.unity`, press Play.
 - **Build the app:** menu **The Grid > Build Mac App**, then open `Builds/TheGrid.app`.
@@ -36,6 +36,8 @@ Settings live in `~/Library/Application Support/DefaultCompany/The Grid/settings
 |---|---|
 | `configDirs` | Claude config directories to read. Empty means `~/.claude` and every `~/.claude-*` that has a `projects` folder |
 | `claudePath` | Path to the `claude` program. Empty means look in `~/.local/bin`, `/opt/homebrew/bin` and `/usr/local/bin` |
+| `pullRequests` | `true` to ask GitHub, through `gh`, about open pull requests; `false` and the app asks nothing of the network. Starts as `true` |
+| `ghPath` | Path to the `gh` program. Empty means look in `/opt/homebrew/bin`, `/usr/local/bin` and `/usr/bin` |
 | `workspaces` | Workspace names, in the order a click cycles through them. Starts as `Personal` |
 | `repoWorkspaces` | Which repo belongs to which workspace. A repo not listed is `Personal` |
 | `workspaceLights` | The light of a workspace's region in the world: `cyan`, `white`, `rose`, `mint`, `violet`, `blue` or `ember`. A workspace not listed takes its place in `workspaces`: the first is cyan, the second white, and so on |
@@ -69,10 +71,11 @@ A building stands for a kind of work:
 | Building | A bot is here when its agent is |
 |---|---|
 | Server tower | reading or searching |
-| Assembly bay | editing files |
 | Test workshop | running tests. Its near walls are cut away, so you see the bot at its terminal |
 | Review hall | looking at diffs, commits or a pull request |
-| Works | working, when it cannot be told on what |
+| Works | editing files, or working when it cannot be told on what |
+
+The sixth building, the relay, is where offline bots wait. The fifth is the PR depot: no bot works there.
 
 Anything else is shown on the bot itself, wherever it stands:
 
@@ -85,6 +88,24 @@ Anything else is shown on the bot itself, wherever it stands:
 | No light at all | offline |
 
 Bots that need you stand in the open at the front of their sector, done ones by the fountain, offline ones in front of the relay. The view opens on the first sector with a bot that needs you, close enough to follow one bot from a doorway to a workstation; in a small window it makes sure that bot is in view.
+
+### The PR depot
+
+Every sector has a depot, and in front of it one crate for each open pull request of its repo, whoever opened it:
+
+| Crate | The pull request is |
+|---|---|
+| Amber band and lid | **for you**: ready to merge, or your review is asked for |
+| A band in the depot's light | **in review**: checks running or failed, a reviewer or a review bot at work, changes asked for, review comments not yet answered, conflicts, or GitHub still working out whether it merges |
+| No light | a **draft** |
+
+Those for you stand nearest the door. The depot's name says how many are open, and far out a sector's line adds how many are for you. Click the depot for the list: every open pull request with the reason it is where it is, in words. Click a row to open it in your browser.
+
+![The depot's list](docs/art/world-depot.png)
+
+"Ready to merge" means nothing is left to wait for: not a draft, GitHub has confirmed it merges without conflicts, checks passed or none, no review asked of anyone, and either approved or no approval required. A review bot is read from its reactions on the pull request's description: eyes while it reviews, a thumbs-up when it found nothing. Review comments count as answered once the pull request's author has replied in a review after them, or the bot that left them has since given its thumbs-up; this goes by the latest review, so a reply on one thread answers for all.
+
+**This is the one place The Grid reaches the network, and it does so through your own `gh`.** Every three minutes, and at once when a repo is new to the map, it runs `gh api graphql` in each repo's folder (and, once per repo, `gh repo view` to learn which repo and host the folder is) with one query, asked again page by page where a repo has more than fifty open: the repo's open pull requests, with their draft flag, review decision, requested reviewers, merge conflicts, check status, reactions and who wrote the latest review, and your GitHub login. `gh` works out which repo from the folder's git remote and signs the request with the login you gave it; The Grid never sees or stores a token. Nothing is written to GitHub. If `gh` is not installed or not signed in, or a repo has no GitHub remote, its depot is empty and the list says why. Set `pullRequests` to `false` in `settings.json` and nothing is asked at all; the app reads the file at its start, and again whenever you click a workspace or a region's name. A repo on a company's own GitHub is asked about there, never on github.com: `gh` says which host a folder's repo is on, and the question goes to that host by name.
 
 ![Three workspaces, far out: a region each, in its own light](docs/art/world-far.png)
 
@@ -124,7 +145,7 @@ To look at the world without any agent sessions, start the app on a roster snaps
 Builds/TheGrid.app/Contents/MacOS/"The Grid" -snapshot "$PWD/fixtures/world/snapshot.json"
 ```
 
-Add `-shots <folder>` and it saves `far.png` and `near.png` there and quits; `-select <account>|<session id>` selects that bot for `near.png`, and `-messages <pile snapshot file>` (try `fixtures/world/messages.json`) shows its messages arriving and saves `courier.png` and `pulse.png` too. `-moved <world file>` lays the map again from that `world.json` after `far.png` and saves `moved.png`: a picture of a map its owner has arranged. With the editor closed, **The Grid > Render World Pictures** does much the same without a window, into `Logs/`, though without the names and badges:
+Add `-shots <folder>` and it saves `far.png` and `near.png` there and quits; `-select <account>|<session id>` selects that bot for `near.png`, and `-messages <pile snapshot file>` (try `fixtures/world/messages.json`) shows its messages arriving and saves `courier.png` and `pulse.png` too. `-pulls <file>` (try `fixtures/world/pulls.json`) puts those pull requests at the depots, since a snapshot never asks GitHub, and `-depot <sector name>` opens that depot's list in `near.png`. `-moved <world file>` lays the map again from that `world.json` after `far.png` and saves `moved.png`: a picture of a map its owner has arranged. With the editor closed, **The Grid > Render World Pictures** does much the same without a window, into `Logs/`, though without the names and badges:
 
 ```bash
 /Applications/Unity/Hub/Editor/6000.4.3f1/Unity.app/Contents/MacOS/Unity -batchmode -projectPath "$PWD" -executeMethod TheGrid.EditorTools.GridMenu.WorldPictures -quit

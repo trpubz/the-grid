@@ -5,8 +5,9 @@ using UnityEngine;
 
 namespace TheGrid.Core
 {
-    // Where a bot stands in its sector. Five places are buildings, one for each kind of work; the rest are open ground.
-    public enum Place { ServerTower, ReviewHall, Works, AssemblyBay, Workshop, Plaza, Forecourt, Dock }
+    // Where a bot stands in its sector. Four places are buildings, one for each kind of work; the rest are open ground.
+    // No bot stands at the depot: that is where the repo's open pull requests are queued.
+    public enum Place { ServerTower, ReviewHall, Works, Workshop, Plaza, Forecourt, Dock }
 
     // How a bot holds itself. (Walking and signalling are the view's: they happen while it moves or a message arrives.)
     public enum Stance { Stand, Type, Inspect, Off }
@@ -37,6 +38,11 @@ namespace TheGrid.Core
         public Vector2Int cell;     // its cell of its region's own grid
         public Vector2Int origin;   // where it stands on the map: the tile of its plot's north corner
         public int needOwner, done, running;
+        // The repo's open pull requests as last heard from GitHub, those for the owner first: the crates at its depot.
+        public List<PullRequest> pulls = new List<PullRequest>();
+        public string pullsProblem = "";   // why they could not be had, in words; empty when they could, or were never asked for
+        public int pullsForOwner;          // how many are ready to merge or wait for the owner's review
+        public bool pullsAsked;            // GitHub has been asked about this repo, whatever came of it
         public List<WorldBot> bots = new List<WorldBot>();
         [NonSerialized] public Layout layout = Layout.Of(0);   // how this sector is arranged and lit: follows from its plot
     }
@@ -72,10 +78,9 @@ namespace TheGrid.Core
                     switch (activity)
                     {
                         case Activity.Reading: return Place.ServerTower;
-                        case Activity.Editing: return Place.AssemblyBay;
                         case Activity.Testing: return Place.Workshop;
                         case Activity.Reviewing: return Place.ReviewHall;
-                        default: return Place.Works;
+                        default: return Place.Works;   // editing, and work that cannot be told apart
                     }
                 case "Finished": return Place.Plaza;
                 case "Offline": return Place.Dock;
@@ -147,12 +152,14 @@ namespace TheGrid.Core
         public static WorldSector Opening(WorldModel world) =>
             world.sectors.Find(s => s.needOwner > 0) ?? world.sectors.Find(s => s.bots.Count > 0);
 
-        // What a sector says about itself when it is too far off to make out bots: "2 need you · 1 done". Empty when neither applies.
+        // What a sector says about itself when it is too far off to make out bots: "2 need you · 1 done · 1 PR for you".
+        // Empty when none applies.
         public static string Summary(WorldSector sector)
         {
             var parts = new List<string>();
             if (sector.needOwner > 0) parts.Add(sector.needOwner + (sector.needOwner == 1 ? " needs you" : " need you"));
             if (sector.done > 0) parts.Add(sector.done + " done");
+            if (sector.pullsForOwner > 0) parts.Add(sector.pullsForOwner + (sector.pullsForOwner == 1 ? " PR for you" : " PRs for you"));
             return string.Join(" · ", parts);
         }
 
@@ -185,8 +192,8 @@ namespace TheGrid.Core
         // Once put, nothing moves unless the owner moves it: all of it is kept in `plots`. With one workspace that is the
         // one spiral, from the middle.
         // settings: where a repo with no session belongs, the order of the workspaces, and the look the owner picked for
-        // each. Left out, everything is the default.
-        public static WorldModel Build(RosterSnapshot snap, Plots plots, Settings settings = null)
+        // each. Left out, everything is the default. pulls: each repo's open pull requests; left out, no depot has any.
+        public static WorldModel Build(RosterSnapshot snap, Plots plots, Settings settings = null, PullsSnapshot pulls = null)
         {
             settings = settings ?? new Settings();
             foreach (var a in snap.agents) plots.IndexFor(a.repoRoot, out _);
@@ -252,6 +259,16 @@ namespace TheGrid.Core
                     layout = Layout.For(i, cell[i], world.regions[regionOf[workspace[i]]].look),
                     name = root == "" ? NoProject : Path.GetFileName(root.TrimEnd('/')),
                 });
+            }
+
+            foreach (var sector in world.sectors)
+            {
+                var heard = sector.repoRoot == "" ? null : pulls?.For(sector.repoRoot);
+                if (heard == null) continue;
+                sector.pullsAsked = true;
+                sector.pulls = heard.open;
+                sector.pullsProblem = heard.problem;
+                sector.pullsForOwner = heard.open.FindAll(p => p.state == PullState.ForOwner).Count;
             }
 
             foreach (var a in snap.agents)

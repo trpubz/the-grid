@@ -17,6 +17,8 @@ namespace TheGrid.Core
 
         public List<string> configDirs = new List<string>();   // empty means: discover
         public string claudePath = "";                          // empty means: look in the usual places
+        public bool pullRequests = true;                        // ask GitHub, through gh, about the open pull requests of the repos on the map
+        public string ghPath = "";                              // empty means: look in the usual places
         public List<string> workspaces = new List<string> { DefaultWorkspace };
         public List<RepoWorkspace> repoWorkspaces = new List<RepoWorkspace>();
         public List<WorkspaceLight> workspaceLights = new List<WorkspaceLight>();   // a light: one of Lights.LookNames
@@ -34,6 +36,7 @@ namespace TheGrid.Core
             s = s ?? new Settings();
             s.configDirs = s.configDirs ?? new List<string>();
             s.claudePath = s.claudePath ?? "";
+            s.ghPath = s.ghPath ?? "";
             s.repoWorkspaces = s.repoWorkspaces ?? new List<RepoWorkspace>();
             s.workspaceLights = s.workspaceLights ?? new List<WorkspaceLight>();
             if (s.workspaces == null || s.workspaces.Count == 0) s.workspaces = new List<string> { DefaultWorkspace };
@@ -46,6 +49,8 @@ namespace TheGrid.Core
             var fresh = Load(path);
             configDirs = fresh.configDirs;
             claudePath = fresh.claudePath;
+            pullRequests = fresh.pullRequests;
+            ghPath = fresh.ghPath;
             workspaces = fresh.workspaces;
             repoWorkspaces = fresh.repoWorkspaces;
             workspaceLights = fresh.workspaceLights;

@@ -121,6 +121,58 @@ namespace TheGrid.Core.Tests
             }
         }
 
+        [Test]
+        public void CratesQueueInFrontOfTheDepotOnThePlotClearOfEveryBuildingAndEveryBot()
+        {
+            Assert.AreEqual(9, Layout.Crates);
+            foreach (int a in All)
+            {
+                var l = Layout.Of(a);
+                var built = new HashSet<Vector2Int>(Structures.SelectMany(s => TilesOf(l, s)));
+                var depot = l.Footprint(Structure.Depot);
+                var bots = new List<Vector2>();
+                foreach (var place in Places)
+                    for (int slot = 0; slot < 12; slot++) bots.Add(Tile(Iso.BotSpot(Vector2Int.zero, l, place, slot)));
+                var seen = new HashSet<Vector2>();
+                for (int slot = 0; slot < Layout.Crates; slot++)
+                {
+                    var t = Tile(Iso.CrateSpot(Vector2Int.zero, l, slot));
+                    string which = "arrangement " + a + ": crate " + slot + " at " + t;
+                    Assert.IsTrue(seen.Add(t), which + " shares a spot");
+                    Assert.IsTrue(t.x >= -.5f && t.y >= -.5f && t.x <= Iso.PlotTiles - .5f && t.y <= Iso.PlotTiles - .5f, which + " is off the plot");
+                    Assert.IsFalse(built.Contains(new Vector2Int(Mathf.RoundToInt(t.x), Mathf.RoundToInt(t.y))), which + " stands on a structure");
+                    // in front of the depot, within its width
+                    Assert.IsTrue(t.y > depot.yMax - .5f && t.x > depot.xMin - .5f && t.x < depot.xMax - .5f, which + " is not in front of the depot");
+                    foreach (var b in bots) Assert.Greater((b - t).magnitude, .6f, which + " is where a bot stands");
+                    Assert.LessOrEqual(Covered(Iso.CrateSpot(Vector2Int.zero, l, slot), l, Vector2Int.zero, true), 6, which + " is behind a building");
+                }
+            }
+        }
+
+        [Test]
+        public void AClickOnTheDepotOrOnAnyCrateShownIsAClickOnTheDepot()
+        {
+            var origin = new Vector2Int(24, -7);
+            foreach (int a in All)
+            {
+                var l = Layout.Of(a);
+                string which = "arrangement " + a + ": ";
+                var foot = Iso.StructureSpot(origin, l, Structure.Depot);
+                Assert.IsTrue(Iso.OnDepot(origin, l, 0, foot + new Vector2(0, 40)), which + "the middle of the building");
+                Assert.IsTrue(Iso.OnDepot(origin, l, 0, foot + new Vector2(-80, 30)) && Iso.OnDepot(origin, l, 0, foot + new Vector2(80, 30)), which + "its two ends");
+                for (int crates = 1; crates <= Layout.Crates; crates++)
+                    for (int slot = 0; slot < crates; slot++)
+                        Assert.IsTrue(Iso.OnDepot(origin, l, crates, Iso.CrateSpot(origin, l, slot) + new Vector2(0, 10)), which + "crate " + slot + " of " + crates);
+                // a crate that is not there is not clicked: with two shown, the place of the ninth is open ground
+                Assert.IsFalse(Iso.OnDepot(origin, l, 2, Iso.CrateSpot(origin, l, 8) + new Vector2(0, 10)), which + "the place of a crate not shown");
+                // and nothing else of the sector is the depot
+                foreach (Structure s in Structures)
+                    if (s != Structure.Depot) Assert.IsFalse(Iso.OnDepot(origin, l, Layout.Crates, Iso.StructureSpot(origin, l, s) + new Vector2(0, 20)), which + s);
+                for (int slot = 0; slot < 12; slot++)
+                    Assert.IsFalse(Iso.OnDepot(origin, l, Layout.Crates, Iso.BotSpot(origin, l, Place.Forecourt, slot) + new Vector2(0, 16)), which + "a bot that needs the owner, slot " + slot);
+            }
+        }
+
         // How many pixels of a bot's height a sector's structures cover, where the bot stands at `at` (art pixels).
         // A structure covers a bot only when it is drawn after it: when its own ground point is lower on the screen.
         static float Covered(Vector2 at, Layout l, Vector2Int cell, bool own)

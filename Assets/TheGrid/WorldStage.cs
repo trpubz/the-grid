@@ -17,7 +17,7 @@ namespace TheGrid
         const int MaxSmall = 3;      // subagents drawn beside a bot; its name carries the full count
 
         // In the order of Structure.
-        public static readonly string[] StructureNames = { "Server tower", "Review hall", "Relay", "Works", "Assembly bay", "", "Test workshop" };
+        public static readonly string[] StructureNames = { "Server tower", "Review hall", "Relay", "Works", "PR depot", "", "Test workshop" };
         // A bot's light is drawn in three marker colours: the light, its highlight, its dim partner. They become one of
         // these colourways: blue, white, orange. Which one is the account's number, kept in the world's file, so an account
         // keeps its colour. All from the art palette, and none of them amber: amber is for badges.
@@ -55,6 +55,8 @@ namespace TheGrid
         readonly Dictionary<int, (Vector2Int origin, int arrangement, int look)> painted = new Dictionary<int, (Vector2Int, int, int)>();
         readonly HashSet<(Vector2Int, Vector2Int)> roads = new HashSet<(Vector2Int, Vector2Int)>();
         readonly HashSet<Vector2Int> opened = new HashSet<Vector2Int>();
+        // The crates at each sector's depot, by its plot: what they show, and the object that holds them.
+        readonly Dictionary<int, (string shown, GameObject holder)> crates = new Dictionary<int, (string, GameObject)>();
         readonly Dictionary<Vector2Int, GameObject> outlands = new Dictionary<Vector2Int, GameObject>();
         readonly Dictionary<string, float> signals = new Dictionary<string, float>();   // bot key: signalling until this time
         readonly float[] tops = new float[ArtNames.Structures.Length];
@@ -210,6 +212,8 @@ namespace TheGrid
             foreach (var road in all)
                 if (roads.Add(road)) Road(road.from, road.to, at[road.from].region == at[road.to].region ? Lights.Primary(at[road.from].layout.Look) : 0);
 
+            foreach (var sector in model.sectors) PutCrates(sector);
+
             var seen = new HashSet<string>();
             foreach (var sector in model.sectors)
                 foreach (var b in sector.bots)
@@ -227,6 +231,30 @@ namespace TheGrid
             return true;
         }
 
+        // One crate for each open pull request of the sector's repo, as far as there is room in front of its depot: those
+        // for the owner nearest the door. A crate in review is lit as the depot is; one for the owner is amber everywhere.
+        void PutCrates(WorldSector sector)
+        {
+            int count = Mathf.Min(sector.pulls.Count, Layout.Crates);
+            var states = new System.Text.StringBuilder(sector.origin + " " + sector.layout.Arrangement + " " + sector.layout.Look);
+            for (int i = 0; i < count; i++) states.Append(' ').Append((int)sector.pulls[i].state);
+            string shown = states.ToString();
+            if (crates.TryGetValue(sector.plot, out var was))
+            {
+                if (was.shown == shown) return;
+                Kill(was.holder);
+            }
+            var holder = Holder("Crates " + sector.plot);
+            for (int i = 0; i < count; i++)
+            {
+                var state = sector.pulls[i].state;
+                string name = ArtNames.Crates[(int)state];
+                var sprite = state == PullState.InReview ? InLight(name, sector.layout.Light(Structure.Depot)) : Art(name);
+                NewSprite("crate", sprite, holder).transform.localPosition = Iso.CrateSpot(sector.origin, sector.layout, i);
+            }
+            crates[sector.plot] = (shown, holder.gameObject);
+        }
+
         // Takes everything off the map, bots too: they are put back where they now stand, not walked there.
         void Clear()
         {
@@ -238,6 +266,8 @@ namespace TheGrid
             built = Holder("Buildings");
             foreach (var blocks in outlands.Values) Kill(blocks);
             foreach (var b in bots.Values) Kill(b.at.gameObject);
+            foreach (var c in crates.Values) Kill(c.holder);
+            crates.Clear();
             outlands.Clear();
             bots.Clear();
             painted.Clear();
