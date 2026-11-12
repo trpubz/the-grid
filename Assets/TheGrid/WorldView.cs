@@ -256,9 +256,11 @@ namespace TheGrid
                 var push = taken != null && taken(pointer) ? Vector2.zero : Iso.EdgePan(view, pointer, EdgePoints);
                 if (push != Vector2.zero)
                 {
+                    var was = centre;
                     centre += push * (EdgeSpeed * Time.unscaledDeltaTime * pointScale / Iso.Zoom[level]);
                     PlaceCamera();
-                    fastUntil = now + .2f;
+                    // Sixty frames a second only while the map is moving: at its limit a pointer resting at the edge costs nothing.
+                    if (centre != was) fastUntil = now + .2f;
                 }
             }
             // Ten frames a second is plenty for a lens that sits open all day; a walk or a drag gets sixty while it lasts.
