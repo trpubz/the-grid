@@ -78,6 +78,62 @@
    "groundY": 24
   },
   {
+   "name": "line-round-out-back",
+   "width": 96,
+   "height": 48,
+   "groundX": 48,
+   "groundY": 24
+  },
+  {
+   "name": "line-round-in-back",
+   "width": 96,
+   "height": 48,
+   "groundX": 48,
+   "groundY": 24
+  },
+  {
+   "name": "line-round-out-right",
+   "width": 96,
+   "height": 48,
+   "groundX": 48,
+   "groundY": 24
+  },
+  {
+   "name": "line-round-in-right",
+   "width": 96,
+   "height": 48,
+   "groundX": 48,
+   "groundY": 24
+  },
+  {
+   "name": "line-round-out-front",
+   "width": 96,
+   "height": 48,
+   "groundX": 48,
+   "groundY": 24
+  },
+  {
+   "name": "line-round-in-front",
+   "width": 96,
+   "height": 48,
+   "groundX": 48,
+   "groundY": 24
+  },
+  {
+   "name": "line-round-out-left",
+   "width": 96,
+   "height": 48,
+   "groundX": 48,
+   "groundY": 24
+  },
+  {
+   "name": "line-round-in-left",
+   "width": 96,
+   "height": 48,
+   "groundX": 48,
+   "groundY": 24
+  },
+  {
    "name": "fountain",
    "width": 192,
    "height": 160,

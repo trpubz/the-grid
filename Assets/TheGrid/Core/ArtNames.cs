@@ -25,6 +25,11 @@ namespace TheGrid.Core
         public const string Paving = "tile-paving", PavingJointA = "tile-paving-joint-a", PavingJointB = "tile-paving-joint-b";
         public const string Lane = "tile-lane", ChevronA = "tile-lane-chevron-a", ChevronB = "tile-lane-chevron-b", Crossing = "tile-crossing-a";
         public const string Void = "tile-void", LineA = "line-a", LineB = "line-b";
+        // A corner of lane or road, rounded: an overlay for the one tile. Cut from a paved tile, or filled in on an open one,
+        // toward one of the tile's four corners (steps along columns and rows).
+        static readonly string[] Toward = { "back", "right", "front", "left" };
+        public static string Round(bool filled, UnityEngine.Vector2Int toward) =>
+            (filled ? "line-round-in-" : "line-round-out-") + Toward[toward.y < 0 ? (toward.x < 0 ? 0 : 1) : (toward.x > 0 ? 2 : 3)];
         public const int PulseSteps = 3;
 
         public static string Bot(string pose, string facing) => "bot-" + pose + "-" + facing;
@@ -50,6 +55,9 @@ namespace TheGrid.Core
             yield return SmallBot;
             for (int i = 0; i < PulseSteps; i++) yield return Pulse(i);
             foreach (var t in new[] { Paving, PavingJointA, PavingJointB, Lane, ChevronA, ChevronB, Crossing, Void, LineA, LineB }) yield return t;
+            foreach (bool filled in new[] { false, true })
+                foreach (var corner in new[] { new UnityEngine.Vector2Int(-1, -1), new UnityEngine.Vector2Int(1, -1), new UnityEngine.Vector2Int(1, 1), new UnityEngine.Vector2Int(-1, 1) })
+                    yield return Round(filled, corner);
         }
     }
 }
