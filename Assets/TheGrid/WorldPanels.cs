@@ -22,7 +22,7 @@ namespace TheGrid
         Vector2 scroll;
         Rect needs, card, depot;   // where the panels are; zero when not drawn
         Vector2 depotScroll;
-        GUIStyle wrapped;
+        GUIStyle wrapped, oneLine;
         readonly Texture2D[] crates = new Texture2D[ArtNames.Crates.Length];   // in the order of PullState
         List<string> subagents = new List<string>();   // the card's lines about subagents, as many as this map has room for
 
@@ -239,9 +239,10 @@ namespace TheGrid
         // The list a repo's workspace is picked from, drawn over everything else, at `at` or as near as fits the window. A
         // click on a workspace gives it to the repo; a name typed in the last line makes a new one. `give` is called with
         // the name, `close` when the owner puts the list away. Until one of them is, nothing under the list takes a click.
-        public void Workspaces(Rect window, Vector2 at, string repo, string current, List<string> names, GUIStyle text, GUIStyle strong, Action<string> give, Action close)
+        // Its last line is not a workspace: `cloud` is called when the owner wants a cloud session brought to this repo.
+        public void Workspaces(Rect window, Vector2 at, string repo, string current, List<string> names, GUIStyle text, GUIStyle strong, Action<string> give, Action close, Action cloud)
         {
-            float high = TitleHigh + names.Count * ListRow + 34;
+            float high = TitleHigh + names.Count * ListRow + 34 + ListRow;
             var list = new Rect(Mathf.Clamp(at.x, window.x, window.xMax - ListWide), Mathf.Clamp(at.y, window.y, window.yMax - high), ListWide, high);
             GUI.ModalWindow(0x6c697374, list, id =>
             {
@@ -267,11 +268,97 @@ namespace TheGrid
                 if (typed == "") Faint(new Rect(field.x + 5, field.y + 1, field.width - 6, 20), "New workspace", text);
                 bool add = GUI.Button(new Rect(all.width - 50, field.y, 42, 22), "Add");
                 if ((enter || add) && typed.Trim() != "") picked = typed;
-                if (picked == "" && !away) return;
+                var bring = new Rect(1, field.yMax + 6, all.width - 2, ListRow);
+                Fill(new Rect(bring.x, bring.y, bring.width, 1), Edge);
+                GUI.Label(new Rect(24, bring.y + 2, bring.width - 30, 20), "Bring a cloud session here", text);
+                bool toCloud = picked == "" && GUI.Button(bring, GUIContent.none, GUIStyle.none);
+                if (picked == "" && !away && !toCloud) return;
                 typed = "";
                 if (e.type != EventType.Repaint && e.type != EventType.Layout) e.Use();
-                if (picked != "") give(picked); else close();
+                if (picked != "") give(picked); else if (toCloud) cloud(); else close();
             }, GUIContent.none, GUIStyle.none);
+        }
+
+        // Starts the cloud panel afresh: what is in its box, and which account is chosen.
+        public void OpenCloud(string text, int account)
+        {
+            pasted = text ?? "";
+            cloudAccount = account;
+        }
+
+        // The panel that makes the command which brings a cloud session to a repo's folder, drawn over everything else as
+        // the list of workspaces is. The owner pastes what names the session and picks the account that owns it; `command`
+        // gives the command for an id, an account and whether it only downloads. The app runs neither: each has a Copy.
+        public void Cloud(Rect window, Vector2 at, string repo, List<string> accounts, Func<string, int, bool, string> command, GUIStyle text, GUIStyle strong, Action close)
+        {
+            if (wrapped == null) wrapped = new GUIStyle(text) { wordWrap = true, clipping = TextClipping.Clip };
+            string id = RosterFormat.CloudId(pasted);
+            bool wrong = id == "" && pasted.Trim() != "";
+            float high = TitleHigh + 30 + (wrong ? 36 : 0) + 26 + (id == "" ? 0 : 6 * LineHigh + 12) + 58;
+            var panel = new Rect(Mathf.Clamp(at.x, window.x, window.xMax - CloudWide), Mathf.Clamp(at.y, window.y, window.yMax - high), CloudWide, high);
+            GUI.ModalWindow(0x636c6f75, panel, _ =>
+            {
+                var e = Event.current;
+                var all = new Rect(0, 0, panel.width, panel.height);
+                bool away = e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape || e.type == EventType.MouseDown && !all.Contains(e.mousePosition);
+                Back(all);
+                GUI.Label(new Rect(8, 3, all.width - 40, 22), repo + " · cloud session", strong);
+                GUI.Label(new Rect(all.width - 22, 3, 16, 22), "×", strong);
+                away |= GUI.Button(new Rect(all.width - 30, 0, 30, TitleHigh), GUIContent.none, GUIStyle.none);
+                float y = TitleHigh + 4;
+                var field = new Rect(8, y, all.width - 72, 22);
+                pasted = GUI.TextField(field, pasted, 300);
+                if (pasted == "") Faint(new Rect(field.x + 5, field.y + 1, field.width - 6, 20), "Session id, its /teleport line, or its link", text);
+                if (GUI.Button(new Rect(all.width - 58, y, 50, 22), "Paste")) pasted = GUIUtility.systemCopyBuffer ?? "";
+                y += 26;
+                if (wrong)
+                {
+                    Faint(new Rect(10, y, all.width - 20, 34), "That names no cloud session. Give a cse_… or session_… id, the line the session prints for /teleport, or a claude.ai/code link.", wrapped);
+                    y += 36;
+                }
+                // The account that owns the session: the command is run under it.
+                float each = Mathf.Min(120, (all.width - 16) / Mathf.Max(1, accounts.Count));
+                for (int i = 0; i < accounts.Count; i++)
+                {
+                    var pick = new Rect(8 + i * each, y, each, 22);
+                    if (i == cloudAccount) Fill(new Rect(pick.x + 2, pick.y + 8, 6, 6), Lit);
+                    GUI.Label(new Rect(pick.x + 14, pick.y + 1, pick.width - 16, 20), accounts[i], text);
+                    if (GUI.Button(pick, GUIContent.none, GUIStyle.none)) cloudAccount = i;
+                }
+                y += 26;
+                if (id != "")
+                {
+                    y = Copied(all, y, "Open it here", "cloud-open", command(id, cloudAccount, false), text);
+                    Faint(new Rect(10, y, all.width - 20, 20), "Nothing is kept on this Mac until you say something in it.", text);
+                    y += LineHigh + 6;
+                    y = Copied(all, y, "Download only", "cloud-download", command(id, cloudAccount, true), text);
+                    Faint(new Rect(10, y, all.width - 20, 20), "One model turn over the whole conversation: it can be large.", text);
+                    y += LineHigh + 6;
+                }
+                Faint(new Rect(10, y, all.width - 20, 54), "The folder must have no uncommitted changes: teleport switches it to the session's branch. \"Session not found\" usually means the other account. The Grid runs neither command.", wrapped);
+                if (!away) return;
+                if (e.type != EventType.Repaint && e.type != EventType.Layout) e.Use();
+                close();
+            }, GUIContent.none, GUIStyle.none);
+        }
+
+        // One command of the cloud panel: what it is for, a Copy for the whole of it, and under them its end, as far as
+        // fits. Returns the next line.
+        float Copied(Rect all, float y, string name, string key, string command, GUIStyle text)
+        {
+            var copy = new Rect(all.width - 60, y + 1, 52, 16);
+            GUI.Label(new Rect(10, y, copy.x - 16, 20), name, text);
+            if (oneLine == null) oneLine = new GUIStyle(text) { wordWrap = false, clipping = TextClipping.Clip };
+            Faint(new Rect(10, y + LineHigh, all.width - 20, 20), command.Substring(Mathf.Max(0, command.LastIndexOf("claude --teleport", StringComparison.Ordinal))), oneLine);
+            Fill(copy, Edge);
+            GUI.Label(new Rect(copy.x + 6, copy.y - 2, copy.width - 8, 20), copiedKey == key && Time.unscaledTime < copiedUntil ? "Copied" : "Copy", text);
+            if (GUI.Button(copy, GUIContent.none, GUIStyle.none))
+            {
+                GUIUtility.systemCopyBuffer = command;
+                copiedKey = key;
+                copiedUntil = Time.unscaledTime + 1.5f;
+            }
+            return y + 2 * LineHigh;
         }
 
         // How many lines of the card are about getting into the conversation.
@@ -280,8 +367,10 @@ namespace TheGrid
         string copiedKey = "";   // the bot whose command was last copied, and until when the card says so
         float copiedUntil;
 
-        const float ListWide = 236, ListRow = 24;
+        const float ListWide = 236, ListRow = 24, CloudWide = 440;
         string typed = "";   // the name of a new workspace, as far as it has been typed
+        string pasted = "";  // what the owner put in the cloud panel's box
+        int cloudAccount;    // and the account chosen there
 
         static void Back(Rect r)
         {

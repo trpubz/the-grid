@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 
 namespace TheGrid.Core
 {
@@ -49,9 +50,36 @@ namespace TheGrid.Core
             bool background = kind == "background";
             string by = background ? id : sessionId;
             if (string.IsNullOrEmpty(by)) return "";
+            return In(cwd, configDir, home, several) + (background ? "claude attach " : "claude --resume ") + Word(by);
+        }
+
+        // The start of a command for the owner's shell: into the folder, and under the account.
+        static string In(string cwd, string configDir, string home, bool several)
+        {
             bool usual = string.IsNullOrEmpty(configDir) || configDir.TrimEnd('/') == Path.Combine(home ?? "", ".claude");
-            return (string.IsNullOrEmpty(cwd) ? "" : "cd " + Word(cwd) + " && ") + (!usual ? "CLAUDE_CONFIG_DIR=" + Word(configDir) + " " : several ? "env -u CLAUDE_CONFIG_DIR " : "")
-                + (background ? "claude attach " : "claude --resume ") + Word(by);
+            return (string.IsNullOrEmpty(cwd) ? "" : "cd " + Word(cwd) + " && ") + (!usual ? "CLAUDE_CONFIG_DIR=" + Word(configDir) + " " : several ? "env -u CLAUDE_CONFIG_DIR " : "");
+        }
+
+        // The id of the cloud session the owner pasted: the id itself, the line a cloud session prints when asked how to
+        // bring it to a terminal, or a link to it. "" when the text names none.
+        public static string CloudId(string pasted)
+        {
+            var id = Regex.Match(pasted ?? "", @"(?<![A-Za-z0-9_])(cse|session)_[A-Za-z0-9]+");
+            if (id.Success) return id.Value;
+            // shortcut: seen on one session, that the longer id in the browser's link starts with the session's own; if a link stops giving a session that is found, ask the owner for the line the cloud session prints
+            var link = Regex.Match(pasted ?? "", @"(?<![A-Za-z0-9_])cshk_([A-Za-z0-9]{24})");
+            return link.Success ? "cse_" + link.Groups[1].Value : "";
+        }
+
+        // The command that brings a cloud session to this Mac: in a checkout of its repo, under the account that owns it.
+        // As it is, it opens the conversation in the terminal, and nothing is kept on this Mac until the owner says
+        // something in it. With `download` it asks one short question with no terminal and no tools, which writes the whole
+        // conversation here, at the price of one turn over all of it. "" for no id.
+        public static string Teleport(string id, string cwd, string configDir, string home, bool several, bool download)
+        {
+            if (string.IsNullOrEmpty(id)) return "";
+            return In(cwd, configDir, home, several) + "claude --teleport " + Word(id)
+                + (download ? " -p " + Word("Reply with the single word: ok. Do nothing else.") + " --tools '' --permission-mode plan" : "");
         }
 
         static string Word(string s)
@@ -105,6 +133,9 @@ namespace TheGrid.Core
             var name = Path.GetFileName((configDir ?? "").TrimEnd(Path.DirectorySeparatorChar));
             return name.StartsWith(".claude-", StringComparison.Ordinal) ? name.Substring(".claude-".Length) : name.TrimStart('.');
         }
+
+        // The folder of the account with that name under `home`: the reverse of AccountLabel, for a snapshot, which has names only.
+        public static string ConfigDir(string label, string home) => Path.Combine(home ?? "", label == "claude" ? ".claude" : ".claude-" + label);
 
         public RosterSnapshot Build(IReadOnlyList<LiveSession> live, IReadOnlyList<string> errors, long nowMs)
         {
