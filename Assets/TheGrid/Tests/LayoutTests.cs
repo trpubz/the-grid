@@ -334,6 +334,57 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
+        public void TheFrontOfABotsBuildingIsOutsideItAndBeforeItsFront()
+        {
+            foreach (int a in All)
+            {
+                var l = Layout.Of(a);
+                foreach (var place in Places)
+                    for (int slot = 0; slot < 8; slot++)
+                    {
+                        string who = "arrangement " + a + ": " + place + " slot " + slot;
+                        Vector2 spot = l.Spot(place, slot), front = l.Front(place, slot);
+                        Assert.IsNull(l.Room(front), who + ": the front is inside a building");
+                        if (l.Room(spot) is Structure room)
+                        {
+                            // never the bot's own place on a floor, never behind: on the ground before the building's front
+                            var f = l.Footprint(room);
+                            Assert.Greater(front.y, f.yMax - .5f, who + " is not before the front");
+                            Assert.IsTrue(front.x > f.xMin - .5f && front.x < f.xMax - .5f, who + " is off to the side of its building");
+                            Assert.IsTrue(front.y < Iso.PlotTiles - .5f, who + " is off the plot");
+                        }
+                        else Assert.AreEqual(spot, front, who + " stands in the open: there");
+                        // from there a courier rides to the aisle between the two low buildings, turning square corners,
+                        // through nothing
+                        var way = l.ToAisle(place, slot);
+                        Assert.AreEqual(front, way[0], who);
+                        Assert.AreEqual(Layout.Aisle, way[way.Count - 1].x, who + " does not come to the aisle");
+                        for (int i = 1; i < way.Count; i++)
+                        {
+                            Vector2 p = way[i - 1], q = way[i];
+                            Assert.IsTrue(p.x == q.x || p.y == q.y, who + ": " + p + " to " + q + " is askew");
+                            for (float k = 0; k <= (q - p).magnitude; k += .25f)
+                            {
+                                var at = Vector2.MoveTowards(p, q, k);
+                                foreach (var s in Structures)
+                                {
+                                    var f = l.Footprint(s);
+                                    Assert.IsFalse(at.x > f.xMin - .5f && at.x < f.xMax - .5f && at.y > f.yMin - .5f && at.y < f.yMax - .5f, who + ": the way to the aisle goes through the " + s + " at " + at);
+                                }
+                            }
+                        }
+                    }
+                // the aisle itself is clear from the street behind it to the lane in front
+                for (float row = Layout.Street; row <= Iso.PlotTiles; row += .25f)
+                    foreach (var s in Structures)
+                    {
+                        var f = l.Footprint(s);
+                        Assert.IsFalse(Layout.Aisle > f.xMin - .5f && Layout.Aisle < f.xMax - .5f && row > f.yMin - .5f && row < f.yMax - .5f, "arrangement " + a + ": the " + s + " stands in the aisle at row " + row);
+                    }
+            }
+        }
+
+        [Test]
         public void ABotChangingPlacesGoesByTheStairsAndNoFurtherThanItMust()
         {
             foreach (int a in All)

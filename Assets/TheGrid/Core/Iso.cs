@@ -122,6 +122,15 @@ namespace TheGrid.Core
             return points;
         }
 
+        // A bot at a job (Jobs), a step from its own place. stands: its own place in art pixels, with how much further down
+        // the screen it is drawn there as if it stood. step: the job's step, in tiles. The bot is drawn a step away, and as
+        // far down the order as at its own place: a step toward the back of its room does not put it behind its building.
+        public static Vector3 AtWork(Vector3 stands, Vector2 step)
+        {
+            var by = Point(step.x, step.y);
+            return new Vector3(stands.x + by.x, stands.y + by.y, stands.z + by.y);
+        }
+
         // How far down the screen a bot is drawn as if it stood, in art pixels: what is lower is drawn later, over what is
         // higher. In the open that is where it stands. Inside a building it is never higher than just below the point the
         // building is drawn from, or a bot at the back of a room would be drawn first and the room over it. Two bots in one
@@ -212,9 +221,93 @@ namespace TheGrid.Core
             return new List<Vector2Int>(tiles);
         }
 
+        // The whole of a courier's ride out, in tiles (RideTiles) or in art pixels (Ride): from the front of the sender's
+        // building over its plot (Layout.ToAisle, then down the aisle) to its crossing, by the lanes and roads of the
+        // sectors on its way (Route), and over the recipient's plot to the front of its building. Within one sector, from
+        // the one front to the other by the aisle. Every leg runs along columns or along rows, through nothing that
+        // stands. It rides back the same way.
+        public static List<Vector2> RideTiles(Vector2Int fromOrigin, Layout fromLayout, Place fromPlace, int fromSlot, Vector2Int toOrigin, Layout toLayout, Place toPlace, int toSlot, IReadOnlyList<Vector2Int> way)
+        {
+            var ride = new List<Vector2>();
+            void Put(Vector2Int o, Vector2 p)
+            {
+                var at = new Vector2(o.x + p.x, o.y + p.y);
+                // Never out along a stretch and straight back along it. The lanes' way begins and ends at a sector's
+                // crossing, and the aisle meets the lane a tile and a half to one side of it: coming from that side the
+                // courier turns up the aisle as it reaches it, and leaving to that side it does not go to the crossing first.
+                while (ride.Count >= 2)
+                {
+                    Vector2 last = ride[ride.Count - 1] - ride[ride.Count - 2], next = at - ride[ride.Count - 1];
+                    if (last.x * next.y - last.y * next.x != 0 || Vector2.Dot(last, next) >= 0) break;
+                    ride.RemoveAt(ride.Count - 1);
+                }
+                if (ride.Count == 0 || ride[ride.Count - 1] != at) ride.Add(at);
+            }
+            foreach (var p in fromLayout.ToAisle(fromPlace, fromSlot)) Put(fromOrigin, p);
+            var lanes = Route(way);
+            if (lanes.Count > 0)
+            {
+                // Down the aisle to the lane in front, along it to the crossing, and at the other end the same turned round.
+                Put(fromOrigin, new Vector2(Layout.Aisle, PlotTiles + .5f));
+                foreach (var p in lanes) Put(Vector2Int.zero, p);
+                Put(toOrigin, new Vector2(Layout.Aisle, PlotTiles + .5f));
+            }
+            var last = toLayout.ToAisle(toPlace, toSlot);
+            for (int i = last.Count - 1; i >= 0; i--) Put(toOrigin, last[i]);
+            return ride;
+        }
+
+        public static List<Vector2> Ride(Vector2Int fromOrigin, Layout fromLayout, Place fromPlace, int fromSlot, Vector2Int toOrigin, Layout toLayout, Place toPlace, int toSlot, IReadOnlyList<Vector2Int> way)
+        {
+            var ride = new List<Vector2>();
+            foreach (var p in RideTiles(fromOrigin, fromLayout, fromPlace, fromSlot, toOrigin, toLayout, toPlace, toSlot, way)) ride.Add(Point(p.x, p.y));
+            return ride;
+        }
+
+        // One upright slice of the ribbon of light a courier leaves behind it. x: the middle of the slice. y: the ground at
+        // the lower end of the piece of the way it stands on. wide: how wide it is. rise: how much higher the ground is at
+        // the other end of that piece, which the slice is taller by. at: how far along the ride it starts.
+        public struct RibbonSlice { public float x, y, wide, rise, at; }
+
+        // A ride (Ride), cut into upright slices so many art pixels wide, side by side: a wall along the way, seen as the
+        // map is seen. Each is a thing of its own, so that each is drawn in its own place among the buildings. Where the
+        // way runs straight down the screen the wall is seen edge on: one slice, as much taller as that piece is long.
+        public static List<RibbonSlice> Ribbon(IReadOnlyList<Vector2> ride, float step)
+        {
+            var slices = new List<RibbonSlice>();
+            float gone = 0;
+            for (int i = 1; i < ride.Count; i++)
+            {
+                Vector2 a = ride[i - 1], b = ride[i];
+                float dx = b.x - a.x, dy = b.y - a.y, leg = (b - a).magnitude, across = Mathf.Abs(dx);
+                if (across < .001f)
+                {
+                    if (leg > 0) slices.Add(new RibbonSlice { x = a.x, y = Mathf.Min(a.y, b.y), wide = step, rise = Mathf.Abs(dy), at = gone });
+                }
+                else
+                    for (float from = 0; from < across - .001f; from += step)
+                    {
+                        float to = Mathf.Min(from + step, across), y0 = a.y + dy * from / across, y1 = a.y + dy * to / across;
+                        slices.Add(new RibbonSlice { x = a.x + Mathf.Sign(dx) * (from + to) / 2, y = Mathf.Min(y0, y1), wide = to - from, rise = Mathf.Abs(y1 - y0), at = gone + leg * from / across });
+                    }
+                gone += leg;
+            }
+            return slices;
+        }
+
+        // How long a courier takes over so many art pixels: four tiles a second, and never under three seconds, or a short
+        // ride is over before anyone has looked.
+        public static float RideSeconds(float pixels) => Mathf.Max(3f, pixels / (4f * TileStep));
+
+        // A place on a sector's lane (Ring), moved from the middle of the lane's inner tile to the middle of the lane, which
+        // is two tiles wide: half a tile further out. Along the lane it moves half a tile on, to the middle of the road
+        // that meets the lane there, which is two tiles wide as well.
+        static Vector2 Middle(Vector2Int ring) => new Vector2(ring.x == -1 ? -1.5f : ring.x + .5f, ring.y == -1 ? -1.5f : ring.y + .5f);
+
         // The way a courier rides through the sectors at these origins, first to last: corner points, in tiles (column,
         // row). It leaves from the crossing in front of the first, goes round each sector's lane to the side the next one
-        // is on and along the road to it, and ends at the last one's crossing. Empty for fewer than two.
+        // is on and along the road to it, and ends at the last one's crossing: all of it down the middle of the lane or
+        // the road. Empty for fewer than two.
         public static List<Vector2> Route(IReadOnlyList<Vector2Int> hops)
         {
             var route = new List<Vector2>();
@@ -223,7 +316,7 @@ namespace TheGrid.Core
             {
                 if (route.Count == 0 || route[route.Count - 1] != p) route.Add(p);
             }
-            void Add(Vector2Int o, int node) => Put(o + Ring[node]);
+            void Add(Vector2Int o, int node) => Put(o + Middle(Ring[node]));
             // Round the lane from one node to another, the shorter way; only the corners and the last node are corner points.
             void Round(Vector2Int o, int from, int to)
             {
@@ -245,9 +338,13 @@ namespace TheGrid.Core
                 bool forward = RoadRunsFrom(at, next);
                 var line = forward ? RoadLine(at, next) : RoadLine(next, at);
                 if (!forward) line.Reverse();
-                foreach (var p in line) Put(p);
+                int arrive = (leave + Ring.Length / 2) % Ring.Length;   // a road arrives on the side facing the one it left
+                // RoadLine runs along the first of the road's two rows of tiles, from lane to lane: the middle of the road
+                // is half a tile over, and its ends are the middles of the two lanes.
+                for (int k = 0; k < line.Count; k++)
+                    Put(k == 0 ? at + Middle(Ring[leave]) : k == line.Count - 1 ? next + Middle(Ring[arrive]) : line[k] + new Vector2(.5f, .5f));
                 at = next;
-                node = (leave + Ring.Length / 2) % Ring.Length;   // a road arrives on the side facing the one it left
+                node = arrive;
             }
             Round(at, node, InFront);
             return route;
@@ -270,6 +367,37 @@ namespace TheGrid.Core
         }
 
         public static int ClampLevel(int level) => Mathf.Clamp(level, 0, Zoom.Length - 1);
+
+        // Which way the map moves for a pointer resting within `edge` of an edge of the map: -1, 0 or 1 across, and the
+        // same up, where up is toward the top of the window. Nothing while the pointer is off the map. view and pointer
+        // are in the window's points, y running down.
+        public static Vector2 EdgePan(Rect view, Vector2 pointer, float edge)
+        {
+            if (!view.Contains(pointer)) return Vector2.zero;
+            return new Vector2(pointer.x < view.xMin + edge ? -1 : pointer.x > view.xMax - edge ? 1 : 0, pointer.y < view.yMin + edge ? 1 : pointer.y > view.yMax - edge ? -1 : 0);
+        }
+
+        // After a level of zoom the wheel rests for so many seconds.
+        public const float WheelRest = .15f;
+
+        // How many levels to zoom for a turn of the wheel: 1 in, -1 out, or 0. A mouse's wheel sends a notch at a time and
+        // two fingers on a trackpad many small turns, which are added up in `pending` until they make a notch. However
+        // hard it is turned it is one level, and then the wheel rests (`since`: seconds since the last level), or one
+        // swipe would run through every level there is.
+        public static int WheelStep(ref float pending, float delta, float since)
+        {
+            if (since < WheelRest)
+            {
+                pending = 0;
+                return 0;
+            }
+            if (pending * delta < 0) pending = 0;   // turned back: start afresh
+            pending += delta;
+            if (Mathf.Abs(pending) < 1f) return 0;
+            int step = pending < 0 ? 1 : -1;
+            pending = 0;
+            return step;
+        }
 
         // The closest level at which the content fits the view; the farthest when none does; actual size when there is nothing to fit.
         public static int FitLevel(float viewW, float viewH, Rect content)

@@ -282,17 +282,20 @@ namespace TheGrid.Core.Tests
                     Assert.AreEqual(a.origin, hops[0]);
                     Assert.AreEqual(b.origin, hops[hops.Count - 1]);
                     var route = Iso.Route(hops);
-                    Assert.AreEqual(new Vector2(a.origin.x + Iso.Crossing, a.origin.y + Iso.PlotTiles), route[0]);
-                    Assert.AreEqual(new Vector2(b.origin.x + Iso.Crossing, b.origin.y + Iso.PlotTiles), route[route.Count - 1]);
+                    Assert.AreEqual(new Vector2(a.origin.x + Iso.Crossing + .5f, a.origin.y + Iso.PlotTiles + .5f), route[0]);
+                    Assert.AreEqual(new Vector2(b.origin.x + Iso.Crossing + .5f, b.origin.y + Iso.PlotTiles + .5f), route[route.Count - 1]);
                     for (int i = 1; i < route.Count; i++)
                     {
                         Vector2 p = route[i - 1], q = route[i];
                         Assert.IsTrue(p.x == q.x || p.y == q.y, "a leg runs along columns or along rows: " + p + " to " + q);
-                        int steps = (int)Mathf.Max(Mathf.Abs(q.x - p.x), Mathf.Abs(q.y - p.y));
-                        for (int k = 0; k <= steps; k++)
+                        // down the middle of lanes and roads two tiles wide: one of their tiles on either side, all the way
+                        float length = Mathf.Abs(q.x - p.x) + Mathf.Abs(q.y - p.y);
+                        for (float k = 0; k <= length; k += .5f)
                         {
-                            int col = (int)(p.x + Math.Sign(q.x - p.x) * k), row = (int)(p.y + Math.Sign(q.y - p.y) * k);
-                            Assert.IsTrue(roads.Contains(new Vector2Int(col, row)) || w.sectors.Any(s => Iso.OnLane(s.origin, col, row)), a.repoRoot + " to " + b.repoRoot + ": tile " + col + ", " + row + " is no lane, link or road");
+                            var at = Vector2.MoveTowards(p, q, k);
+                            foreach (int col in new[] { Mathf.FloorToInt(at.x), Mathf.CeilToInt(at.x) })
+                                foreach (int row in new[] { Mathf.FloorToInt(at.y), Mathf.CeilToInt(at.y) })
+                                    Assert.IsTrue(roads.Contains(new Vector2Int(col, row)) || w.sectors.Any(s => Iso.OnLane(s.origin, col, row)), a.repoRoot + " to " + b.repoRoot + ": at " + at + ", tile " + col + ", " + row + " is no lane, link or road");
                         }
                     }
                 }
