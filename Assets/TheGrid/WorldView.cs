@@ -49,6 +49,8 @@ namespace TheGrid
 
         // The sector whose depot was clicked in this pass of Gui, as its plot; else -1. The owner wants its list.
         public int DepotClicked { get; private set; } = -1;
+        // The plot of the sector whose name was clicked in the last Gui; else -1. Its repo's workspace is the owner's to pick.
+        public int SectorClicked { get; private set; } = -1;
 
         // What the owner let go of in this pass of Gui after dragging it to a place it may stand: a region, as its number
         // among the model's regions, moved MovedBy tiles; or a sector, as its plot, moved MovedBy cells of its region's
@@ -171,6 +173,13 @@ namespace TheGrid
 
         public void ZoomBy(int steps) => level = Iso.ClampLevel(level + steps);
 
+        // False to keep the map still under a pointer at its edge: for pictures.
+        public bool EdgeMoves = true;
+        const float EdgePoints = 28f, EdgeSpeed = 600f;   // how wide the edge is, and how fast the map moves, in the window's points
+        float wheel, wheelAt = -10f;                      // what the wheel has turned toward its next level, and when it last zoomed
+        Func<Vector2, bool> taken;                        // as the last Gui was told: where panels are, and whether the map listens
+        bool deaf;
+
         // What has to be in view is more than the ground: the skyline stands above the back of a sector, with its names over it.
         void Fit(Rect ground)
         {
@@ -239,6 +248,21 @@ namespace TheGrid
             bool riding = traffic.Tick(now);
             stale |= stage.Tick(now) | riding;
             if (stage.Walking || riding) fastUntil = now + .2f;
+            // The pointer resting at an edge of the map moves the map that way: not while something is being dragged, nor
+            // over a panel, nor while this is not the window in front.
+            if (EdgeMoves && !deaf && !dragging && Application.isFocused)
+            {
+                var pointer = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y) / pointScale;
+                var push = taken != null && taken(pointer) ? Vector2.zero : Iso.EdgePan(view, pointer, EdgePoints);
+                if (push != Vector2.zero)
+                {
+                    var was = centre;
+                    centre += push * (EdgeSpeed * Time.unscaledDeltaTime * pointScale / Iso.Zoom[level]);
+                    PlaceCamera();
+                    // Sixty frames a second only while the map is moving: at its limit a pointer resting at the edge costs nothing.
+                    if (centre != was) fastUntil = now + .2f;
+                }
+            }
             // Ten frames a second is plenty for a lens that sits open all day; a walk or a drag gets sixty while it lasts.
             Application.targetFrameRate = now < fastUntil ? 60 : 10;
         }
@@ -285,12 +309,15 @@ namespace TheGrid
         // Mouse and keys, then the picture of the map and the names over it, drawn as text at the screen's own sharpness.
         // Call inside OnGUI after Show. covered: true for a point that something drawn over the map has taken; a press or a
         // scroll there is not the map's.
-        public void Gui(GUIStyle label, GUIStyle loud, Func<Vector2, bool> covered = null)
+        public void Gui(GUIStyle label, GUIStyle loud, Func<Vector2, bool> covered = null, bool listens = true)
         {
             if (holder == null) return;
             var e = Event.current;
-            RegionClicked = MovedRegion = MovedPlot = DepotClicked = -1;
-            Handle(e, covered);
+            RegionClicked = MovedRegion = MovedPlot = DepotClicked = SectorClicked = -1;
+            taken = covered;
+            deaf = !listens;
+            // With something open over the whole window, the map takes no press, scroll or key: they are for what is open.
+            if (listens) Handle(e, covered);
             if (e.type != EventType.Repaint) return;
 
             if (picture != null) GUI.DrawTexture(new Rect(view.x, view.y, pixelW / pointScale, pixelH / pointScale), picture, ScaleMode.StretchToFill, false);
@@ -489,13 +516,16 @@ namespace TheGrid
                         dragging = false;
                         if (!moved)
                         {
-                            // A click on a region's name is for the region; anywhere else, for the bot under it.
+                            // A click on a region's name is for the region, one on a sector's name for the sector; anywhere
+                            // else, for the bot under it.
                             RegionClicked = heldRegion == "" ? -1 : model.regions.FindIndex(r => r.name == heldRegion);
+                            SectorClicked = heldPlot;
+                            bool onName = RegionClicked >= 0 || SectorClicked >= 0;
                             var at = ToWorld(e.mousePosition - view.position);
-                            string bot = RegionClicked < 0 ? stage.Pick(at) : "";
-                            if (RegionClicked < 0) Selected = bot;
+                            string bot = onName ? "" : stage.Pick(at);
+                            if (!onName) Selected = bot;
                             // A click on a depot that is on no bot, close enough in to tell buildings apart: its list.
-                            if (RegionClicked < 0 && bot == "" && !Far) DepotClicked = DepotAt(at);
+                            if (!onName && bot == "" && !Far) DepotClicked = DepotAt(at);
                         }
                         else if (holding && heldBy != Vector2Int.zero && Held(out int region, out var sector))
                         {
@@ -512,8 +542,15 @@ namespace TheGrid
                     e.Use();
                     break;
                 case EventType.ScrollWheel when inside:
-                    if (e.command || e.control) ZoomBy(e.delta.y < 0 ? 1 : -1);
-                    else centre += new Vector2(e.delta.x, -e.delta.y) * 12f / k;
+                    // The wheel zooms, a level at a time, and what is under the pointer stays under it.
+                    int levels = Iso.WheelStep(ref wheel, e.delta.y, Time.unscaledTime - wheelAt);
+                    if (levels != 0)
+                    {
+                        wheelAt = Time.unscaledTime;
+                        var under = ToWorld(e.mousePosition - view.position);
+                        ZoomBy(levels);
+                        centre += under - ToWorld(e.mousePosition - view.position);
+                    }
                     Moved(e);
                     break;
                 case EventType.KeyDown when e.keyCode == KeyCode.Equals || e.keyCode == KeyCode.Plus || e.keyCode == KeyCode.KeypadPlus:

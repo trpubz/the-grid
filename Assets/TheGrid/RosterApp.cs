@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using TheGrid.Core;
 using UnityEngine;
 
@@ -24,6 +25,8 @@ namespace TheGrid
         Collector collector;
         PullReader pullReader;                 // asks GitHub about open pull requests, while that is turned on; null on a snapshot
         PullsSnapshot pullsFixed, pullsFrom;   // a snapshot's pull requests from a file; and the ones worldDrawn was built from
+        string workspaceFor = "";              // the repo whose workspace list is open, by its root; "" for none
+        Vector2 workspaceAt;                   // where the list was asked for, in screen points
         int depotOpen = -1;                    // the plot of the sector whose depot list is open
         Pile pile;
         Vector2 scroll, pileScroll;
@@ -38,9 +41,12 @@ namespace TheGrid
         readonly WorldPanels panels = new WorldPanels();
         List<NeedsYouRow> needsYou = new List<NeedsYouRow>();
         BotCard card;
+        // Where the session of the card that is open lives: asked once when the card opens, on a thread of its own.
+        string whereFor = "", whereFixed = "", zellij = "";
+        Task<string> where;
         Deliveries deliveries;      // made when the world is first opened: only what arrives after that is shown
         PileSnapshot deliveredFrom; // the pile snapshot last looked through for deliveries
-        string lastRecipient = "";  // picture mode: the recipient of the longest ride, how long that ride is and when it ends
+        string lastSender = "", lastRecipient = "";  // picture mode: the sender and the recipient of the longest ride, how long that ride is and when it ends
         float longestRide = -1f, rideEnds;
         bool showArrivals;          // picture mode with -messages: there are deliveries to take pictures of
         bool leftWorld;             // the world has been closed since it was last drawn
@@ -84,14 +90,16 @@ namespace TheGrid
                 }
                 // Pull requests for a picture of the depot come from a file: a snapshot never asks GitHub.
                 if (Arg("-pulls") != "") pullsFixed = JsonUtility.FromJson<PullsSnapshot>(File.ReadAllText(Arg("-pulls")));
+                whereFixed = Arg("-where");   // nor does it ask zellij where a session lives: for a picture, the card is told
                 shotsDir = Arg("-shots");
+                world.EdgeMoves = shotsDir == "";   // a pointer left at the window's edge does not move the map out of a picture
                 if (shotsDir != "") StartCoroutine(Shots());
                 return;
             }
             var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             settingsPath = Path.Combine(Application.persistentDataPath, "settings.json");
             settings = Settings.Load(settingsPath);
-            if (!File.Exists(settingsPath)) TrySave(); // so there is a file to edit: workspaces are added by hand
+            if (!File.Exists(settingsPath)) TrySave(); // so there is a file to edit
             var claude = ClaudeCli.ResolvePath(settings.claudePath, ClaudeCli.UsualPlaces(home));
             collector = new Collector(settings, home, dir => ClaudeCli.AgentsJson(claude, dir, home), SessionFiles.ChangeStamp);
             collector.Start();
@@ -101,6 +109,7 @@ namespace TheGrid
             var gh = ClaudeCli.ResolvePath(settings.ghPath, Gh.UsualPlaces());
             pullReader = new PullReader(root => Gh.Ask(gh, root), () => settings.pullRequests);
             pullReader.Start();
+            zellij = ClaudeCli.ResolvePath(settings.zellijPath, Zellij.UsualPlaces(home));
             // The pile's file sits beside settings.json, never under an agent app's folder.
             pile = new Pile(settings, home, Path.Combine(Application.persistentDataPath, "pile.json"));
             pile.Start();
@@ -123,8 +132,12 @@ namespace TheGrid
             world.LookAtAll();
             if (showArrivals)
             {
-                // The courier is caught three fifths of its way, where in the sample world it comes off the road between two
-                // regions onto the recipient's lane; its recipient pulses for nine tenths of a second once it arrives.
+                // The courier is caught as it leaves its sender, a short trail behind it; in the sample world a second one is
+                // then on its way between two bots of that sector. Then three fifths of its way, where it comes off the road
+                // between two regions onto the recipient's lane; its recipient pulses for nine tenths of a second once it arrives.
+                world.LookAt(lastSender);
+                yield return new WaitForSecondsRealtime(Mathf.Max(0f, rideEnds - longestRide * .86f - Time.unscaledTime));
+                yield return Shot("start.png");
                 world.LookAt(lastRecipient);   // close enough to make out the bike
                 yield return new WaitForSecondsRealtime(Mathf.Max(0f, rideEnds - longestRide * .4f - Time.unscaledTime));
                 yield return Shot("courier.png");
@@ -148,7 +161,23 @@ namespace TheGrid
             world.Select(Arg("-select"));   // a picture with a bot's card in it
             var depot = worldDrawn.sectors.Find(s => s.name == Arg("-depot"));   // and with that sector's depot list open
             if (depot != null) depotOpen = depot.plot;
+            var listed = worldDrawn.sectors.Find(s => s.name == Arg("-workspace"));   // or with that sector's list of workspaces open
+            if (listed != null && listed.repoRoot != "")
+            {
+                workspaceFor = listed.repoRoot;
+                workspaceAt = new Vector2(Screen.width * .3f, Screen.height * .3f);
+            }
             yield return Shot("near.png");
+            // A picture of the map after that sector's repo was given a workspace, as a click in the list does.
+            if (listed != null && Arg("-give") != "")
+            {
+                GiveWorkspace(listed.repoRoot, Arg("-give"));
+                workspaceFor = "";
+                yield return null;
+                yield return null;
+                world.LookAtAll();
+                yield return Shot("given.png");
+            }
             // A picture of bots on their way: the snapshot is swapped for a later one, in which some have gone to work on
             // another floor, and every one of them is put three fifths of its way there.
             if (Arg("-then") != "")
@@ -267,6 +296,7 @@ namespace TheGrid
                 else if (tab == 0) DrawRoster(area, drawn, now);
                 else DrawPile(area, pileDrawn, now);
             }
+            if (workspaceFor != "") DrawWorkspaces(new Rect(0, 0, width + 16, height + 12));
         }
 
         // The map, and over it who needs the owner and the card of the bot that was clicked. All from the snapshot the lists draw.
@@ -296,6 +326,19 @@ namespace TheGrid
                 }
                 world.Show(worldDrawn, map, scale);
                 card = selected == "" ? null : Panels.Card(drawn, selected, now);
+                if (card == null) whereFor = "";
+                else
+                {
+                    // shortcut: asked when the card opens and not again while it stays open, so a session moved to another tab meanwhile is shown in the old one; click the bot again
+                    if (card.key != whereFor)
+                    {
+                        whereFor = card.key;
+                        int pid = card.pid;
+                        string path = zellij;
+                        where = fixedSnap != null || pid <= 0 ? null : Task.Run(() => Zellij.Where(pid, path, Zellij.Run));
+                    }
+                    card.where = fixedSnap != null ? whereFixed : where != null && where.Status == TaskStatus.RanToCompletion ? where.Result : "";
+                }
                 // Messages that arrived since the world was opened, each shown once. Looked for only when the pile has changed.
                 // Coming back from the lists, what arrived meanwhile is old mail and is not replayed.
                 if (leftWorld && deliveries != null) deliveries.Reopen(now);
@@ -304,19 +347,23 @@ namespace TheGrid
                 if (!ReferenceEquals(pileDrawn, deliveredFrom))
                 {
                     deliveredFrom = pileDrawn;
-                    foreach (var d in deliveries.New(pileDrawn, worldDrawn))
+                    var said = new List<string>();
+                    foreach (var d in deliveries.New(pileDrawn, worldDrawn, said))
                     {
                         float ride = world.Deliver(d);
                         if (ride <= longestRide) continue;
                         longestRide = ride;
                         rideEnds = Time.unscaledTime + ride;
+                        lastSender = d.fromBot;
                         lastRecipient = d.toBot;
                     }
+                    // One line for each message that arrived: its courier, or why it has none.
+                    foreach (var line in said) Debug.Log("[mail] " + line);
                 }
             }
             var depotOf = depotOpen < 0 ? null : worldDrawn.sectors.Find(s => s.plot == depotOpen);
             panels.Place(map, needsYou.Count, card, depotOf);
-            world.Gui(detail, title, panels.Covers);
+            world.Gui(detail, title, panels.Covers, workspaceFor == "");   // while the list of workspaces is open, the map is deaf
             if (drawn.errors.Count > 0) GUI.Label(new Rect(map.x + 4, map.y + 4, map.width - 8, 32), string.Join(" | ", drawn.errors), error);
             string notAsked = depotOf == null ? "" : depotOf.repoRoot == "" ? "Sessions with no repo have no pull requests."
                 : fixedSnap != null ? "This snapshot has no pull requests for this repo."
@@ -331,7 +378,10 @@ namespace TheGrid
                 world.Select(clicked);
                 world.LookAt(clicked);
             }
-            if (panels.WorkspaceClicked && card != null && card.repoRoot != "") CycleWorkspace(card.repoRoot);
+            // A click on the card's workspace, or on a sector's name: the list of workspaces, for that repo.
+            if (panels.WorkspaceClicked && card != null) OpenWorkspaces(card.repoRoot);
+            var named = world.SectorClicked < 0 ? null : worldDrawn.sectors.Find(s => s.plot == world.SectorClicked);
+            if (named != null) OpenWorkspaces(named.repoRoot);
             if (world.RegionClicked >= 0 && world.RegionClicked < worldDrawn.regions.Count) CycleLight(worldDrawn.regions[world.RegionClicked]);
             // The owner dragged a region or a sector to a new place: it is kept there. The view has seen that it may stand there.
             if (world.MovedRegion >= 0 && world.MovedRegion < worldDrawn.regions.Count) plots.MoveRegion(worldDrawn.regions[world.MovedRegion].name, world.MovedBy);
@@ -448,7 +498,7 @@ namespace TheGrid
             GUILayout.FlexibleSpace();
             if (a.prNumber > 0 && GUILayout.Button("PR #" + a.prNumber, button) && RosterFormat.IsWebLink(a.prUrl)) Application.OpenURL(a.prUrl);
             if (a.repoRoot == "") GUILayout.Label(a.workspace, dim);
-            else if (GUILayout.Button(a.workspace, button)) CycleWorkspace(a.repoRoot);
+            else if (GUILayout.Button(a.workspace, button)) OpenWorkspaces(a.repoRoot);
             GUILayout.EndHorizontal();
             CheckFits();
 
@@ -472,15 +522,45 @@ namespace TheGrid
             Debug.LogWarning("[roster] layout overflow: a row needs " + Mathf.CeilToInt(r.xMax) + " points, the window gives " + Mathf.FloorToInt(rowWidth));
         }
 
-        // The collector reads these settings on its own thread; a read that overlaps this change shows up as one error line for one pass.
-        void CycleWorkspace(string repoRoot)
+        // Opens the list of workspaces for a repo, where the pointer is. A session with no repo has no workspace to pick.
+        void OpenWorkspaces(string repoRoot)
         {
-            if (fixedSnap != null) return; // a picture of a snapshot changes nothing
-            settings.Reload(settingsPath); // pick up workspaces added by hand since the app started
-            pullReader?.Wake();            // and the pull request setting: off stops the asking, on starts it
-            settings.CycleWorkspace(repoRoot);
-            TrySave();
-            pile.Refresh(); // the cross-workspace flags follow the new assignment
+            if (repoRoot == "") return;
+            workspaceFor = repoRoot;
+            workspaceAt = GUIUtility.GUIToScreenPoint(Event.current.mousePosition);
+        }
+
+        // The open list of workspaces, over whichever view is showing.
+        void DrawWorkspaces(Rect window)
+        {
+            var row = drawn.agents.Find(a => a.repoRoot == workspaceFor);
+            string current = row != null ? row.workspace : settings.WorkspaceFor(workspaceFor);
+            // Every workspace the settings know, and any other that is in use: a snapshot brings its own.
+            var names = new List<string>(settings.workspaces);
+            foreach (var a in drawn.agents)
+                if (a.workspace != "" && !names.Contains(a.workspace)) names.Add(a.workspace);
+            if (!names.Contains(current)) names.Add(current);
+            string repo = row != null ? row.repoName : Path.GetFileName(workspaceFor.TrimEnd('/'));
+            panels.Workspaces(window, GUIUtility.ScreenToGUIPoint(workspaceAt), repo, current, names, detail, title,
+                name => { GiveWorkspace(workspaceFor, name); workspaceFor = ""; }, () => workspaceFor = "");
+        }
+
+        // The collector reads these settings on its own thread; a read that overlaps this change shows up as one error line for one pass.
+        void GiveWorkspace(string repoRoot, string name)
+        {
+            // On a snapshot the repo changes workspace for as long as the app is open: there is no settings file to keep it in.
+            if (fixedSnap == null) settings.Reload(settingsPath); // pick up what was changed by hand since the app started
+            pullReader?.Wake();                                   // and the pull request setting: off stops the asking, on starts it
+            // Every workspace in use is in the list first, so that a new one comes after them all and takes the next light.
+            foreach (var a in drawn.agents)
+                if (a.workspace != "" && !settings.workspaces.Contains(a.workspace)) settings.workspaces.Add(a.workspace);
+            string given = settings.SetWorkspace(repoRoot, name);
+            if (fixedSnap == null) TrySave();
+            // The lists and the card show it at once; the collector's next pass will say the same.
+            foreach (var a in drawn.agents)
+                if (a.repoRoot == repoRoot) a.workspace = given;
+            pile?.Refresh();   // the cross-workspace flags follow the new assignment
+            worldFrom = null;  // the same roster, in other regions: build the world again
         }
 
         // A click on a region's name: the region takes the next light, and keeps it.

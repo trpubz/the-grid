@@ -28,9 +28,9 @@ The first working piece: a window that lists your live Claude Code sessions on t
 
 The first time a build runs, macOS asks whether The Grid can access folders such as Documents, because your repos live there. Until you answer, the roster shows an error saying `claude agents did not answer`. It asks once: **Build Mac App** signs every build with the first Apple Development certificate in your keychain (Xcode creates one for any Apple account, free or paid), so a rebuilt app is still the same app to macOS. To sign with a different certificate, put its name or SHA-1, as `security find-identity -v -p codesigning` prints it, on one line in `UserSettings/TheGridSignIdentity.txt`; that folder is not tracked. With no certificate at all the build is left unsigned and macOS asks again after every rebuild. Run one copy at a time: two open copies with different signatures, such as an older unsigned build beside a new signed one, are one app by name but not by identity, and macOS then asks over and over until one of them is closed.
 
-Each row shows the state (question, permission, done, running and so on), what a running agent is doing (reading, editing, testing, reviewing, or just working when it cannot be told), the session name, its account, how long it has been in that state, the repo, the ticket read from the branch name, the pull request, and the workspace. Click the pull request to open it. Click the workspace to move the repo to the next one.
+Each row shows the state (question, permission, done, running and so on), what a running agent is doing (reading, editing, testing, reviewing, or just working when it cannot be told), the session name, its account, how long it has been in that state, the repo, the ticket read from the branch name, the pull request, and the workspace. Click the pull request to open it. Click the workspace to give the repo another: a short list opens with every workspace, the repo's own marked. Click one to move the repo there, or type a name in the last line and press Return (or **Add**) to make a new workspace and move the repo into it. **×**, Escape or a click beside the list puts it away.
 
-Settings live in `~/Library/Application Support/DefaultCompany/The Grid/settings.json`, created on first launch. Edit the file to add workspaces; the app re-reads it the next time you click a workspace or a region's name.
+Settings live in `~/Library/Application Support/DefaultCompany/The Grid/settings.json`, created on first launch. You do not need to edit it to add a workspace: the list does that. The app re-reads the file the next time you pick a workspace or click a region's name.
 
 | Field | Meaning |
 |---|---|
@@ -38,7 +38,8 @@ Settings live in `~/Library/Application Support/DefaultCompany/The Grid/settings
 | `claudePath` | Path to the `claude` program. Empty means look in `~/.local/bin`, `/opt/homebrew/bin` and `/usr/local/bin` |
 | `pullRequests` | `true` to ask GitHub, through `gh`, about open pull requests; `false` and the app asks nothing of the network. Starts as `true` |
 | `ghPath` | Path to the `gh` program. Empty means look in `/opt/homebrew/bin`, `/usr/local/bin` and `/usr/bin` |
-| `workspaces` | Workspace names, in the order a click cycles through them. Starts as `Personal` |
+| `zellijPath` | Path to the `zellij` program, asked which tab a session is in. Empty means look in `~/.cargo/bin`, `/opt/homebrew/bin` and `/usr/local/bin` |
+| `workspaces` | Workspace names, in the order the list shows them and regions take their lights. Starts as `Personal`; a workspace made in the app is added at the end |
 | `repoWorkspaces` | Which repo belongs to which workspace. A repo not listed is `Personal` |
 | `workspaceLights` | The light of a workspace's region in the world: `cyan`, `white`, `rose`, `mint`, `violet`, `blue` or `ember`. A workspace not listed takes its place in `workspaces`: the first is cyan, the second white, and so on |
 
@@ -83,7 +84,20 @@ A bot at work goes inside. While anyone works in a building it is drawn opened, 
 
 **The lights of a building someone is working in pulse**: its lines, windows and glow go a step dimmer and back, about once every second and a half. A sector where lights are pulsing has agents at work; one that is still has none. Nothing else on the map moves for it.
 
-![Bots at work inside the server tower, the review hall and the works](docs/art/world-working.png)
+**A bot inside a building does one of the building's jobs**, and after a while the other one its place has:
+
+| Building | Jobs |
+|---|---|
+| Server tower | swaps a drive between two racks; plugs a cable into a rack; holds its disc up to read |
+| Review hall | pushes buttons on the console; reads a screen upstairs; holds its disc up |
+| Works | moves a core from one reactor to the other; pulls a lever on the panel; tends a reactor |
+| Test workshop | types at the terminal; pulls the lever at the bench; pushes buttons; moves a crate |
+
+It moves on the beat the building's lights pulse on, a pose every 0.7 seconds: an arm out and back, up to a lever and down, and a bot that carries takes a step each beat. Nothing moves between beats, so the map is drawn no more often than the pulse already has it drawn. Which job a bot is at follows from the bot and the clock alone: two bots in one building are out of step, and the same moment always looks the same. What a bot carries is lit in the bot's own colour.
+
+![Bots at their jobs in the server tower, the review hall and the works](docs/art/world-working.png)
+
+![The same bots three beats later: other poses, and the one that carries a step further on](docs/art/world-working-later.png)
 
 ![Bots on the stairs: two in the tower changing floors, one coming down in the hall](docs/art/world-stairs.png)
 
@@ -123,23 +137,29 @@ Those for you stand nearest the door. The depot's name says how many are open, a
 
 A lane runs round every sector, and roads cross the open ground so that every sector can be reached from every other: a short link between two sectors side by side in one region, a longer road between regions, which bends twice where the two sectors it joins do not face each other squarely. Past the last sector the city carries on to the edge of the window as dark blocks. Lanes, roads and blocks are scenery, worked out from where the sectors are; they say nothing about any agent.
 
-- **Move:** drag, or scroll with two fingers.
-- **Zoom:** the **−** and **+** buttons, the `-` and `+` keys, or scroll while holding Command. There are five levels, each double the last.
-- **Far out,** each sector shows its name, how many bots need you and how many are done, and with more than one workspace each region shows its workspace's name. Click a region's name to give it the next light; the choice is kept in `settings.json`. Drag a name to move what it names (below). **Closer in,** buildings and bots are named; where the two would overlap, the bot's name wins. The colour of a bot's light (blue, white or orange) is its account: an account gets the next colour the first time it is seen, and keeps it. Small bots beside a bot are its subagents.
+- **Move:** drag the map, or rest the pointer at an edge of it: the map moves that way for as long as the pointer stays there. Not over a panel, and not while the window is behind another.
+- **Zoom:** the wheel, or two fingers on a trackpad: a level at a time, and what is under the pointer stays under it. Also the **−** and **+** buttons and the `-` and `+` keys. There are five levels, each double the last.
+- **Far out,** each sector shows its name, how many bots need you and how many are done, and with more than one workspace each region shows its workspace's name. Click a region's name to give it the next light; the choice is kept in `settings.json`. Click a sector's name to give its repo another workspace, from the same list as in the lists: this works for a repo with no session too, which has no row and no bot. A workspace with a repo in it has a region, so a new workspace gets a region and the next light the moment a repo is put in it, and the sector moves there. Drag a name to move what it names (below). **Closer in,** buildings and bots are named; where the two would overlap, the bot's name wins. The colour of a bot's light (blue, white or orange) is its account: an account gets the next colour the first time it is seen, and keeps it. Small bots beside a bot are its subagents.
 - **Click a bot** to see its card.
+
+![The list of workspaces, opened from a sector's name](docs/art/world-workspace.png)
 
 Two panels lie over the map, down its right side:
 
 - **Needs you** lists every bot that is waiting on you, most urgent first, with what it wants: an answer, an approval, or a look at a failure. Click a row and the view goes to that bot and selects it. Click the title to fold the list away; in a narrow window it starts folded.
-- **The card** of the selected bot says what it is doing, who it is, in which repo and on which ticket, for how long, and what each of its subagents is doing. Click its workspace to move the repo to the next one, as in the lists. When the agent has a pull request, **PR #n** opens it.
+- **The card** of the selected bot says what it is doing, who it is, in which repo and on which ticket, for how long, and what each of its subagents is doing. Click its workspace to give the repo another, as in the lists. When the agent has a pull request, **PR #n** opens it. Under that the card says how to get into the conversation. **The command** that opens it in a terminal: `claude attach <id>` for a background session, which has no window of its own, and `claude --resume <session id>` for any other. The card shows the end of it; **Copy** puts the whole of it on the clipboard, with the `cd` to the session's folder in front and, for an account other than the default one, its `CLAUDE_CONFIG_DIR`. If you have more than one account, the default account's command unsets that variable, so that it works from a terminal set up for another account. And, for a session that runs in a [zellij](https://zellij.dev) pane, **where it already is**: `zellij: <session> › <tab>`. Go there rather than run the command, which would open the conversation a second time. To find that, the app reads the environment of that one process when you click its bot (`ps`), keeps from it the zellij session's name and the pane's number and nothing else, and asks `zellij` for that session's panes. The app runs nothing in a terminal, and types nothing into a conversation and reads nothing from one.
 
 ![A narrow window: the list folded, the card across the bottom](docs/art/world-narrow.png)
 
-When a message from one agent reaches another, the world shows it arriving. Between two sectors a courier on a bike, in the sender's colours, rides the lanes and roads from the sender's crossing to the recipient's; then a ring of violet light pulses under the recipient. Within one sector there is only the pulse. While it lasts the recipient holds a hand to its helmet. A courier is drawn over buildings, so you can follow it the whole way.
+When a message from one agent reaches another, the world shows it arriving. A courier on a bike, in the sender's colours, appears at the front of the sender's building, rides to the front of the recipient's, and rides back the way it came. Between two sectors it goes by the crossing, the lanes and the road, down the middle of them; over a plot it keeps to the street before the back row and the aisle between the two low buildings, and turns square corners. Between two bots of one sector it rides from the one front to the other. As it arrives, a ring of violet light pulses under the recipient, who holds a hand to its helmet while it lasts.
 
-![A courier coming off the road between two regions](docs/art/world-courier.png)
+**Behind the courier stands a ribbon of light**, as tall as the bike and see-through, in the sender's colour. It stays for two minutes after the courier is back, fading in four steps, so a message you were not watching can still be read off the map, far out as well: who sent it, to whom, by which road. Bike and ribbon are drawn where they are: where the road runs behind a building, they are behind it.
 
-The Grid only shows deliveries: it sends nothing and holds nothing back. A message is shown once, if it was received after you opened the world and both its sender and its recipient are bots on the map. The review pile has every message, shown or not.
+![A courier leaving the front of its sender's building, its ribbon behind it; a second rides within the sector](docs/art/world-courier.png)
+
+![Far out, two minutes of mail: the ribbons show who wrote to whom](docs/art/world-ribbons.png)
+
+The Grid only shows deliveries: it sends nothing and holds nothing back. A message is shown once, if it was received after you opened the world and both its sender and its recipient are bots on the map. The review pile has every message, shown or not. The app's log (`~/Library/Logs/DefaultCompany/The Grid/Player.log`) has a line for each message that arrived while the world was open: `[mail] courier: <sender> to <recipient>, through 2 sectors`, or `[mail] no courier:` and why.
 
 Which repo has which sector, where every region and every sector stands, and which account has which colour, is kept in `world.json` beside `settings.json`. Nothing on the map moves unless you move it, also after its sessions are gone: a new region is put beside the map, a new sector on the nearest free place of its region. Delete the file to start the map again. Move a repo to another workspace and its sector goes to that region; no other sector moves.
 
@@ -155,7 +175,7 @@ To look at the world without any agent sessions, start the app on a roster snaps
 Builds/TheGrid.app/Contents/MacOS/"The Grid" -snapshot "$PWD/fixtures/world/snapshot.json"
 ```
 
-Add `-shots <folder>` and it saves `far.png` and `near.png` there and quits; `-select <account>|<session id>` selects that bot for `near.png`, and `-messages <pile snapshot file>` (try `fixtures/world/messages.json`) shows its messages arriving and saves `courier.png` and `pulse.png` too. `-pulls <file>` (try `fixtures/world/pulls.json`) puts those pull requests at the depots, since a snapshot never asks GitHub, and `-depot <sector name>` opens that depot's list in `near.png`. `-moved <world file>` lays the map again from that `world.json` after `far.png` and saves `moved.png`: a picture of a map its owner has arranged. `-then <snapshot file>` (try `fixtures/world/later.json`) swaps the snapshot for a later one after `near.png` and saves `stairs.png` with every bot that has somewhere new to go three fifths of its way there. With the editor closed, **The Grid > Render World Pictures** does much the same without a window, into `Logs/`, though without the names and badges:
+Add `-shots <folder>` and it saves `far.png` and `near.png` there and quits; `-select <account>|<session id>` selects that bot for `near.png`, and `-messages <pile snapshot file>` (try `fixtures/world/messages.json`) shows its messages arriving and saves `start.png`, `courier.png` and `pulse.png` too. `-pulls <file>` (try `fixtures/world/pulls.json`) puts those pull requests at the depots, since a snapshot never asks GitHub, and `-depot <sector name>` opens that depot's list in `near.png`. `-moved <world file>` lays the map again from that `world.json` after `far.png` and saves `moved.png`: a picture of a map its owner has arranged. `-workspace <sector name>` opens that sector's list of workspaces in `near.png`, and with `-give <workspace>` too the repo is given that workspace and `given.png` shows the map afterwards. `-where <text>` puts that on the selected bot's card as the place its session lives, since a snapshot never asks zellij. `-then <snapshot file>` (try `fixtures/world/later.json`) swaps the snapshot for a later one after `near.png` and saves `stairs.png` with every bot that has somewhere new to go three fifths of its way there. With the editor closed, **The Grid > Render World Pictures** does much the same without a window, into `Logs/`, though without the names and badges; it also renders the first sector at three beats (`world-jobs-2.png`, `-5`, `-9`), where the bots at work are seen in other poses and places:
 
 ```bash
 /Applications/Unity/Hub/Editor/6000.4.3f1/Unity.app/Contents/MacOS/Unity -batchmode -projectPath "$PWD" -executeMethod TheGrid.EditorTools.GridMenu.WorldPictures -quit
@@ -174,7 +194,7 @@ The sprites are made by a script; see [tools/art/README.md](tools/art/README.md)
 | Assets/TheGrid/WorldView.cs | The world as the window sees it: the camera, moving and zooming, names and badges. |
 | Assets/TheGrid/WorldStage.cs | The world's scene: ground, lanes, buildings, bots and the blocks beyond. |
 | Assets/TheGrid/WorldPanels.cs | The two panels over the world: who needs you, and the selected bot's card. |
-| Assets/TheGrid/WorldTraffic.cs | Messages arriving in the world: couriers and pulses. |
+| Assets/TheGrid/WorldTraffic.cs | Messages arriving in the world: couriers, their ribbons, and pulses. |
 | Assets/TheGrid/Resources/Art/, tools/art/ | The sprites, and the Blender script that makes them. |
 | Assets/TheGrid/Tests/ | EditMode tests for Core. |
 | fixtures/ | Hand-written sample records and the pinned roster snapshot. |

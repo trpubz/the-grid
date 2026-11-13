@@ -19,6 +19,7 @@ namespace TheGrid.Core
         public string claudePath = "";                          // empty means: look in the usual places
         public bool pullRequests = true;                        // ask GitHub, through gh, about the open pull requests of the repos on the map
         public string ghPath = "";                              // empty means: look in the usual places
+        public string zellijPath = "";                          // the same
         public List<string> workspaces = new List<string> { DefaultWorkspace };
         public List<RepoWorkspace> repoWorkspaces = new List<RepoWorkspace>();
         public List<WorkspaceLight> workspaceLights = new List<WorkspaceLight>();   // a light: one of Lights.LookNames
@@ -37,6 +38,7 @@ namespace TheGrid.Core
             s.configDirs = s.configDirs ?? new List<string>();
             s.claudePath = s.claudePath ?? "";
             s.ghPath = s.ghPath ?? "";
+            s.zellijPath = s.zellijPath ?? "";
             s.repoWorkspaces = s.repoWorkspaces ?? new List<RepoWorkspace>();
             s.workspaceLights = s.workspaceLights ?? new List<WorkspaceLight>();
             if (s.workspaces == null || s.workspaces.Count == 0) s.workspaces = new List<string> { DefaultWorkspace };
@@ -51,6 +53,7 @@ namespace TheGrid.Core
             claudePath = fresh.claudePath;
             pullRequests = fresh.pullRequests;
             ghPath = fresh.ghPath;
+            zellijPath = fresh.zellijPath;
             workspaces = fresh.workspaces;
             repoWorkspaces = fresh.repoWorkspaces;
             workspaceLights = fresh.workspaceLights;
@@ -91,15 +94,19 @@ namespace TheGrid.Core
             return DefaultWorkspace;
         }
 
-        // Assigns the next entry of `workspaces` to the repo and returns it. A session with no repo cannot be assigned.
-        public string CycleWorkspace(string repoRoot)
+        // Gives the repo a workspace by name and returns the name it now has. A name there is no workspace of makes one, at
+        // the end of the list; one that differs from a workspace's only by case is that workspace. No name changes nothing.
+        // A session with no repo cannot be given one.
+        public string SetWorkspace(string repoRoot, string name)
         {
-            if (string.IsNullOrEmpty(repoRoot)) return DefaultWorkspace;
-            var next = workspaces[(workspaces.IndexOf(WorkspaceFor(repoRoot)) + 1) % workspaces.Count];
+            name = (name ?? "").Trim();
+            if (string.IsNullOrEmpty(repoRoot) || name == "") return WorkspaceFor(repoRoot);
+            string known = workspaces.Find(w => string.Equals(w, name, StringComparison.OrdinalIgnoreCase));
+            if (known == null) workspaces.Add(known = name);
             var entry = repoWorkspaces.Find(rw => rw.repo == repoRoot);
             if (entry == null) repoWorkspaces.Add(entry = new RepoWorkspace { repo = repoRoot });
-            entry.workspace = next;
-            return next;
+            entry.workspace = known;
+            return known;
         }
 
         // ~/.claude and every ~/.claude-* that holds a projects folder.

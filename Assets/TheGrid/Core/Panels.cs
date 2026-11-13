@@ -19,6 +19,10 @@ namespace TheGrid.Core
         public string key = "", title = "", who = "", doing = "", since = "", ticket = "", prUrl = "";
         public string workspace = "", repoRoot = "";               // repoRoot: empty for a session with no repo, whose workspace cannot be changed
         public int prNumber;
+        // enter: the command that opens the conversation in a terminal. pid: the session's process, or 0. where: the zellij
+        // session and tab it runs in, which the app finds out for the card that is open; "" until then, or when it is in none.
+        public string enter = "", where = "";
+        public int pid;
         public List<string> subagents = new List<string>();        // what each subagent is doing, in the roster's order
     }
 
@@ -58,7 +62,7 @@ namespace TheGrid.Core
                 doing = a.ticket == "" ? Sector(a) : Sector(a) + " · " + a.ticket,
                 since = RosterFormat.Elapsed(a.stateSince, nowMs), ticket = a.ticket,
                 prUrl = RosterFormat.IsWebLink(a.prUrl) ? a.prUrl : "", prNumber = a.prNumber,   // only a web link is ever opened
-                workspace = a.workspace, repoRoot = a.repoRoot, subagents = a.subagents.ConvertAll(s => s.description ?? ""),
+                workspace = a.workspace, repoRoot = a.repoRoot, enter = a.enter ?? "", pid = a.pid, subagents = a.subagents.ConvertAll(s => s.description ?? ""),
             };
         }
 

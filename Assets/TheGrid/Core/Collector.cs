@@ -76,7 +76,7 @@ namespace TheGrid.Core
             this.home = home;
             this.agentsJsonForConfigDir = agentsJsonForConfigDir;
             this.changeStampForConfigDir = changeStampForConfigDir;
-            builder = new RosterBuilder(settings);
+            builder = new RosterBuilder(settings, home);
         }
 
         public RosterSnapshot Latest => latest;

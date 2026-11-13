@@ -17,6 +17,8 @@
             "activity": "",
             "prNumber": 7,
             "stateSince": 1794000123000,
+            "enter": "cd /work/alpha && CLAUDE_CONFIG_DIR=/home/demo/.claude-demo claude --resume 00000000-0000-4000-8000-000000000002",
+            "pid": 1002,
             "subagents": [
                 {
                     "agentId": "a1",
@@ -41,6 +43,8 @@
             "activity": "",
             "prNumber": 0,
             "stateSince": 1794000150000,
+            "enter": "cd /work/alpha && CLAUDE_CONFIG_DIR=/home/demo/.claude-demo claude --resume 00000000-0000-4000-8000-000000000005",
+            "pid": 1004,
             "subagents": []
         },
         {
@@ -59,6 +63,8 @@
             "activity": "",
             "prNumber": 0,
             "stateSince": 1794000300000,
+            "enter": "cd /work/beta && CLAUDE_CONFIG_DIR=/home/demo/.claude-demo claude attach bg000001",
+            "pid": 0,
             "subagents": []
         },
         {
@@ -77,6 +83,8 @@
             "activity": "",
             "prNumber": 0,
             "stateSince": 1794000200000,
+            "enter": "cd /work/beta && CLAUDE_CONFIG_DIR=/home/demo/.claude-demo claude --resume 00000000-0000-4000-8000-000000000003",
+            "pid": 1003,
             "subagents": []
         },
         {
@@ -95,6 +103,8 @@
             "activity": "working",
             "prNumber": 0,
             "stateSince": 1794000000000,
+            "enter": "cd /work/alpha && CLAUDE_CONFIG_DIR=/home/demo/.claude-demo claude --resume 00000000-0000-4000-8000-000000000001",
+            "pid": 1001,
             "subagents": []
         }
     ],

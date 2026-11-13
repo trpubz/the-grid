@@ -386,6 +386,174 @@
    "groundY": 8
   },
   {
+   "name": "bot-press-a-se",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-press-a-ne",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-press-a-nw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-press-a-sw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-press-b-se",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-press-b-ne",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-press-b-nw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-press-b-sw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-pull-a-se",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-pull-a-ne",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-pull-a-nw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-pull-a-sw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-pull-b-se",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-pull-b-ne",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-pull-b-nw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-pull-b-sw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-carry-a-se",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-carry-a-ne",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-carry-a-nw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-carry-a-sw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-carry-b-se",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-carry-b-ne",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-carry-b-nw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
+   "name": "bot-carry-b-sw",
+   "width": 40,
+   "height": 48,
+   "groundX": 20,
+   "groundY": 8
+  },
+  {
    "name": "bot-small",
    "width": 24,
    "height": 32,

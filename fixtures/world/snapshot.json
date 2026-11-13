@@ -17,7 +17,9 @@
       "activity": "",
       "prNumber": 0,
       "stateSince": 1794000001000,
-      "subagents": []
+      "subagents": [],
+      "enter": "cd /work/alpha && claude --resume 00000000-0000-4000-8000-000000000001",
+      "pid": 0
     },
     {
       "sessionId": "00000000-0000-4000-8000-000000000002",
@@ -46,7 +48,9 @@
           "description": "Synthetic task 1",
           "agentType": "general-purpose"
         }
-      ]
+      ],
+      "enter": "cd /work/alpha && claude --resume 00000000-0000-4000-8000-000000000002",
+      "pid": 0
     },
     {
       "sessionId": "00000000-0000-4000-8000-000000000003",
@@ -64,7 +68,9 @@
       "activity": "testing",
       "prNumber": 0,
       "stateSince": 1794000003000,
-      "subagents": []
+      "subagents": [],
+      "enter": "cd /work/alpha && claude --resume 00000000-0000-4000-8000-000000000003",
+      "pid": 0
     },
     {
       "sessionId": "00000000-0000-4000-8000-000000000004",
@@ -82,7 +88,9 @@
       "activity": "reading",
       "prNumber": 0,
       "stateSince": 1794000004000,
-      "subagents": []
+      "subagents": [],
+      "enter": "cd /work/alpha && claude --resume 00000000-0000-4000-8000-000000000004",
+      "pid": 0
     },
     {
       "sessionId": "00000000-0000-4000-8000-000000000005",
@@ -100,7 +108,9 @@
       "activity": "",
       "prNumber": 0,
       "stateSince": 1794000005000,
-      "subagents": []
+      "subagents": [],
+      "enter": "cd /work/alpha && claude --resume 00000000-0000-4000-8000-000000000005",
+      "pid": 0
     },
     {
       "sessionId": "00000000-0000-4000-8000-000000000006",
@@ -118,7 +128,9 @@
       "activity": "",
       "prNumber": 0,
       "stateSince": 1794000006000,
-      "subagents": []
+      "subagents": [],
+      "enter": "cd /work/alpha && claude --resume 00000000-0000-4000-8000-000000000006",
+      "pid": 0
     },
     {
       "sessionId": "00000000-0000-4000-8000-000000000007",
@@ -136,7 +148,9 @@
       "activity": "",
       "prNumber": 0,
       "stateSince": 1794000007000,
-      "subagents": []
+      "subagents": [],
+      "enter": "cd /work/alpha && claude --resume 00000000-0000-4000-8000-000000000007",
+      "pid": 0
     },
     {
       "sessionId": "00000000-0000-4000-8000-000000000015",
@@ -154,7 +168,9 @@
       "activity": "reading",
       "prNumber": 0,
       "stateSince": 1794000015000,
-      "subagents": []
+      "subagents": [],
+      "enter": "cd /work/alpha && claude --resume 00000000-0000-4000-8000-000000000015",
+      "pid": 0
     },
     {
       "sessionId": "00000000-0000-4000-8000-000000000016",
@@ -172,7 +188,9 @@
       "activity": "reviewing",
       "prNumber": 0,
       "stateSince": 1794000016000,
-      "subagents": []
+      "subagents": [],
+      "enter": "cd /work/alpha && claude --resume 00000000-0000-4000-8000-000000000016",
+      "pid": 0
     },
     {
       "sessionId": "00000000-0000-4000-8000-000000000017",
@@ -190,7 +208,9 @@
       "activity": "reading",
       "prNumber": 0,
       "stateSince": 1794000017000,
-      "subagents": []
+      "subagents": [],
+      "enter": "cd /work/alpha && claude --resume 00000000-0000-4000-8000-000000000017",
+      "pid": 0
     },
     {
       "sessionId": "00000000-0000-4000-8000-000000000018",
@@ -208,7 +228,9 @@
       "activity": "reviewing",
       "prNumber": 0,
       "stateSince": 1794000018000,
-      "subagents": []
+      "subagents": [],
+      "enter": "cd /work/alpha && claude --resume 00000000-0000-4000-8000-000000000018",
+      "pid": 0
     },
     {
       "sessionId": "00000000-0000-4000-8000-000000000008",
@@ -226,7 +248,9 @@
       "activity": "reviewing",
       "prNumber": 0,
       "stateSince": 1794000008000,
-      "subagents": []
+      "subagents": [],
+      "enter": "cd /work/beta && claude --resume 00000000-0000-4000-8000-000000000008",
+      "pid": 0
     },
     {
       "sessionId": "00000000-0000-4000-8000-000000000009",
@@ -244,7 +268,9 @@
       "activity": "reading",
       "prNumber": 0,
       "stateSince": 1794000009000,
-      "subagents": []
+      "subagents": [],
+      "enter": "cd /work/beta && claude --resume 00000000-0000-4000-8000-000000000009",
+      "pid": 0
     },
     {
       "sessionId": "00000000-0000-4000-8000-000000000010",
@@ -262,7 +288,9 @@
       "activity": "",
       "prNumber": 0,
       "stateSince": 1794000010000,
-      "subagents": []
+      "subagents": [],
+      "enter": "cd /work/beta && claude --resume 00000000-0000-4000-8000-000000000010",
+      "pid": 0
     },
     {
       "sessionId": "00000000-0000-4000-8000-000000000011",
@@ -280,7 +308,9 @@
       "activity": "",
       "prNumber": 0,
       "stateSince": 1794000011000,
-      "subagents": []
+      "subagents": [],
+      "enter": "cd /work/beta && claude --resume 00000000-0000-4000-8000-000000000011",
+      "pid": 0
     },
     {
       "sessionId": "00000000-0000-4000-8000-000000000012",
@@ -298,7 +328,9 @@
       "activity": "",
       "prNumber": 0,
       "stateSince": 1794000012000,
-      "subagents": []
+      "subagents": [],
+      "enter": "cd /work/beta && claude attach bg000012",
+      "pid": 0
     },
     {
       "sessionId": "00000000-0000-4000-8000-000000000013",
@@ -316,7 +348,9 @@
       "activity": "working",
       "prNumber": 0,
       "stateSince": 1794000013000,
-      "subagents": []
+      "subagents": [],
+      "enter": "cd /work/scratch && claude --resume 00000000-0000-4000-8000-000000000013",
+      "pid": 0
     },
     {
       "sessionId": "00000000-0000-4000-8000-000000000014",
@@ -334,7 +368,9 @@
       "activity": "",
       "prNumber": 0,
       "stateSince": 1794000014000,
-      "subagents": []
+      "subagents": [],
+      "enter": "cd /work/scratch && claude --resume 00000000-0000-4000-8000-000000000014",
+      "pid": 0
     }
   ],
   "errors": []

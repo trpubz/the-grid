@@ -10,6 +10,7 @@ namespace TheGrid.Core
     {
         public string key = "", fromBot = "", toBot = "";
         public Vector2Int fromAt, toAt;   // the origins of the sender's sector and the recipient's
+        public List<Vector2> ride = new List<Vector2>();   // the way its courier rides out, in art pixels (Iso.Ride)
         public long receivedAt;
         public List<Vector2Int> way = new List<Vector2Int>();   // the sectors its courier passes, by their origins, first to last; one when both bots are in the same sector
     }
@@ -32,8 +33,17 @@ namespace TheGrid.Core
 
         // The rows that were received after the world opened and have not been returned before. Each row at most once, ever.
         // A row is shown only when its sender and its recipient each match exactly one bot, by account and session name;
-        // anything else (a bot that has gone, two sessions with one name, another account) is dropped without a word.
-        public List<Delivery> New(PileSnapshot pile, WorldModel world)
+        // anything else (a bot that has gone, two sessions with one name, another account) is dropped. `said` gets a line
+        // for each message that arrived: its courier, or why it has none. That is for the log, so that "I saw no courier"
+        // can be answered from it.
+        // A courier leaves a trail of light along the way it rode, so that a ride nobody was watching can still be read. It
+        // fades in steps and is gone after two minutes. Trail: which step it is at, so many seconds after the courier
+        // arrived: 0 the brightest, also while the courier is still riding; -1 once it is gone.
+        public const int TrailSteps = 4;
+        public const float TrailSeconds = 120f;
+        public static int Trail(float sinceArrival) => sinceArrival >= TrailSeconds ? -1 : Mathf.Max(0, (int)(sinceArrival / (TrailSeconds / TrailSteps)));
+
+        public List<Delivery> New(PileSnapshot pile, WorldModel world, List<string> said = null)
         {
             var found = new List<Delivery>();
             foreach (var row in pile.rows)
@@ -43,19 +53,28 @@ namespace TheGrid.Core
                 bool byArrival = settled.Add("at " + row.receivedAt + " " + row.account + "|" + row.from + "|" + row.to);
                 if (!byKey || !byArrival) continue;
                 if (row.receivedAt <= openedAt) continue;     // history, not news
-                if (!One(world, row.account, row.from, out var from, out var fromAt)) continue;
-                if (!One(world, row.account, row.to, out var to, out var toAt)) continue;
-                found.Add(new Delivery { key = row.key, fromBot = from, toBot = to, fromAt = fromAt, toAt = toAt, receivedAt = row.receivedAt, way = Roads.Hops(world, fromAt, toAt) ?? new List<Vector2Int>() });
+                string who = row.from + " to " + row.to;
+                bool sender = One(world, row.account, row.from, out var from, out var fromIn), recipient = One(world, row.account, row.to, out var to, out var toIn);
+                if (!sender || !recipient)
+                {
+                    said?.Add("no courier: " + who + ": the " + (sender ? "recipient" : "sender") + " is not one bot on the map");
+                    continue;
+                }
+                Vector2Int fromAt = fromIn.origin, toAt = toIn.origin;
+                var way = Roads.Hops(world, fromAt, toAt) ?? new List<Vector2Int>();
+                said?.Add("courier: " + who + (way.Count > 1 ? ", through " + way.Count + " sectors" : fromAt == toAt ? ", within one sector" : ", across open ground"));
+                found.Add(new Delivery { key = row.key, fromBot = from.key, toBot = to.key, fromAt = fromAt, toAt = toAt, receivedAt = row.receivedAt, way = way,
+                    ride = Iso.Ride(fromAt, fromIn.layout, from.place, from.slot, toAt, toIn.layout, to.place, to.slot, way) });
             }
             return found;
         }
 
         // The one bot of that name on that account. An ended session stays on the map for hours as an offline bot, and a
         // session restarted under the same name is a second bot called the same: among namesakes, only the live ones count.
-        static bool One(WorldModel world, string account, string name, out string key, out Vector2Int at)
+        static bool One(WorldModel world, string account, string name, out WorldBot bot, out WorldSector at)
         {
-            key = "";
-            at = default;
+            bot = null;
+            at = null;
             if (account == "" || name == "") return false;
             int live = 0, ended = 0;
             foreach (var sector in world.sectors)
@@ -66,8 +85,8 @@ namespace TheGrid.Core
                     if (isLive) live++; else ended++;
                     if (isLive || live == 0)
                     {
-                        key = b.key;
-                        at = sector.origin;
+                        bot = b;
+                        at = sector;
                     }
                 }
             return live == 1 || (live == 0 && ended == 1);
