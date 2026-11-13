@@ -61,7 +61,7 @@ namespace TheGrid
 
         readonly Transform root;
         Transform built;   // the buildings of every sector: all of them go when the map is laid out again
-        readonly Tilemap ground, lines, roadLinesA, roadLinesB;
+        readonly Tilemap ground, lines, linesA, linesB;   // lines: the rounded corners; linesA and linesB: the straight lines, one layer for each way they run
         static readonly Dictionary<string, Sprite> plain = new Dictionary<string, Sprite>();   // pictures as drawn, by name
         readonly Dictionary<string, Sprite> sprites = new Dictionary<string, Sprite>();          // pictures in an account's colours
         readonly Dictionary<string, Tile> tiles = new Dictionary<string, Tile>();
@@ -71,6 +71,11 @@ namespace TheGrid
         readonly Dictionary<int, (Vector2Int origin, int arrangement, int look)> painted = new Dictionary<int, (Vector2Int, int, int)>();
         readonly HashSet<(Vector2Int, Vector2Int)> roads = new HashSet<(Vector2Int, Vector2Int)>();
         readonly HashSet<Vector2Int> opened = new HashSet<Vector2Int>();
+        // Every tile of lane and road that is down, with the light its lines are in; every tile of a plot; and whether
+        // the lines have to be laid again.
+        readonly Dictionary<Vector2Int, int> paved = new Dictionary<Vector2Int, int>();
+        readonly HashSet<Vector2Int> plots = new HashSet<Vector2Int>();
+        bool relay;
         readonly Dictionary<(int plot, Structure kind), Building> buildings = new Dictionary<(int, Structure), Building>();
         int beat;   // 0 or 1: which of the two levels the lights of busy buildings are at
         // The crates at each sector's depot, by its plot: what they show, and the object that holds them.
@@ -93,11 +98,11 @@ namespace TheGrid
             grid.cellSize = new Vector3(Iso.TileW, Iso.TileH, 1);
             grid.transform.localPosition = new Vector3(0, -Iso.TileH / 2, 0);   // so a cell's centre is Iso.TileCentre
             ground = Layer(grid, "Tiles", -10);
-            lines = Layer(grid, "Light", -9);   // lines of light lie over the ground, never in it
-            // A road's lines have layers of their own, one for each way a line can run: where a road meets a lane, or turns,
-            // one tile needs a line of the lane's and one or two of the road's.
-            roadLinesA = Layer(grid, "Road light a", -9);
-            roadLinesB = Layer(grid, "Road light b", -9);
+            // Lines of light lie over the ground, never in it. The straight ones have a layer for each way a line can run:
+            // one tile can need one of each. Rounded corners have a layer of their own.
+            lines = Layer(grid, "Light corners", -9);
+            linesA = Layer(grid, "Light a", -9);
+            linesB = Layer(grid, "Light b", -9);
             for (int i = 0; i < tops.Length; i++) tops[i] = Top(Art(ArtNames.Structures[i]));
             built = Holder("Buildings");
         }
@@ -255,6 +260,9 @@ namespace TheGrid
             foreach (var road in all)
                 if (roads.Add(road)) Road(road.from, road.to, at[road.from].region == at[road.to].region ? Lights.Primary(at[road.from].layout.Look) : 0);
 
+            if (relay) LayLines();
+            relay = false;
+
             foreach (var sector in model.sectors) PutCrates(sector);
             // A building a bot has come to work in is opened; one the last has left is closed again.
             foreach (var sector in model.sectors)
@@ -314,8 +322,8 @@ namespace TheGrid
         {
             ground.ClearAllTiles();
             lines.ClearAllTiles();
-            roadLinesA.ClearAllTiles();
-            roadLinesB.ClearAllTiles();
+            linesA.ClearAllTiles();
+            linesB.ClearAllTiles();
             Kill(built.gameObject);
             built = Holder("Buildings");
             foreach (var blocks in outlands.Values) Kill(blocks);
@@ -326,6 +334,8 @@ namespace TheGrid
             outlands.Clear();
             bots.Clear();
             painted.Clear();
+            paved.Clear();
+            plots.Clear();
             roads.Clear();
             opened.Clear();
             outlandsFor = default;
@@ -501,23 +511,13 @@ namespace TheGrid
             // The sector's paving, and its own lane round it. Beyond the lane the ground stays open: a sector stands apart.
             for (int col = First; col < Ring; col++)
                 for (int row = First; row < Ring; row++)
-                    ground.SetTile(At(o.x + col, o.y + row), Iso.OnLane(o, o.x + col, o.y + row) ? T(Lane(col, row), light) : T(Paving(col, row)));
-
-            // A line of light down each edge of the lane. line-a runs along a tile's far edge one way, line-b the other; the
-            // lane's outer edge is the far edge of the tile beyond it.
-            for (int i = First; i < Ring; i++)
-            {
-                bool inner = i >= 0 && i < Iso.PlotTiles;
-                lines.SetTile(At(o.x + i, o.y + First), T(ArtNames.LineA, light));
-                lines.SetTile(At(o.x + i, o.y + Ring), T(ArtNames.LineA, light));
-                lines.SetTile(At(o.x + First - 1, o.y + i), T(ArtNames.LineB, light));
-                lines.SetTile(At(o.x + Ring - 1, o.y + i), T(ArtNames.LineB, light));
-                if (!inner) continue;
-                lines.SetTile(At(o.x + i, o.y), T(ArtNames.LineA, light));
-                lines.SetTile(At(o.x + i, o.y + Iso.PlotTiles), T(ArtNames.LineA, light));
-                lines.SetTile(At(o.x - 1, o.y + i), T(ArtNames.LineB, light));
-                lines.SetTile(At(o.x + Iso.PlotTiles - 1, o.y + i), T(ArtNames.LineB, light));
-            }
+                {
+                    var tile = new Vector2Int(o.x + col, o.y + row);
+                    bool lane = Iso.OnLane(o, tile.x, tile.y);
+                    ground.SetTile(At(tile.x, tile.y), lane ? T(Lane(col, row), light) : T(Paving(col, row)));
+                    if (lane) paved[tile] = light; else plots.Add(tile);
+                }
+            relay = true;
 
             // Every sector has the same buildings; where each stands and how it is lit is the sector's own.
             foreach (Structure s in Enum.GetValues(typeof(Structure)))
@@ -529,21 +529,30 @@ namespace TheGrid
             }
         }
 
-        // The road across the open ground from one sector's lane to another's: lane tiles where Iso.RoadTiles says, and a
-        // line of light along every edge of it that is not the lane it runs into. line-a lies along the far edge of a tile's
-        // row, line-b along the near edge of its column.
+        // The road across the open ground from one sector's lane to another's: lane tiles where Iso.RoadTiles says.
         void Road(Vector2Int from, Vector2Int to, int light)
         {
-            var tiles = new HashSet<Vector2Int>(Iso.RoadTiles(from, to));
-            bool Open(int col, int row) => tiles.Contains(new Vector2Int(col, row)) || Iso.OnLane(from, col, row) || Iso.OnLane(to, col, row);
-            foreach (var t in tiles)
+            foreach (var t in Iso.RoadTiles(from, to))
             {
                 ground.SetTile(At(t.x, t.y), T(ArtNames.Lane));
-                if (!Open(t.x, t.y - 1)) roadLinesA.SetTile(At(t.x, t.y), T(ArtNames.LineA, light));
-                if (!Open(t.x, t.y + 1)) roadLinesA.SetTile(At(t.x, t.y + 1), T(ArtNames.LineA, light));
-                if (!Open(t.x - 1, t.y)) roadLinesB.SetTile(At(t.x - 1, t.y), T(ArtNames.LineB, light));
-                if (!Open(t.x + 1, t.y)) roadLinesB.SetTile(At(t.x, t.y), T(ArtNames.LineB, light));
+                if (!paved.ContainsKey(t)) paved[t] = light;
             }
+            relay = true;
+        }
+
+        // The lines of light on the ground, all of them, from everything that is paved now (Ground.Outline): a straight
+        // line along every edge of lane and road, in the light of the sector or the road it is the edge of, and a rounded
+        // corner where two of them would meet in a point. Laid again from nothing whenever a sector or a road is new: a
+        // road opens the edge of the lane it runs into.
+        void LayLines()
+        {
+            lines.ClearAllTiles();
+            linesA.ClearAllTiles();
+            linesB.ClearAllTiles();
+            Ground.Outline(new HashSet<Vector2Int>(paved.Keys), plots.Contains, out var edges, out var corners);
+            foreach (var e in edges) (e.a ? linesA : linesB).SetTile(At(e.cell.x, e.cell.y), T(e.a ? ArtNames.LineA : ArtNames.LineB, paved[e.of]));
+            // shortcut: one rounded corner a tile; a tile with two (a road one tile wide, which there is none of) shows the last. Give corners a layer each if roads ever narrow.
+            foreach (var c in corners) lines.SetTile(At(c.tile.x, c.tile.y), T(ArtNames.Round(c.filled, c.toward), paved[c.beside]));
         }
 
         // Paving is plain, with a joint every third tile each way.

@@ -5,6 +5,7 @@ line along an edge, laid over the ground as its own sprite, with its glow in fla
 """
 import math
 
+import bmesh
 import bpy
 
 import kit
@@ -72,6 +73,45 @@ def line(name, way):
     render(name, 96, 48, 24)
 
 
+def arc(r0, r1, a0, a1, z, colour, cx=0.0, cy=0.0, steps=32):
+    """A flat piece of a ring on the ground: between two radii, from one angle to another, in degrees anticlockwise from +x."""
+    bm = bmesh.new()
+    inner, outer = [], []
+    for i in range(steps + 1):
+        a = math.radians(a0 + (a1 - a0) * i / steps)
+        inner.append(bm.verts.new((cx + max(r0, 0) * math.cos(a), cy + max(r0, 0) * math.sin(a), z)))
+        outer.append(bm.verts.new((cx + r1 * math.cos(a), cy + r1 * math.sin(a), z)))
+    for i in range(steps):
+        bm.faces.new((inner[i], outer[i], outer[i + 1], inner[i + 1]))
+    mesh = bpy.data.meshes.new("arc")
+    bm.to_mesh(mesh)
+    bm.free()
+    o = bpy.data.objects.new("arc", mesh)
+    bpy.context.collection.objects.link(o)
+    o.data.materials.append(mat(PALETTE[colour]))
+
+
+# The four corners of a tile, by the steps along columns and rows that lead to them, as the game names them.
+CORNERS = {"back": (-1, -1), "right": (1, -1), "front": (1, 1), "left": (-1, 1)}
+
+
+def rounded(name, corner, filled):
+    """An overlay for one tile: a corner of lane or road rounded by one tile. The line of light is a quarter of a circle
+    about the tile's opposite corner, with its glow either side, in place of the two straight lines that would meet in
+    the corner. Cut (not filled): the tile is paved, and outside the arc is open ground: the outer corner of a lane, the
+    outside of a bend. Filled: the tile is open ground, and outside the arc is paved: where a road meets a lane, the
+    inside of a bend."""
+    columns, rows = CORNERS[corner]
+    x, y = columns, -rows                                   # columns run along +x, rows along -y
+    cx, cy = -x / 2, -y / 2                                 # the opposite corner: the arc's centre
+    a0 = {(1, 1): 0, (-1, 1): 90, (-1, -1): 180, (1, -1): 270}[(x, y)]
+    light(0, 0, 0, 1, 1, .001, "g0" if filled else "ground")
+    arc(0, 1, a0, a0 + 90, .002, "ground" if filled else "g0", cx, cy)
+    for i, (colour, reach) in enumerate((("cg0", .5), ("cg1", .28), ("cg2", .12), ("cyanw", .03))):
+        arc(1 - reach, 1 + reach, a0, a0 + 90, .003 + i * .001, colour, cx, cy)
+    render(name, 96, 48, 24)
+
+
 def fountain():
     """The plaza's landmark: a low platform outlined in light, a ring and a column of violet light."""
     glow(0, 0, 2, 2, "violet")
@@ -100,6 +140,8 @@ def make():
     lane("tile-crossing-a", "crossing-a"); lane("tile-crossing-b", "crossing-b")
     void()
     line("line-a", "a"); line("line-b", "b")
+    for corner in CORNERS:
+        rounded("line-round-out-" + corner, corner, False); rounded("line-round-in-" + corner, corner, True)
     kit.DEPTH = True
     fountain()
     block("block-a", 1.7, 1.7, .6, 1); block("block-b", 1.6, 1.8, 1.2, 2); block("block-c", 1.5, 1.5, 2.0, 2)
