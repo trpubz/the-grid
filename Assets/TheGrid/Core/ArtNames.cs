@@ -17,6 +17,10 @@ namespace TheGrid.Core
         public static readonly string[] Blocks = { "block-a", "block-b", "block-c" };
         public static readonly string[] Crates = { "crate-draft", "crate-review", "crate-ready" };   // in the order of PullState
         public const string WalkA = "walk-a", WalkB = "walk-b", Signal = "signal";
+        // A bot at a job: an arm out to a button or a socket and drawn back; up to a lever and down with it; a core or a
+        // drive carried, in two strides.
+        public const string PressA = "press-a", PressB = "press-b", PullA = "pull-a", PullB = "pull-b", CarryA = "carry-a", CarryB = "carry-b";
+        public static readonly string[] AtWork = { PressA, PressB, PullA, PullB, CarryA, CarryB };
         public const string SmallBot = "bot-small";
         public const string Paving = "tile-paving", PavingJointA = "tile-paving-joint-a", PavingJointB = "tile-paving-joint-b";
         public const string Lane = "tile-lane", ChevronA = "tile-lane-chevron-a", ChevronB = "tile-lane-chevron-b", Crossing = "tile-crossing-a";
@@ -40,6 +44,7 @@ namespace TheGrid.Core
                 yield return Bot(WalkA, f);
                 yield return Bot(WalkB, f);
                 yield return Bot(Signal, f);
+                foreach (var pose in AtWork) yield return Bot(pose, f);
                 yield return Bike(f);
             }
             yield return SmallBot;

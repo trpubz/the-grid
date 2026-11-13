@@ -18,5 +18,28 @@ namespace TheGrid.Core.Tests
         [TestCase("", false)]
         [TestCase(null, false)]
         public void OnlyHttpsLinksAreOpened(string url, bool expected) => Assert.AreEqual(expected, RosterFormat.IsWebLink(url));
+
+        // a background session is attached to by its short id; any other is resumed by its session id
+        [TestCase("background", "bg000001", "0000-4", "/work/beta", "/home/me/.claude", "cd /work/beta && claude attach bg000001")]
+        [TestCase("interactive", "", "0000-4", "/work/alpha", "/home/me/.claude", "cd /work/alpha && claude --resume 0000-4")]
+        [TestCase("interactive", "", "0000-4", "/work/alpha", "/home/me/.claude/", "cd /work/alpha && claude --resume 0000-4")]
+        // an account other than the default one is named, as a person's shell would name it
+        [TestCase("interactive", "", "0000-4", "/work/alpha", "/home/me/.claude-two", "cd /work/alpha && CLAUDE_CONFIG_DIR=/home/me/.claude-two claude --resume 0000-4")]
+        // whatever a shell would not take as one plain word is quoted
+        [TestCase("interactive", "", "0000-4", "/work/my app/it's", "/home/me/.claude", "cd '/work/my app/it'\\''s' && claude --resume 0000-4")]
+        [TestCase("background", "x; rm -rf ~", "0000-4", "/work/beta", "/home/me/.claude", "cd /work/beta && claude attach 'x; rm -rf ~'")]
+        // no folder: no cd. Nothing to open it by: no command
+        [TestCase("interactive", "", "0000-4", "", "/home/me/.claude", "claude --resume 0000-4")]
+        [TestCase("background", "", "0000-4", "/work/beta", "/home/me/.claude", "")]
+        [TestCase("interactive", "", "", "/work/alpha", "/home/me/.claude", "")]
+        public void TheCommandThatOpensAConversation(string kind, string id, string sessionId, string cwd, string configDir, string expected) =>
+            Assert.AreEqual(expected, RosterFormat.Enter(kind, id, sessionId, cwd, configDir, "/home/me", false));
+
+        // With more than one account, the terminal the command is pasted into may have another account's folder set: the
+        // default account, which is the one with none set, then says so.
+        [TestCase("/home/me/.claude", "cd /work/alpha && env -u CLAUDE_CONFIG_DIR claude --resume 0000-4")]
+        [TestCase("/home/me/.claude-two", "cd /work/alpha && CLAUDE_CONFIG_DIR=/home/me/.claude-two claude --resume 0000-4")]
+        public void WithSeveralAccountsTheCommandNamesTheDefaultOneToo(string configDir, string expected) =>
+            Assert.AreEqual(expected, RosterFormat.Enter("interactive", "", "0000-4", "/work/alpha", configDir, "/home/me", true));
     }
 }

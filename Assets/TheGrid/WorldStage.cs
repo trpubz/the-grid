@@ -13,7 +13,7 @@ namespace TheGrid
     {
         static readonly float WalkPixelsPerSecond = 4f * Iso.TileStep;   // four tiles a second
         const float StepSeconds = .2f;
-        const float BeatSeconds = .7f;   // how long the lights of a building someone works in stay at each of their two levels
+        const float BeatSeconds = Jobs.BeatSeconds;   // how long the lights of a building someone works in stay at each of their two levels, and a bot at a job in each pose
         const int OutlandRing = 3;   // plot-sized cells of city kept beyond the sectors of a small map; more for a wide one
         const int MaxSmall = 3;      // subagents drawn beside a bot; its name carries the full count
 
@@ -131,6 +131,9 @@ namespace TheGrid
         // A picture in the colourway of a bot's account: the courier's bike is its sender's. Plain if the bot has gone.
         public Sprite BotArt(string botKey, string name) =>
             bots.TryGetValue(botKey, out var b) ? Lit(name, b.data.colour) : Art(name);
+
+        // The colour of a bot's light: its account's. What its courier's ribbon is drawn in.
+        public Color32 Light(string botKey) => Colourways[(bots.TryGetValue(botKey, out var b) ? b.data.colour : 0) % Colourways.Length][0];
 
         // Every picture the world, its panels and its traffic draw comes through here. One that is missing is said once,
         // by name, and the world is drawn without it.
@@ -335,7 +338,7 @@ namespace TheGrid
             Walking = false;
             // The lights of every building someone works in go a step down and back, together. Nothing else in the map
             // moves for it: two pictures, swapped, and the map drawn again at each swap.
-            int now2 = (int)(now / BeatSeconds) % 2;
+            int count = (int)(now / BeatSeconds), now2 = count % 2;
             if (now2 != beat)
             {
                 beat = now2;
@@ -369,6 +372,14 @@ namespace TheGrid
                 {
                     pose = ArtNames.Signal;
                     facing = "se";   // toward us, so the raised hand shows
+                }
+                else if (Jobs.TryFrame(b.data.place, b.data.slot, b.data.key, count, out var job))
+                {
+                    // At work inside a building: one of the building's jobs, a beat at a time, a step or two from its place.
+                    pose = job.pose;
+                    facing = job.facing;
+                    var there = Iso.AtWork(p, job.at);
+                    at = new Vector3(Mathf.Round(there.x), Mathf.Round(there.y), -1 - there.z);
                 }
                 else
                 {

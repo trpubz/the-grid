@@ -11,7 +11,6 @@ namespace TheGrid.Core.Tests
     {
         const long Opened = 1794000092000;   // the world was opened between the two messages being sent
         RosterSnapshot snap;
-        WorldModel world;
         PileSnapshot pile;
 
         [SetUp]
@@ -46,10 +45,121 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(1794000095000, between.receivedAt);
             var within = got.Single(d => d.key == "m-0002");
             Assert.AreEqual(within.fromAt, within.toAt);
-            // between two sectors a courier rides; within one there is nowhere to ride, only the pulse
+            // between two sectors a courier rides the lanes and a road; within one there are none to ride
             Assert.Greater(Iso.Route(between.way).Count, 1);
             CollectionAssert.AreEqual(new[] { within.fromAt }, within.way);
             Assert.AreEqual(0, Iso.Route(within.way).Count);
+        }
+
+        // True when a point of the map, in tiles, is on a building, the relay or the fountain of that sector.
+        static bool Built(WorldSector s, Vector2 at)
+        {
+            foreach (Structure kind in Enum.GetValues(typeof(Structure)))
+            {
+                var f = s.layout.Footprint(kind);
+                if (at.x > s.origin.x + f.xMin - .5f && at.x < s.origin.x + f.xMax - .5f && at.y > s.origin.y + f.yMin - .5f && at.y < s.origin.y + f.yMax - .5f) return true;
+            }
+            return false;
+        }
+
+        static void AssertRidesRoundEverything(List<Vector2> ride, string who)
+        {
+            for (int i = 1; i < ride.Count; i++)
+            {
+                Vector2 p = ride[i - 1], q = ride[i];
+                Assert.AreNotEqual(p, q, who + ": a leg of no length");
+                Assert.IsTrue(p.x == q.x || p.y == q.y, who + ": a courier turns square corners: " + p + " to " + q);
+                // and never rides a stretch only to come straight back along it
+                if (i > 1) Assert.GreaterOrEqual(Vector2.Dot(q - p, p - ride[i - 2]), 0f, who + ": doubles back at " + p + ", from " + ride[i - 2] + " and on to " + q);
+                for (float k = 0; k <= (q - p).magnitude; k += .25f)
+                    foreach (var sector in world.sectors) Assert.IsFalse(Built(sector, Vector2.MoveTowards(p, q, k)), who + ": rides through something of " + sector.name + " at " + Vector2.MoveTowards(p, q, k));
+            }
+        }
+
+        static WorldModel world;
+
+        [Test]
+        public void ACourierRidesFromTheFrontOfOneBuildingToTheFrontOfAnotherRoundEverythingBetween()
+        {
+            var got = new Deliveries(Opened).New(pile, world);
+            Delivery between = got.Single(d => d.key == "m-0001"), within = got.Single(d => d.key == "m-0002");
+            WorldSector alpha = world.sectors[0], beta = world.sectors[1];
+            WorldBot Bot(WorldSector s, string name) => s.bots.Single(b => b.name == name);
+            Vector2 Before(WorldSector s, WorldBot b) => new Vector2(s.origin.x, s.origin.y) + s.layout.Front(b.place, b.slot);
+
+            // between two sectors: from the front of the sender's building, over its plot to its crossing, by the lanes and
+            // the road, and over the recipient's plot to the front of its building
+            WorldBot sender = Bot(alpha, "alpha-04"), recipient = Bot(beta, "beta-01");
+            var ride = Iso.RideTiles(alpha.origin, alpha.layout, sender.place, sender.slot, beta.origin, beta.layout, recipient.place, recipient.slot, between.way);
+            Assert.AreEqual(Before(alpha, sender), ride[0]);
+            Assert.AreEqual(Before(beta, recipient), ride[ride.Count - 1]);
+            // all of the lanes' way but its two ends, the crossings: a crossing is ridden through only where it is on the way
+            var lanes = Iso.Route(between.way);
+            var middle = lanes.GetRange(1, lanes.Count - 2);
+            int at = ride.IndexOf(middle[0]);
+            Assert.Greater(at, 0, "it comes to the lanes over the plot");
+            CollectionAssert.AreEqual(middle, ride.GetRange(at, middle.Count));
+            AssertRidesRoundEverything(ride, "between sectors");
+            // what the world draws is that ride, in art pixels
+            CollectionAssert.AreEqual(ride.Select(p => Iso.Point(p.x, p.y)).ToList(), between.ride);
+
+            // within one sector: over the plot from the one front to the other, and never out on the lane
+            WorldBot a = Bot(alpha, "alpha-02"), b = Bot(alpha, "alpha-03");
+            var across = Iso.RideTiles(alpha.origin, alpha.layout, a.place, a.slot, alpha.origin, alpha.layout, b.place, b.slot, within.way);
+            Assert.AreEqual(Before(alpha, a), across[0]);
+            Assert.AreEqual(Before(alpha, b), across[across.Count - 1]);
+            Assert.IsTrue(across.All(p => p.y < alpha.origin.y + Iso.PlotTiles - .5f), "it stays on the plot");
+            AssertRidesRoundEverything(across, "within a sector");
+            CollectionAssert.AreEqual(across.Select(p => Iso.Point(p.x, p.y)).ToList(), within.ride);
+
+            // from and to every place a bot can be, in every arrangement, nothing is ridden through
+            foreach (var from in alpha.bots)
+                foreach (var to in beta.bots)
+                    AssertRidesRoundEverything(Iso.RideTiles(alpha.origin, alpha.layout, from.place, from.slot, beta.origin, beta.layout, to.place, to.slot, between.way), from.name + " to " + to.name);
+            foreach (var from in alpha.bots)
+                foreach (var to in alpha.bots)
+                    if (from != to) AssertRidesRoundEverything(Iso.RideTiles(alpha.origin, alpha.layout, from.place, from.slot, alpha.origin, alpha.layout, to.place, to.slot, within.way), from.name + " to " + to.name);
+        }
+
+        [Test]
+        public void ARideIsFourTilesASecondAndNeverSoShortThatItIsMissed()
+        {
+            Assert.AreEqual(3f, Iso.RideSeconds(0));
+            Assert.AreEqual(3f, Iso.RideSeconds(11 * Iso.TileStep));
+            Assert.AreEqual(10f, Iso.RideSeconds(40 * Iso.TileStep), .001f);
+        }
+
+        [Test]
+        public void ATrailFadesInFourStepsOverTwoMinutesAndIsThenGone()
+        {
+            Assert.AreEqual(0, Deliveries.Trail(-2f), "while the courier is still on its way");
+            Assert.AreEqual(0, Deliveries.Trail(0f));
+            Assert.AreEqual(0, Deliveries.Trail(29.9f));
+            Assert.AreEqual(1, Deliveries.Trail(30f));
+            Assert.AreEqual(2, Deliveries.Trail(60f));
+            Assert.AreEqual(3, Deliveries.Trail(119.9f));
+            Assert.AreEqual(-1, Deliveries.Trail(120f));
+            Assert.AreEqual(4, Deliveries.TrailSteps);
+        }
+
+        [Test]
+        public void EveryMessageThatArrivesIsSaidOnceWithItsCourierOrWhyItHasNone()
+        {
+            var said = new List<string>();
+            var d = new Deliveries(Opened);
+            d.New(pile, world, said);
+            CollectionAssert.AreEqual(new[] { "courier: alpha-04 to beta-01, through 2 sectors", "courier: alpha-02 to alpha-03, within one sector" }, said);
+            // once: looked at again, nothing more is said
+            said.Clear();
+            d.New(pile, world, said);
+            Assert.AreEqual(0, said.Count);
+            // old mail is not news, and is not spoken of
+            new Deliveries(Opened + 100000).New(pile, world, said);
+            Assert.AreEqual(0, said.Count);
+            // a message that cannot be placed: why
+            d.New(Only(Row("alpha-04", "nobody", "two", Opened + 5, "x1")), world, said);
+            d.New(Only(Row("nobody", "beta-01", "two", Opened + 6, "x2")), world, said);
+            CollectionAssert.AreEqual(new[] { "no courier: alpha-04 to nobody: the recipient is not one bot on the map", "no courier: nobody to beta-01: the sender is not one bot on the map" }, said);
         }
 
         [Test]
@@ -143,22 +253,57 @@ namespace TheGrid.Core.Tests
             Vector2Int a = new Vector2Int(ax, ay), b = new Vector2Int(bx, by);
             var route = Iso.Route(new[] { a, b });
             Assert.GreaterOrEqual(route.Count, 2);
-            // at a sector's crossing: on the lane along its front, where no building of its own stands in the way
-            Assert.AreEqual(new Vector2(a.x + Iso.Crossing, a.y + Iso.PlotTiles), route[0]);
-            Assert.AreEqual(new Vector2(b.x + Iso.Crossing, b.y + Iso.PlotTiles), route[route.Count - 1]);
+            // at a sector's crossing: in the middle of the lane along its front, where no building of its own stands in the way
+            Assert.AreEqual(new Vector2(a.x + Iso.Crossing + .5f, a.y + Iso.PlotTiles + .5f), route[0]);
+            Assert.AreEqual(new Vector2(b.x + Iso.Crossing + .5f, b.y + Iso.PlotTiles + .5f), route[route.Count - 1]);
             var road = new HashSet<Vector2Int>(Iso.RoadTiles(a, b));
+            bool Paved(float col, float row) => Iso.OnLane(a, (int)col, (int)row) || Iso.OnLane(b, (int)col, (int)row) || road.Contains(new Vector2Int((int)col, (int)row));
             for (int i = 1; i < route.Count; i++)
             {
                 Vector2 p = route[i - 1], q = route[i];
                 Assert.AreNotEqual(p, q, "a leg of no length");
                 Assert.IsTrue(p.x == q.x || p.y == q.y, "a leg runs along columns or along rows, never both: " + p + " to " + q);
-                int steps = (int)Mathf.Max(Mathf.Abs(q.x - p.x), Mathf.Abs(q.y - p.y));
-                for (int k = 0; k <= steps; k++)
+                // down the middle: lanes and roads are two tiles wide, and all the way there is one of their tiles on either side
+                float length = Mathf.Abs(q.x - p.x) + Mathf.Abs(q.y - p.y);
+                for (float k = 0; k <= length; k += .5f)
                 {
-                    int col = (int)(p.x + Math.Sign(q.x - p.x) * k), row = (int)(p.y + Math.Sign(q.y - p.y) * k);
-                    Assert.IsTrue(Iso.OnLane(a, col, row) || Iso.OnLane(b, col, row) || road.Contains(new Vector2Int(col, row)), "tile " + col + ", " + row + " is neither lane nor road");
+                    var at = Vector2.MoveTowards(p, q, k);
+                    foreach (float col in new[] { Mathf.Floor(at.x), Mathf.Ceil(at.x) })
+                        foreach (float row in new[] { Mathf.Floor(at.y), Mathf.Ceil(at.y) })
+                            Assert.IsTrue(Paved(col, row), "at " + at + ", tile " + col + ", " + row + " is neither lane nor road");
                 }
             }
+        }
+
+        [Test]
+        public void ARibbonIsCutIntoUprightSlicesSideBySide()
+        {
+            // down a lane to the right, then straight down the screen, then back to the left
+            var ride = new List<Vector2> { new Vector2(0, 0), new Vector2(64, -32), new Vector2(64, -100), new Vector2(30, -117) };
+            var slices = Iso.Ribbon(ride, 4);
+            Assert.AreEqual(16 + 1 + 9, slices.Count);
+            float legOne = new Vector2(64, -32).magnitude;
+            for (int k = 0; k < 16; k++)
+            {
+                // each four pixels wide, standing on the lower end of its piece of the way, and that piece's climb taller
+                Assert.AreEqual(2 + 4 * k, slices[k].x, .001f);
+                Assert.AreEqual(4f, slices[k].wide, .001f);
+                Assert.AreEqual(-2 * (k + 1), slices[k].y, .001f);
+                Assert.AreEqual(2f, slices[k].rise, .001f);
+                Assert.AreEqual(legOne * k / 16, slices[k].at, .001f);
+            }
+            // straight down the screen the ribbon is seen edge on: one slice, as much taller as the way is long
+            Assert.AreEqual(64f, slices[16].x, .001f);
+            Assert.AreEqual(-100f, slices[16].y, .001f);
+            Assert.AreEqual(68f, slices[16].rise, .001f);
+            Assert.AreEqual(legOne, slices[16].at, .001f);
+            // to the left, the last slice only as wide as what is left
+            Assert.AreEqual(62f, slices[17].x, .001f);
+            Assert.AreEqual(31f, slices[25].x, .001f);
+            Assert.AreEqual(2f, slices[25].wide, .001f);
+            Assert.AreEqual(34f, slices.Skip(17).Sum(s => s.wide), .001f);
+            for (int i = 1; i < slices.Count; i++) Assert.GreaterOrEqual(slices[i].at, slices[i - 1].at, "slice " + i + " comes before the one before it");
+            Assert.AreEqual(0, Iso.Ribbon(new List<Vector2> { new Vector2(5, 5) }, 4).Count);
         }
     }
 }

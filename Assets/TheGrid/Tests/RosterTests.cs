@@ -51,6 +51,27 @@ namespace TheGrid.Core.Tests
             File.SetLastWriteTimeUtc(log, At(changedAt));
         }
 
+        [Test]
+        public void ARowCarriesTheCommandThatOpensItsConversationAndItsProcess()
+        {
+            var open = Idle("s-1", "alpha-01", "/work/alpha");
+            open.Pid = 4242;
+            var hidden = new LiveSession { SessionId = "s-2", Id = "bg000002", Name = "beta-nightly", Cwd = "/work/beta", Kind = "background", State = "blocked", Status = "", WaitingFor = "", ConfigDir = "/cfg/.claude-two" };
+            var snap = new RosterBuilder(settings, "/cfg").Build(new[] { open, hidden }, None, Now);
+            var a = snap.agents.Find(x => x.sessionId == "s-1");
+            Assert.AreEqual("cd /work/alpha && claude --resume s-1", a.enter);
+            Assert.AreEqual(4242, a.pid);
+            var b = snap.agents.Find(x => x.sessionId == "s-2");
+            Assert.AreEqual("cd /work/beta && CLAUDE_CONFIG_DIR=/cfg/.claude-two claude attach bg000002", b.enter);
+            Assert.AreEqual(0, b.pid, "a background session has no process to ask");
+
+            // an owner with more than one account: the default account's command says it is the default one
+            settings.configDirs = new List<string> { "/cfg/.claude", "/cfg/.claude-two" };
+            snap = new RosterBuilder(settings, "/cfg").Build(new[] { open, hidden }, None, Now);
+            Assert.AreEqual("cd /work/alpha && env -u CLAUDE_CONFIG_DIR claude --resume s-1", snap.agents.Find(x => x.sessionId == "s-1").enter);
+            Assert.AreEqual("cd /work/beta && CLAUDE_CONFIG_DIR=/cfg/.claude-two claude attach bg000002", snap.agents.Find(x => x.sessionId == "s-2").enter);
+        }
+
         static LiveSession Idle(string id, string name, string cwd = "/work/none") =>
             new LiveSession { SessionId = id, Name = name, Cwd = cwd, Kind = "interactive", Status = "idle", WaitingFor = "", State = "", ConfigDir = "/cfg/.claude" };
 
@@ -179,7 +200,8 @@ namespace TheGrid.Core.Tests
         [Test]
         public void SnapshotSerialisesToTheGoldenFile()
         {
-            var actual = JsonUtility.ToJson(new RosterBuilder(settings).Build(live, None, Now), true).Replace("\r\n", "\n").Trim();
+            // The sessions' account folder is under a temporary folder with a name of its own each run: in the file it is /home/demo.
+            var actual = JsonUtility.ToJson(new RosterBuilder(settings).Build(live, None, Now), true).Replace("\r\n", "\n").Replace(tmp, "/home/demo").Trim();
             var goldenPath = Path.Combine(Fixtures, "roster", "snapshot.json");
             var golden = File.Exists(goldenPath) ? File.ReadAllText(goldenPath).Replace("\r\n", "\n").Trim() : "";
             if (actual != golden) File.WriteAllText(Path.Combine(Path.GetTempPath(), "grid-roster-snapshot.actual.json"), actual + "\n");

@@ -127,16 +127,16 @@ namespace TheGrid.Core
         public static int Floors(Structure s) => s == Structure.ServerTower ? 3 : s == Structure.ReviewHall ? 2 : 1;
 
         // Where the six stand in each tall building, from the corner of its footprint: column, row and floor. In the order
-        // of the slots, which spreads them over the floors. On the ground they are clear of the racks along the far
-        // walls. On an upper floor they stand on its walk, near the open edge, where the floor above does not hide them,
+        // of the slots, which spreads them over the floors. On the ground they stand before what they work at (Jobs): the
+        // racks, the console. On an upper floor they stand on its walk, near the open edge, where the floor above does not hide them,
         // and clear of the head of the stair. None stands in the far right of a floor: the building next along the back
         // row, a tile away, would hide it behind its corner.
         static readonly Vector3[][] InATall =
         {
             // the server tower: two to a floor
-            new[] { new Vector3(1.25f, .9f, 0), new Vector3(.55f, WalkRow, 1), new Vector3(.4f, WalkRow, 2), new Vector3(.9f, 1.7f, 0), new Vector3(1.1f, WalkRow, 1), new Vector3(.95f, WalkRow, 2) },
+            new[] { new Vector3(.75f, .9f, 0), new Vector3(.55f, WalkRow, 1), new Vector3(.4f, WalkRow, 2), new Vector3(1.35f, .9f, 0), new Vector3(1.1f, WalkRow, 1), new Vector3(.95f, WalkRow, 2) },
             // the review hall: three to a floor
-            new[] { new Vector3(1f, 1.2f, 0), new Vector3(.4f, WalkRow, 1), new Vector3(.55f, 1.65f, 0), new Vector3(.76f, WalkRow, 1), new Vector3(1.6f, 1.7f, 0), new Vector3(1.12f, WalkRow, 1) },
+            new[] { new Vector3(.95f, .8f, 0), new Vector3(.4f, WalkRow, 1), new Vector3(.55f, .8f, 0), new Vector3(.76f, WalkRow, 1), new Vector3(1.4f, .8f, 0), new Vector3(1.12f, WalkRow, 1) },
             // the works: one floor
             new[] { new Vector3(1.25f, .85f, 0), new Vector3(.6f, 1.45f, 0), new Vector3(1.9f, 1.45f, 0), new Vector3(.6f, .85f, 0), new Vector3(1.25f, 2f, 0), new Vector3(1.9f, 2f, 0) },
         };
@@ -155,6 +155,45 @@ namespace TheGrid.Core
 
         // Which floor a bot stands on: 0 for the ground, and for everyone not inside a tall building.
         public int Floor(Place place, int slot) => Tall(place) >= 0 && slot < Inside ? (int)InATall[Tall(place)][slot].z : 0;
+
+        // Where a courier stops for a bot: where the bot stands, if that is in the open; for a bot inside a building, on the
+        // ground before the building's front, at its door. Never on an upper floor, never behind.
+        public Vector2 Front(Place place, int slot)
+        {
+            var spot = Spot(place, slot);
+            if (!(Room(spot) is Structure room)) return spot;
+            if (Tall(place) >= 0 && slot < Inside)
+            {
+                var door = Way(place, slot)[0];
+                return new Vector2(door.x, door.y);
+            }
+            var f = Footprint(room);   // the workshop has no door: before the middle of its open front
+            return new Vector2(f.x + (f.width - 1) / 2f, f.yMax - .1f);
+        }
+
+        // Two ways over every plot are always clear, however it is arranged: the street, a row before the fronts of the
+        // back row of buildings, and the aisle, a column between the two low buildings that runs from the street to the
+        // lane in front. A courier keeps to them.
+        public const float Street = 3.25f, Aisle = 4f;
+
+        // A courier's way from a bot's front (Front) to the aisle, in tiles from the plot's first tile, turning square
+        // corners: from behind the street, down to it and along it; from before it, straight along its own row.
+        public List<Vector2> ToAisle(Place place, int slot)
+        {
+            var front = Front(place, slot);
+            var way = new List<Vector2> { front };
+            void Put(Vector2 p)
+            {
+                if (way[way.Count - 1] != p) way.Add(p);
+            }
+            if (front.y < Street)
+            {
+                Put(new Vector2(front.x, Street));
+                Put(new Vector2(Aisle, Street));
+            }
+            else Put(new Vector2(Aisle, front.y));
+            return way;
+        }
 
         // The building a point of the plot is inside, if it is one a bot works inside.
         public Structure? Room(Vector2 at)
