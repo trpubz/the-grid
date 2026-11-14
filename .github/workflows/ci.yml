@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Nothing here writes to the repo.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Needs no Unity: runs on every pull request, a fork's too.
+  files:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Every file under Assets has its .meta
+        run: python3 tools/check_meta.py
+      - name: The demo recording is sound
+        run: python3 tools/check_replay.py
+
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # GitHub gives a fork's pull request no secrets. The job then fails rather than being skipped: a skipped job counts as
+      # passed, and main would take a change whose tests never ran.
+      - name: The Unity licence is here
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        run: |
+          if [ -z "$UNITY_LICENSE$UNITY_SERIAL" ]; then
+            echo "::error::The tests need a Unity licence, which this run was not given. A pull request from a fork never is: a maintainer runs its tests by pushing the branch to this repo. See 'Checks' in the README."
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: Library
+          key: Library-${{ hashFiles('Packages/**', 'ProjectSettings/**') }}
+          restore-keys: Library-
+      # This step is handed the Unity account's password, so it is pinned to a commit. 4.3.2 is the last release that is the
+      # whole program; later ones fetch another program when they run.
+      - name: EditMode tests
+        uses: game-ci/unity-test-runner@fa6ced25861c16ef56187828c43f76d00df43a23 # v4.3.2
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          testMode: EditMode
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: test-results
+          path: artifacts
+          if-no-files-found: ignore

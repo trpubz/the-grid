@@ -1,5 +1,7 @@
 # The Grid
 
+[![CI](https://github.com/trpubz/the-grid/actions/workflows/ci.yml/badge.svg)](https://github.com/trpubz/the-grid/actions/workflows/ci.yml)
+
 > **Note (2026-11-10):** parts of this document are superseded by the approved product requirements. The world is now isometric 16-bit pixel art; version 1 observes the messages agents already send rather than delivering them; seeing which agents are idle is the primary feature; and the order of work has changed. Where this document and the requirements differ, the requirements win. A public summary of the requirements will be added to this repo.
 
 An open-source Unity desktop world where people share a repo sector, watch their coding agents work, and let specific agents exchange addressed messages across providers.
@@ -205,6 +207,19 @@ Add `-shots <folder>` and it saves `far.png` and `near.png` there and quits; `-s
 ```
 
 The sprites are made by a script; see [tools/art/README.md](tools/art/README.md).
+
+## Checks
+
+Every pull request to `main`, and every change that lands there, is run through `.github/workflows/ci.yml`. Both jobs must pass before a pull request can be merged.
+
+| Job | What it checks | Run it yourself |
+|---|---|---|
+| `files` | Every file and folder under `Assets` has its `.meta`, and every `.meta` its file or folder. The demo recording is sound. | `python3 tools/check_meta.py` and `python3 tools/check_replay.py` |
+| `tests` | The EditMode tests for Core, in Unity on Linux. | The command under **Run the tests** above |
+
+**A pull request from a fork:** `tests` needs a Unity licence, which is kept as a secret of this repo, and GitHub gives a fork's pull request no secrets. So on a fork's pull request `files` runs and `tests` fails, saying why. Run the tests on your own machine before you open it; a maintainer then pushes your branch to this repo, where `tests` runs.
+
+**For a maintainer:** the licence is three repo secrets. With a Personal licence: `UNITY_LICENSE` (the text of `Unity_lic.ulf`), `UNITY_EMAIL` and `UNITY_PASSWORD`. With a paid one: `UNITY_SERIAL` in place of `UNITY_LICENSE`. The step that is handed them is pinned to a commit.
 
 ## Package map
 
