@@ -82,6 +82,10 @@ namespace TheGrid.Core
                 + (download ? " -p " + Word("Reply with the single word: ok. Do nothing else.") + " --tools '' --permission-mode plan" : "");
         }
 
+        // The command that opens a Codex thread in a terminal: in the folder it works in, by its id. "" for no id.
+        public static string EnterCodex(string id, string cwd) =>
+            string.IsNullOrEmpty(id) ? "" : (string.IsNullOrEmpty(cwd) ? "" : "cd " + Word(cwd) + " && ") + "codex resume " + Word(id);
+
         // A command as a code block shows it: every step on a line of its own. A shell reads it the same either way.
         public static string Shown(string command) => (command ?? "").Replace(" && ", " &&\n");
 
@@ -136,6 +140,24 @@ namespace TheGrid.Core
             var name = Path.GetFileName((configDir ?? "").TrimEnd(Path.DirectorySeparatorChar));
             return name.StartsWith(".claude-", StringComparison.Ordinal) ? name.Substring(".claude-".Length) : name.TrimStart('.');
         }
+
+        // A snapshot with the rows of another app's sessions among its own, in the roster's order: by state, then by how long
+        // in it, then by name. The snapshot given is not changed.
+        public static RosterSnapshot With(RosterSnapshot snap, List<AgentRow> more)
+        {
+            if (more == null || more.Count == 0) return snap;
+            var all = new RosterSnapshot { generatedAt = snap.generatedAt, errors = snap.errors, agents = new List<AgentRow>(snap.agents) };
+            foreach (var a in more) all.agents.Add(a.Copy());
+            all.agents.Sort((a, b) =>
+            {
+                int c = StateOf(a).CompareTo(StateOf(b));
+                if (c == 0) c = a.stateSince.CompareTo(b.stateSince);
+                return c != 0 ? c : string.CompareOrdinal(a.name, b.name);
+            });
+            return all;
+        }
+
+        static AgentState StateOf(AgentRow a) => Enum.TryParse(a.state, out AgentState s) ? s : AgentState.Unknown;
 
         // The folder of the account with that name under `home`: the reverse of AccountLabel, for a snapshot, which has names only.
         public static string ConfigDir(string label, string home) => Path.Combine(home ?? "", label == "claude" ? ".claude" : ".claude-" + label);

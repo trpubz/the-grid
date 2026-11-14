@@ -58,6 +58,9 @@ namespace TheGrid.Core
 
         readonly Func<string, string> agentsJsonForConfigDir;
         readonly Func<string, string> changeStampForConfigDir;
+        readonly Func<long, List<AgentRow>> others;   // the rows of another app's sessions, as of a time; null for none
+        List<AgentRow> othersLast = new List<AgentRow>();
+        string othersWere = "";
         readonly RosterBuilder builder;
         readonly Dictionary<string, List<LiveSession>> lastGood = new Dictionary<string, List<LiveSession>>();
         readonly Dictionary<string, string> lastStamp = new Dictionary<string, string>();
@@ -70,8 +73,11 @@ namespace TheGrid.Core
 
         // changeStampForConfigDir returns a value that moves whenever a directory's sessions may have changed.
         // With one, the command only runs on a change, after a failure, or every FullRefreshMs. Without one it runs on every poll.
-        public Collector(Settings settings, string home, Func<string, string> agentsJsonForConfigDir, Func<string, string> changeStampForConfigDir = null)
+        // others gives the rows of sessions that are not Claude's (Codex threads); they stand in the roster among the rest.
+        public Collector(Settings settings, string home, Func<string, string> agentsJsonForConfigDir, Func<string, string> changeStampForConfigDir = null,
+            Func<long, List<AgentRow>> others = null)
         {
+            this.others = others;
             this.settings = settings;
             this.home = home;
             this.agentsJsonForConfigDir = agentsJsonForConfigDir;
@@ -111,9 +117,31 @@ namespace TheGrid.Core
                 }
                 // Nothing changed and nobody is working: no command run, no files read. While an agent runs, the roster is
                 // rebuilt from the last session lists so its activity keeps up; only transcripts that changed are read again.
-                if (!anyRead && !live.Exists(s => LiveSessions.Map(s) == AgentState.Running)) return latest;
-                return latest = builder.Build(live, errors, nowMs);
+                // The other app's rows: a failed read keeps the last ones and says so.
+                var more = othersLast;
+                if (others != null)
+                    try { more = others(nowMs) ?? new List<AgentRow>(); }
+                    catch (Exception e)
+                    {
+                        errors.Add("codex: " + e.Message);
+                        anyRead = true;
+                    }
+                string moreIs = Signature(more);
+                if (!anyRead && moreIs == othersWere && !live.Exists(s => LiveSessions.Map(s) == AgentState.Running)) return latest;
+                othersLast = more;
+                othersWere = moreIs;
+                return latest = RosterBuilder.With(builder.Build(live, errors, nowMs), more);
             }
+        }
+
+        // Everything of those rows that the roster shows: when it is the same, the roster is.
+        static string Signature(List<AgentRow> rows)
+        {
+            var all = new System.Text.StringBuilder();
+            foreach (var a in rows)
+                all.Append(a.account).Append('|').Append(a.sessionId).Append('|').Append(a.state).Append('|').Append(a.stateSince).Append('|').Append(a.activity)
+                    .Append('|').Append(a.name).Append('|').Append(a.repoRoot).Append('|').Append(a.workspace).Append('\n');
+            return all.ToString();
         }
 
         public void Start(int intervalMs = 2000)

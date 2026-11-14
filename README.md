@@ -16,7 +16,7 @@ This is an implementation starter. The included Unity component plays a fixed re
 
 ## The roster
 
-The first working piece: a window that lists your live Claude Code sessions on this Mac, with the one that needs you most on top. It reads what Claude Code already publishes about its own sessions and never writes to an agent app's files. The Grid's own code makes no network calls. It runs two programs of yours: `claude`, to ask for the session list, and `gh`, the GitHub command, to ask GitHub about the open pull requests of the repos on the map (see [The PR depot](#the-pr-depot); it can be turned off).
+The first working piece: a window that lists your live Claude Code sessions on this Mac, and your Codex threads (see [Codex](#codex)), with the one that needs you most on top. It reads what Claude Code already publishes about its own sessions, and Codex's session files, and never writes to an agent app's files. The Grid's own code makes no network calls. It runs two programs of yours: `claude`, to ask for the session list, and `gh`, the GitHub command, to ask GitHub about the open pull requests of the repos on the map (see [The PR depot](#the-pr-depot); it can be turned off).
 
 - **Run it in the editor:** open the project in Unity 6000.4.3f1, open `Assets/TheGrid/Roster.unity`, press Play.
 - **Build the app:** menu **The Grid > Build Mac App**, then open `Builds/TheGrid.app`.
@@ -30,7 +30,7 @@ The first time a build runs, macOS asks whether The Grid can access folders such
 
 Each row shows the state (question, permission, done, running and so on), what a running agent is doing (reading, editing, testing, reviewing, or just working when it cannot be told), the session name, its account, how long it has been in that state, the repo, the ticket read from the branch name, the pull request, and the workspace. Click the pull request to open it. Click the workspace to give the repo another: a short list opens with every workspace, the repo's own marked. Click one to move the repo there, or type a name in the last line and press Return (or **Add**) to make a new workspace and move the repo into it. **×**, Escape or a click beside the list puts it away. The list's last line, **Bring a cloud session here**, is described under the world view.
 
-Settings live in `~/Library/Application Support/DefaultCompany/The Grid/settings.json`, created on first launch. You do not need to edit it to add a workspace: the list does that. The app re-reads the file the next time you pick a workspace or click a region's name.
+Settings live in `~/Library/Application Support/DefaultCompany/The Grid/settings.json`, created on first launch. You do not need to edit it to add a workspace: the list does that. The app re-reads the file the next time you pick a workspace or click a region's name. All text is set in a [Nerd Font](https://www.nerdfonts.com) when the Mac has one: the app takes the font from the Mac and brings none of its own, and says in its log which one it took. Without one the text is in Unity's own letters.
 
 | Field | Meaning |
 |---|---|
@@ -39,9 +39,23 @@ Settings live in `~/Library/Application Support/DefaultCompany/The Grid/settings
 | `pullRequests` | `true` to ask GitHub, through `gh`, about open pull requests; `false` and the app asks nothing of the network. Starts as `true` |
 | `ghPath` | Path to the `gh` program. Empty means look in `/opt/homebrew/bin`, `/usr/local/bin` and `/usr/bin` |
 | `zellijPath` | Path to the `zellij` program, asked which tab a session is in. Empty means look in `~/.cargo/bin`, `/opt/homebrew/bin` and `/usr/local/bin` |
+| `codex` | `true` or `false`: read Codex's session files, so that its threads are in the roster and on the map. On unless set to `false` |
+| `font` | The font family all text is set in, as Font Book names it. Empty means the first installed family that is a Nerd Font (its name has "Nerd Font" or the word "NF"). Read when the app starts |
 | `workspaces` | Workspace names, in the order the list shows them and regions take their lights. Starts as `Personal`; a workspace made in the app is added at the end |
 | `repoWorkspaces` | Which repo belongs to which workspace. A repo not listed is `Personal` |
 | `workspaceLights` | The light of a workspace's region in the world: `cyan`, `white`, `rose`, `mint`, `violet`, `blue` or `ember`. A workspace not listed takes its place in `workspaces`: the first is cyan, the second white, and so on |
+
+### Codex
+
+Codex threads stand in the lists and on the map beside the Claude sessions. The Grid reads them from Codex's own session files, `~/.codex/sessions/<year>/<month>/<day>/rollout-*.jsonl`, and from nowhere else: it runs no Codex program, writes nothing under `~/.codex`, and asks nothing of the network. `codex: false` in the settings stops the reading.
+
+- **Which threads.** Codex keeps no list of the threads that are open, so a thread is shown while its file has changed in the last 12 hours, and is gone after that. Only threads you started are shown: Codex's own reviewer threads and the threads another thread spawned are left out.
+- **What state.** From the last turn mark in the file. A turn that has started and not ended is `RUNNING`; one that has ended is `DONE`; one that ended with an error is `ERROR`; a thread that asked you a question is `QUESTION` until you answer. A turn that is open but has written nothing for 15 minutes is `WAITING`: from outside, that is what a wait for your approval looks like, and Codex does not record such a wait in a way The Grid has seen.
+- **What a running one is doing** follows its last command or file change, by the same rule as for Claude.
+- **The row.** The name is the first line of the first thing you said in the thread, cut to 28 letters; Codex's own name for the thread is in its database, which The Grid does not read. The account is `codex`, with a light of its own on the map. The app is `codex-desktop` or `codex-cli`. Repo and workspace come from the thread's folder. A Codex row has no branch, ticket, pull request or subagents, and its messages are not in the review pile.
+- **The card's command** is `codex resume <id>`, after a `cd` to the thread's folder.
+
+![Codex threads on the map: one asking a question, selected, and one at work](docs/art/world-codex.png)
 
 ## The review pile
 
@@ -149,7 +163,7 @@ A lane runs round every sector, and roads cross the open ground so that every se
 - **Open it here** is `claude --teleport <id>`, after a `cd` to the repo's folder and with the account named as on a bot's card. It opens the conversation in your terminal. Nothing is kept on this Mac until you say something in it; from then on it is a session like any other, with a bot.
 - **Download only** adds one short question that is asked with no terminal and no tools (`-p … --tools '' --permission-mode plan`). That writes the whole conversation to this Mac. It is one model turn over the whole conversation, which for a long session is large: the one it was tried on read over 900,000 tokens.
 
-Either way the folder must have no uncommitted changes, and teleport switches it to the session's branch. If the answer is `Session not found`, try the other account. The letters are Menlo, which every Mac has; the app brings no font and no library for this. The Grid runs neither command and asks nothing of the cloud: it only writes the command. Ordinary claude.ai chats cannot be brought over this way.
+Either way the folder must have no uncommitted changes, and teleport switches it to the session's branch. If the answer is `Session not found`, try the other account. The letters are the app's font (see `font` in the settings), or Menlo when the Mac has no Nerd Font; the app brings no font and no library for this. The Grid runs neither command and asks nothing of the cloud: it only writes the command. Ordinary claude.ai chats cannot be brought over this way.
 
 ![The panel that makes the command for a cloud session](docs/art/world-cloud.png)
 
@@ -184,7 +198,7 @@ To look at the world without any agent sessions, start the app on a roster snaps
 Builds/TheGrid.app/Contents/MacOS/"The Grid" -snapshot "$PWD/fixtures/world/snapshot.json"
 ```
 
-Add `-shots <folder>` and it saves `far.png` and `near.png` there and quits; `-select <account>|<session id>` selects that bot for `near.png`, and `-messages <pile snapshot file>` (try `fixtures/world/messages.json`) shows its messages arriving and saves `start.png`, `courier.png` and `pulse.png` too. `-pulls <file>` (try `fixtures/world/pulls.json`) puts those pull requests at the depots, since a snapshot never asks GitHub, and `-depot <sector name>` opens that depot's list in `near.png`. `-moved <world file>` lays the map again from that `world.json` after `far.png` and saves `moved.png`: a picture of a map its owner has arranged. `-cloud <sector name>` opens the cloud panel for that sector in `near.png`, with `-pasted <text>` in its box. `-workspace <sector name>` opens that sector's list of workspaces in `near.png`, and with `-give <workspace>` too the repo is given that workspace and `given.png` shows the map afterwards. `-where <text>` puts that on the selected bot's card as the place its session lives, since a snapshot never asks zellij. `-then <snapshot file>` (try `fixtures/world/later.json`) swaps the snapshot for a later one after `near.png` and saves `stairs.png` with every bot that has somewhere new to go three fifths of its way there. With the editor closed, **The Grid > Render World Pictures** does much the same without a window, into `Logs/`, though without the names and badges; it also renders the first sector at three beats (`world-jobs-2.png`, `-5`, `-9`), where the bots at work are seen in other poses and places:
+Add `-shots <folder>` and it saves `far.png` and `near.png` there and quits; `-select <account>|<session id>` selects that bot for `near.png`, and `-messages <pile snapshot file>` (try `fixtures/world/messages.json`) shows its messages arriving and saves `start.png`, `courier.png` and `pulse.png` too. `-pulls <file>` (try `fixtures/world/pulls.json`) puts those pull requests at the depots, since a snapshot never asks GitHub, and `-depot <sector name>` opens that depot's list in `near.png`. `-moved <world file>` lays the map again from that `world.json` after `far.png` and saves `moved.png`: a picture of a map its owner has arranged. `-lists` saves `lists.png` too, a picture of the lists. `-also <snapshot file>` (try `fixtures/world/codex.json`) puts that file's rows among the sample's: Codex threads. `-cloud <sector name>` opens the cloud panel for that sector in `near.png`, with `-pasted <text>` in its box. `-workspace <sector name>` opens that sector's list of workspaces in `near.png`, and with `-give <workspace>` too the repo is given that workspace and `given.png` shows the map afterwards. `-where <text>` puts that on the selected bot's card as the place its session lives, since a snapshot never asks zellij. `-then <snapshot file>` (try `fixtures/world/later.json`) swaps the snapshot for a later one after `near.png` and saves `stairs.png` with every bot that has somewhere new to go three fifths of its way there. With the editor closed, **The Grid > Render World Pictures** does much the same without a window, into `Logs/`, though without the names and badges; it also renders the first sector at three beats (`world-jobs-2.png`, `-5`, `-9`), where the bots at work are seen in other poses and places:
 
 ```bash
 /Applications/Unity/Hub/Editor/6000.4.3f1/Unity.app/Contents/MacOS/Unity -batchmode -projectPath "$PWD" -executeMethod TheGrid.EditorTools.GridMenu.WorldPictures -quit

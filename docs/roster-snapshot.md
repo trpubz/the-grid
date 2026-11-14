@@ -18,8 +18,8 @@ The exact JSON is pinned by a test against [`fixtures/roster/snapshot.json`](../
 |---|---|---|
 | `sessionId` | The agent app's id for the session | Live session list |
 | `name` | Session name | Live session list |
-| `account` | Which account the session runs under | Name of the config directory it was read from |
-| `app` | `cli`, `claude-desktop`, or empty when unknown | Per-process session file |
+| `account` | Which account the session runs under; `codex` for a Codex thread | Name of the config directory it was read from |
+| `app` | `cli`, `claude-desktop`, or empty when unknown; for a Codex thread `codex-desktop`, `codex-cli` or `codex` | Per-process session file; for Codex, the first record of its session file |
 | `repoRoot` | Folder of the repo the session works in; empty when none | The session's working folder, walked up to `.git`. Worktrees resolve to the main repo |
 | `repoName` | Folder name of `repoRoot`, or `No project` | Same |
 | `branch` | Current git branch | Last branch recorded in the session's transcript |
@@ -31,7 +31,7 @@ The exact JSON is pinned by a test against [`fixtures/roster/snapshot.json`](../
 | `workspace` | Workspace the repo is assigned to; `Personal` when unassigned | Settings |
 | `stateSince` | When the agent entered `state`, in milliseconds since 1970 UTC | Per-process session file, else the first time the roster saw that state |
 | `subagents` | Helpers the agent started that are still working | Files beside the transcript |
-| `enter` | The command that opens the conversation in a terminal: `cd <folder> && claude attach <id>` for a background session, `cd <folder> && claude --resume <session id>` for any other, with `CLAUDE_CONFIG_DIR=<folder>` before `claude` for an account other than the default. With more than one account, the default account's command has `env -u CLAUDE_CONFIG_DIR` there instead, so that it opens the right account from a terminal set up for another. Empty when there is nothing to open it by | Live session list |
+| `enter` | The command that opens the conversation in a terminal: `cd <folder> && claude attach <id>` for a background session, `cd <folder> && claude --resume <session id>` for any other, with `CLAUDE_CONFIG_DIR=<folder>` before `claude` for an account other than the default. With more than one account, the default account's command has `env -u CLAUDE_CONFIG_DIR` there instead, so that it opens the right account from a terminal set up for another. Empty when there is nothing to open it by For a Codex thread: `cd <folder> && codex resume <id>` | Live session list |
 | `pid` | The session's process; `0` for a background session, which has none. The world asks this process where the session lives (its zellij session and tab) when its card is opened; that answer is not in the snapshot | Live session list |
 
 A subagent has `agentId`, `description` (what it was asked to do) and `agentType`.
@@ -81,3 +81,7 @@ The world also shows a message arriving, read from the review pile (`Deliveries`
 - its sender and its recipient each match exactly one bot, by `account` and session name.
 
 Anything else is not shown: history from before the world opened, a session that has ended, two sessions with one name, a message between accounts. The Grid only shows deliveries; it sends nothing and holds nothing back. `fixtures/world/messages.json` is a synthetic pile with one message between two sectors and one within a sector.
+
+## Codex threads
+
+A Codex thread is a row like any other, read from Codex's session files (`~/.codex/sessions/.../rollout-*.jsonl`) and not from a live list, which Codex does not have. It is in the roster while its file has changed in the last 12 hours. `name` is the first line of its first prompt. `state` comes from the last turn mark in the file; `rawStatus` is that mark (`task_started`, `task_complete`, `turn_aborted`), or `question`, or `turn open, quiet`. `branch`, `ticket`, `prNumber`, `prUrl` and `subagents` are empty and `pid` is 0.

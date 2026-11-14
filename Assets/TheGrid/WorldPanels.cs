@@ -11,7 +11,7 @@ namespace TheGrid
     // Flat plates in palette colours. They say only what Panels made from the roster snapshot.
     public sealed class WorldPanels
     {
-        const float Wide = 220, CardWide = 260, DepotWide = 330, Margin = 8, TitleHigh = 26, RowHigh = 38, CardHigh = 92, LineHigh = 18;
+        const float Wide = 264, CardWide = 320, DepotWide = 396, Margin = 8, TitleHigh = 26, RowHigh = 38, CardHigh = 95, LineHigh = 18;
         const int SubagentLines = 4, SubagentLinesWhenShort = 1;
         const int MostRows = 6, RowsWhenShort = 2, MostPulls = 5;
         static readonly Color Plate = new Color32(0x0c, 0x10, 0x24, 255), Edge = new Color32(0x3a, 0x41, 0x78, 255), Lit = new Color32(0x35, 0xf2, 0xff, 255);
@@ -125,13 +125,13 @@ namespace TheGrid
                 GUI.Label(new Rect(card.x + 10, card.y + 6, card.width - 20, 22), about.title, strong);
                 GUI.Label(new Rect(card.x + 10, card.y + 27, card.width - 20, 20), about.who, text);
                 Faint(new Rect(card.x + 10, card.y + 45, card.width - 20, 20), about.doing, text);
-                Faint(new Rect(card.x + 10, card.y + 63, 70, 20), about.since, text);
+                Faint(new Rect(card.x + 10, card.y + 66, 70, 20), about.since, text);
                 // The workspace: a button that moves the repo to its next workspace, as in the lists. A session with no
                 // repo has none to move.
                 if (about.workspace != "")
                 {
                     bool pr = about.prNumber > 0 && about.prUrl != "";
-                    var ws = new Rect(card.x + 84, card.y + 60, Mathf.Min(110, card.width - 84 - (pr ? 94 : 10)), 22);
+                    var ws = new Rect(card.x + 84, card.y + 65, Mathf.Min(110, card.width - 84 - (pr ? 94 : 10)), 22);
                     if (about.repoRoot == "") Faint(new Rect(ws.x + 8, ws.y + 2, ws.width - 10, 20), about.workspace, text);
                     else
                     {
@@ -140,7 +140,7 @@ namespace TheGrid
                         if (GUI.Button(ws, GUIContent.none, GUIStyle.none)) WorkspaceClicked = true;
                     }
                 }
-                float y = card.y + 86;
+                float y = card.y + 89;
                 // The way into the conversation: where it already lives, if it is in a zellij pane, and the command that
                 // opens it in a terminal. Of the command the card shows the end, which says which conversation; Copy takes
                 // all of it. Nothing is run.
@@ -152,7 +152,7 @@ namespace TheGrid
                 if (about.enter != "")
                 {
                     var copy = new Rect(card.xMax - 62, y + 1, 52, 16);
-                    GUI.Label(new Rect(card.x + 10, y, copy.x - card.x - 16, 20), about.enter.Substring(Mathf.Max(0, about.enter.LastIndexOf("claude ", StringComparison.Ordinal))), text);
+                    GUI.Label(new Rect(card.x + 10, y, copy.x - card.x - 16, 20), about.enter.Substring(Mathf.Max(0, Mathf.Max(about.enter.LastIndexOf("claude ", StringComparison.Ordinal), about.enter.LastIndexOf("codex resume ", StringComparison.Ordinal)))), text);
                     Fill(copy, Edge);
                     bool copied = copiedKey == about.key && Time.unscaledTime < copiedUntil;
                     GUI.Label(new Rect(copy.x + 6, copy.y - 2, copy.width - 8, 20), copied ? "Copied" : "Copy", text);
@@ -168,7 +168,7 @@ namespace TheGrid
                     Faint(new Rect(card.x + 10, y + i * LineHigh, card.width - 20, 20), subagents[i], text);
                 if (about.prNumber > 0 && about.prUrl != "")
                 {
-                    var pr = new Rect(card.xMax - 84, card.y + 60, 74, 22);
+                    var pr = new Rect(card.xMax - 84, card.y + 65, 74, 22);
                     Fill(pr, Edge);
                     GUI.Label(new Rect(pr.x + 8, pr.y + 2, pr.width - 10, 18), "PR #" + about.prNumber, text);
                     if (GUI.Button(pr, GUIContent.none, GUIStyle.none)) Application.OpenURL(about.prUrl);   // Panels.Card kept only a web link
@@ -347,11 +347,15 @@ namespace TheGrid
             }, GUIContent.none, GUIStyle.none);
         }
 
-        // The letters of a code block: fixed-width, from a font every Mac has, so the app brings none of its own.
+        // The font all the app's text is set in, when it has one of its own; null for the skin's.
+        public Font Letters;
+
+        // The letters of a code block: the app's own font, which for a Nerd Font is fixed-width; else a fixed-width font
+        // every Mac has. The app brings no font of its own.
         GUIStyle CodeStyle(GUIStyle text)
         {
             if (code == null)
-                code = new GUIStyle(text) { font = Font.CreateDynamicFontFromOSFont(new[] { "Menlo", "Monaco", "Courier New" }, 11), fontSize = 11, wordWrap = true, clipping = TextClipping.Clip };
+                code = new GUIStyle(text) { font = Letters != null ? Letters : Font.CreateDynamicFontFromOSFont(new[] { "Menlo", "Monaco", "Courier New" }, 11), fontSize = 11, wordWrap = true, clipping = TextClipping.Clip };
             return code;
         }
 
@@ -394,7 +398,7 @@ namespace TheGrid
         string copiedKey = "";   // the bot whose command was last copied, and until when the card says so
         float copiedUntil;
 
-        const float ListWide = 236, ListRow = 24, CloudWide = 520, CodePad = 8, CopyRoom = 22;
+        const float ListWide = 280, ListRow = 24, CloudWide = 520, CodePad = 8, CopyRoom = 22;
         string typed = "";   // the name of a new workspace, as far as it has been typed
         string pasted = "";  // what the owner put in the cloud panel's box
         int cloudAccount;    // and the account chosen there
