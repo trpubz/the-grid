@@ -81,6 +81,8 @@ namespace TheGrid
             if (snapshotFile != "")
             {
                 fixedSnap = JsonUtility.FromJson<RosterSnapshot>(File.ReadAllText(snapshotFile));
+                // More rows for the picture, from a second file: Codex threads among the sample's own.
+                if (Arg("-also") != "") fixedSnap = RosterBuilder.With(fixedSnap, JsonUtility.FromJson<RosterSnapshot>(File.ReadAllText(Arg("-also"))).agents);
                 plots = new Plots();   // never the owner's world.json
                 settings = new Settings();   // nor the owner's settings: lights picked and things moved last until the app closes
                 worldOpen = nextWorldOpen = true;
@@ -104,7 +106,9 @@ namespace TheGrid
             settings = Settings.Load(settingsPath);
             if (!File.Exists(settingsPath)) TrySave(); // so there is a file to edit
             var claude = ClaudeCli.ResolvePath(settings.claudePath, ClaudeCli.UsualPlaces(home));
-            collector = new Collector(settings, home, dir => ClaudeCli.AgentsJson(claude, dir, home), SessionFiles.ChangeStamp);
+            // Codex threads come from Codex's own session files, read only; `codex: false` in the settings stops the reading.
+            collector = new Collector(settings, home, dir => ClaudeCli.AgentsJson(claude, dir, home), SessionFiles.ChangeStamp,
+                new CodexReader(settings, Path.Combine(home, ".codex")).Read);
             collector.Start();
             // The one thing the app asks of the network: GitHub, through the owner's own gh, about the repos on the map.
             // The reader looks at the setting before every round, so turning it off in the file stops the asking as soon as
@@ -196,6 +200,14 @@ namespace TheGrid
                 yield return null;
                 world.Hurry(.6f);
                 yield return Shot("stairs.png");
+            }
+            // A picture of the lists, which a snapshot otherwise never shows.
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-lists") >= 0)
+            {
+                nextWorldOpen = false;
+                yield return null;
+                yield return null;
+                yield return Shot("lists.png");
             }
             Application.Quit();
         }
@@ -488,7 +500,7 @@ namespace TheGrid
             GUILayout.BeginHorizontal();
             var old = GUI.contentColor;
             GUI.contentColor = ColorFor(a.state);
-            GUILayout.Label(LabelFor(a.state), chip, GUILayout.Width(84));
+            GUILayout.Label(LabelFor(a.state), chip, GUILayout.Width(96));
             GUI.contentColor = old;
             GUILayout.Label(a.name, title);
             GUILayout.Label(a.account, dim);
@@ -655,6 +667,10 @@ namespace TheGrid
 
         void MakeStyles()
         {
+            // All text in one family from the Mac: every style below is made from the skin, so the skin's font is theirs.
+            string family = Fonts.Pick(settings.font, Font.GetOSInstalledFontNames());
+            if (family != "") GUI.skin.font = panels.Letters = Font.CreateDynamicFontFromOSFont(family, 12);
+            Debug.Log(family != "" ? "[font] " + family : "[font] no Nerd Font on this Mac and none named in settings.json: text is left as it is");
             var text = new Color(.9f, .93f, .96f);
             var faint = new Color(.55f, .62f, .7f);
             chip = new GUIStyle(GUI.skin.label) { fontSize = 11, fontStyle = FontStyle.Bold, clipping = TextClipping.Clip };
