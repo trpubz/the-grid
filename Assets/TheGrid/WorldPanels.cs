@@ -152,7 +152,7 @@ namespace TheGrid
                 if (about.enter != "")
                 {
                     var copy = new Rect(card.xMax - 62, y + 1, 52, 16);
-                    GUI.Label(new Rect(card.x + 10, y, copy.x - card.x - 16, 20), about.enter.Substring(Mathf.Max(0, about.enter.LastIndexOf("claude ", StringComparison.Ordinal))), text);
+                    GUI.Label(new Rect(card.x + 10, y, copy.x - card.x - 16, 20), about.enter.Substring(Mathf.Max(0, Mathf.Max(about.enter.LastIndexOf("claude ", StringComparison.Ordinal), about.enter.LastIndexOf("codex resume ", StringComparison.Ordinal)))), text);
                     Fill(copy, Edge);
                     bool copied = copiedKey == about.key && Time.unscaledTime < copiedUntil;
                     GUI.Label(new Rect(copy.x + 6, copy.y - 2, copy.width - 8, 20), copied ? "Copied" : "Copy", text);

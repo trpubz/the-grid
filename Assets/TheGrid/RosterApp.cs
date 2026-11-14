@@ -81,6 +81,8 @@ namespace TheGrid
             if (snapshotFile != "")
             {
                 fixedSnap = JsonUtility.FromJson<RosterSnapshot>(File.ReadAllText(snapshotFile));
+                // More rows for the picture, from a second file: Codex threads among the sample's own.
+                if (Arg("-also") != "") fixedSnap = RosterBuilder.With(fixedSnap, JsonUtility.FromJson<RosterSnapshot>(File.ReadAllText(Arg("-also"))).agents);
                 plots = new Plots();   // never the owner's world.json
                 settings = new Settings();   // nor the owner's settings: lights picked and things moved last until the app closes
                 worldOpen = nextWorldOpen = true;
@@ -104,7 +106,9 @@ namespace TheGrid
             settings = Settings.Load(settingsPath);
             if (!File.Exists(settingsPath)) TrySave(); // so there is a file to edit
             var claude = ClaudeCli.ResolvePath(settings.claudePath, ClaudeCli.UsualPlaces(home));
-            collector = new Collector(settings, home, dir => ClaudeCli.AgentsJson(claude, dir, home), SessionFiles.ChangeStamp);
+            // Codex threads come from Codex's own session files, read only; `codex: false` in the settings stops the reading.
+            collector = new Collector(settings, home, dir => ClaudeCli.AgentsJson(claude, dir, home), SessionFiles.ChangeStamp,
+                new CodexReader(settings, Path.Combine(home, ".codex")).Read);
             collector.Start();
             // The one thing the app asks of the network: GitHub, through the owner's own gh, about the repos on the map.
             // The reader looks at the setting before every round, so turning it off in the file stops the asking as soon as

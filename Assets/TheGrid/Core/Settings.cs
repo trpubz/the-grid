@@ -20,6 +20,7 @@ namespace TheGrid.Core
         public bool pullRequests = true;                        // ask GitHub, through gh, about the open pull requests of the repos on the map
         public string ghPath = "";                              // empty means: look in the usual places
         public string zellijPath = "";                          // the same
+        public bool codex = true;                               // read Codex's session files, so that its threads are in the roster too
         public string font = "";                                // the family all text is set in; empty means: the first Nerd Font this Mac has
         public List<string> workspaces = new List<string> { DefaultWorkspace };
         public List<RepoWorkspace> repoWorkspaces = new List<RepoWorkspace>();
@@ -57,6 +58,7 @@ namespace TheGrid.Core
             ghPath = fresh.ghPath;
             zellijPath = fresh.zellijPath;
             font = fresh.font;
+            codex = fresh.codex;
             workspaces = fresh.workspaces;
             repoWorkspaces = fresh.repoWorkspaces;
             workspaceLights = fresh.workspaceLights;
