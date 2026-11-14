@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using UnityEngine;
 
 namespace TheGrid.Core
@@ -173,6 +174,8 @@ namespace TheGrid.Core
                     t.id = meta.id ?? "";
                     t.cwd = meta.cwd ?? "";
                     t.source = meta.thread_source ?? "";
+                    // An older record does not say who started the thread: then a person did, unless it says another thread did.
+                    if (t.source == "" && !Regex.IsMatch(line, "\"source\"\\s*:\\s*\\{\\s*\"subagent\"")) t.source = "user";
                     t.app = meta.originator == "Codex Desktop" ? "codex-desktop" : meta.originator == "codex-tui" ? "codex-cli" : "codex";
                     var repo = RepoResolver.Resolve(t.cwd);
                     t.repoRoot = repo.Root;

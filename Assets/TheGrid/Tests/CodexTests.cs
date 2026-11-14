@@ -186,6 +186,21 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(Id, rows[0].sessionId);
         }
 
+        // The record of an older thread does not say who started it. It is then a person's, unless it says that another
+        // thread started it.
+        [Test]
+        public void AThreadThatDoesNotSayWhoStartedItIsAPersons()
+        {
+            const string other = "0199aaaa-0000-7000-8000-000000000009";
+            string start = "{\"timestamp\":\"" + At0 + "\",\"type\":\"session_meta\",\"payload\":{\"id\":\"";
+            Write(Id, 1000, start + Id + "\",\"cwd\":\"" + repo + "\",\"originator\":\"codex-tui\",\"source\":\"cli\"}}", Event("task_started", At0));
+            Write(other, 1000, start + other + "\",\"cwd\":\"" + repo + "\",\"originator\":\"codex-tui\",\"source\": {\"subagent\":{\"thread_spawn\":{\"parent_thread_id\":\"" + Id + "\"}}}}}",
+                Event("task_started", At0));
+            var rows = Read();
+            Assert.AreEqual(1, rows.Count);
+            Assert.AreEqual(Id, rows[0].sessionId);
+        }
+
         [Test]
         public void TurnedOffNothingIsRead()
         {
