@@ -15,14 +15,14 @@ namespace TheGrid
         const int SubagentLines = 4, SubagentLinesWhenShort = 1;
         const int MostRows = 6, RowsWhenShort = 2, MostPulls = 5;
         static readonly Color Plate = new Color32(0x0c, 0x10, 0x24, 255), Edge = new Color32(0x3a, 0x41, 0x78, 255), Lit = new Color32(0x35, 0xf2, 0xff, 255);
-        static readonly Color Dim = new Color(1, 1, 1, .6f);
+        static readonly Color Dim = new Color(1, 1, 1, .6f), Well = new Color32(0x05, 0x07, 0x12, 255);   // Well: the ground of a code block
 
         readonly Texture2D[] badges = new Texture2D[5];   // in the order of Badge
         bool folded, foldChosen;
         Vector2 scroll;
         Rect needs, card, depot;   // where the panels are; zero when not drawn
         Vector2 depotScroll;
-        GUIStyle wrapped, oneLine;
+        GUIStyle wrapped, code;
         readonly Texture2D[] crates = new Texture2D[ArtNames.Crates.Length];   // in the order of PullState
         List<string> subagents = new List<string>();   // the card's lines about subagents, as many as this map has room for
 
@@ -294,7 +294,9 @@ namespace TheGrid
             if (wrapped == null) wrapped = new GUIStyle(text) { wordWrap = true, clipping = TextClipping.Clip };
             string id = RosterFormat.CloudId(pasted);
             bool wrong = id == "" && pasted.Trim() != "";
-            float high = TitleHigh + 30 + (wrong ? 36 : 0) + 26 + (id == "" ? 0 : 6 * LineHigh + 12) + 58;
+            string open = id == "" ? "" : command(id, cloudAccount, false), download = id == "" ? "" : command(id, cloudAccount, true);
+            float openHigh = CodeHigh(CloudWide - 20, open, text), downloadHigh = CodeHigh(CloudWide - 20, download, text);
+            float high = TitleHigh + 30 + (wrong ? 36 : 0) + 26 + (id == "" ? 0 : openHigh + downloadHigh + 4 * LineHigh + 24) + 58;
             var panel = new Rect(Mathf.Clamp(at.x, window.x, window.xMax - CloudWide), Mathf.Clamp(at.y, window.y, window.yMax - high), CloudWide, high);
             GUI.ModalWindow(0x636c6f75, panel, _ =>
             {
@@ -328,12 +330,14 @@ namespace TheGrid
                 y += 26;
                 if (id != "")
                 {
-                    y = Copied(all, y, "Open it here", "cloud-open", command(id, cloudAccount, false), text);
-                    Faint(new Rect(10, y, all.width - 20, 20), "Nothing is kept on this Mac until you say something in it.", text);
-                    y += LineHigh + 6;
-                    y = Copied(all, y, "Download only", "cloud-download", command(id, cloudAccount, true), text);
-                    Faint(new Rect(10, y, all.width - 20, 20), "One model turn over the whole conversation: it can be large.", text);
-                    y += LineHigh + 6;
+                    GUI.Label(new Rect(10, y, all.width - 20, 20), "Open it here", text);
+                    Code(new Rect(10, y + LineHigh + 2, all.width - 20, openHigh), "cloud-open", open, text);
+                    Faint(new Rect(10, y + LineHigh + 4 + openHigh, all.width - 20, 20), "Nothing is kept on this Mac until you say something in it.", text);
+                    y += openHigh + 2 * LineHigh + 12;
+                    GUI.Label(new Rect(10, y, all.width - 20, 20), "Download only", text);
+                    Code(new Rect(10, y + LineHigh + 2, all.width - 20, downloadHigh), "cloud-download", download, text);
+                    Faint(new Rect(10, y + LineHigh + 4 + downloadHigh, all.width - 20, 20), "One model turn over the whole conversation: it can be large.", text);
+                    y += downloadHigh + 2 * LineHigh + 12;
                 }
                 Faint(new Rect(10, y, all.width - 20, 54), "The folder must have no uncommitted changes: teleport switches it to the session's branch. \"Session not found\" usually means the other account. The Grid runs neither command.", wrapped);
                 if (!away) return;
@@ -342,23 +346,45 @@ namespace TheGrid
             }, GUIContent.none, GUIStyle.none);
         }
 
-        // One command of the cloud panel: what it is for, a Copy for the whole of it, and under them its end, as far as
-        // fits. Returns the next line.
-        float Copied(Rect all, float y, string name, string key, string command, GUIStyle text)
+        // The letters of a code block: fixed-width, from a font every Mac has, so the app brings none of its own.
+        GUIStyle CodeStyle(GUIStyle text)
         {
-            var copy = new Rect(all.width - 60, y + 1, 52, 16);
-            GUI.Label(new Rect(10, y, copy.x - 16, 20), name, text);
-            if (oneLine == null) oneLine = new GUIStyle(text) { wordWrap = false, clipping = TextClipping.Clip };
-            Faint(new Rect(10, y + LineHigh, all.width - 20, 20), command.Substring(Mathf.Max(0, command.LastIndexOf("claude --teleport", StringComparison.Ordinal))), oneLine);
-            Fill(copy, Edge);
-            GUI.Label(new Rect(copy.x + 6, copy.y - 2, copy.width - 8, 20), copiedKey == key && Time.unscaledTime < copiedUntil ? "Copied" : "Copy", text);
-            if (GUI.Button(copy, GUIContent.none, GUIStyle.none))
-            {
-                GUIUtility.systemCopyBuffer = command;
-                copiedKey = key;
-                copiedUntil = Time.unscaledTime + 1.5f;
-            }
-            return y + 2 * LineHigh;
+            if (code == null)
+                code = new GUIStyle(text) { font = Font.CreateDynamicFontFromOSFont(new[] { "Menlo", "Monaco", "Courier New" }, 11), fontSize = 11, wordWrap = true, clipping = TextClipping.Clip };
+            return code;
+        }
+
+        // How high a code block of that width is for that command: its lines, wrapped, clear of the mark in its corner.
+        float CodeHigh(float wide, string command, GUIStyle text) =>
+            command == "" ? 0 : CodeStyle(text).CalcHeight(new GUIContent(RosterFormat.Shown(command)), wide - 2 * CodePad - CopyRoom) + 2 * CodePad;
+
+        // A command as a code block: a darker plate, fixed-width letters, every step on a line of its own, and in its upper
+        // right corner the mark that copies the whole of it: two sheets, one over the other. For a moment after a click the
+        // mark is lit and says so.
+        void Code(Rect block, string key, string command, GUIStyle text)
+        {
+            Fill(block, Edge);
+            Fill(new Rect(block.x + 1, block.y + 1, block.width - 2, block.height - 2), Well);
+            GUI.Label(new Rect(block.x + CodePad, block.y + CodePad, block.width - 2 * CodePad - CopyRoom, block.height - 2 * CodePad), RosterFormat.Shown(command), CodeStyle(text));
+            bool copied = copiedKey == key && Time.unscaledTime < copiedUntil;
+            var mark = new Rect(block.xMax - 22, block.y + 6, 16, 16);
+            var ink = copied ? Lit : Dim;
+            Outline(new Rect(mark.x + 5, mark.y + 1, 9, 11), ink);                      // the sheet behind
+            Fill(new Rect(mark.x + 2, mark.y + 4, 9, 11), Well);                        // the one in front covers its corner
+            Outline(new Rect(mark.x + 2, mark.y + 4, 9, 11), ink);
+            if (copied) Faint(new Rect(mark.x - 52, mark.y - 1, 50, 18), "Copied", text);
+            if (!GUI.Button(new Rect(mark.x - 3, mark.y - 3, 22, 22), GUIContent.none, GUIStyle.none)) return;
+            GUIUtility.systemCopyBuffer = command;
+            copiedKey = key;
+            copiedUntil = Time.unscaledTime + 1.5f;
+        }
+
+        static void Outline(Rect r, Color c)
+        {
+            Fill(new Rect(r.x, r.y, r.width, 1), c);
+            Fill(new Rect(r.x, r.yMax - 1, r.width, 1), c);
+            Fill(new Rect(r.x, r.y, 1, r.height), c);
+            Fill(new Rect(r.xMax - 1, r.y, 1, r.height), c);
         }
 
         // How many lines of the card are about getting into the conversation.
@@ -367,7 +393,7 @@ namespace TheGrid
         string copiedKey = "";   // the bot whose command was last copied, and until when the card says so
         float copiedUntil;
 
-        const float ListWide = 236, ListRow = 24, CloudWide = 440;
+        const float ListWide = 236, ListRow = 24, CloudWide = 520, CodePad = 8, CopyRoom = 22;
         string typed = "";   // the name of a new workspace, as far as it has been typed
         string pasted = "";  // what the owner put in the cloud panel's box
         int cloudAccount;    // and the account chosen there

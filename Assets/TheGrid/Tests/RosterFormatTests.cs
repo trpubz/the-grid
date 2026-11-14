@@ -81,6 +81,12 @@ namespace TheGrid.Core.Tests
         [Test]
         public void NoCloudSessionNoCommand() => Assert.AreEqual("", RosterFormat.Teleport("", "/work/alpha", "/home/me/.claude", "/home/me", false, false));
 
+        // In a code block every step of a command has a line of its own; what is copied stays the one line.
+        [TestCase("cd /work/alpha && claude --teleport cse_01", "cd /work/alpha &&\nclaude --teleport cse_01")]
+        [TestCase("claude --teleport cse_01", "claude --teleport cse_01")]
+        [TestCase("", "")]
+        public void ACommandAsItIsShown(string command, string expected) => Assert.AreEqual(expected, RosterFormat.Shown(command));
+
         // An account's folder from its name, for a snapshot, which has names only: the reverse of AccountLabel.
         [TestCase("claude", "/home/demo/.claude")]
         [TestCase("two", "/home/demo/.claude-two")]

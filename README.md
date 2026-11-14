@@ -144,12 +144,12 @@ A lane runs round every sector, and roads cross the open ground so that every se
 
 ![The list of workspaces, opened from a sector's name](docs/art/world-workspace.png)
 
-**A cloud session** is not on the map: The Grid sees the sessions on this Mac, and there is no list of the ones that run in the cloud. To bring one here, pick the last line of that list, **Bring a cloud session here**. A panel opens for that repo. Paste what names the session: its id (`cse_…` or `session_…`), the line the cloud session prints when you type `/teleport` in it, or its `claude.ai/code` link (**Paste** takes it from the clipboard). Pick the account that owns the session; the one whose session in this repo changed last is picked for you. The panel then has two commands, each with a **Copy**:
+**A cloud session** is not on the map: The Grid sees the sessions on this Mac, and there is no list of the ones that run in the cloud. To bring one here, pick the last line of that list, **Bring a cloud session here**. A panel opens for that repo. Paste what names the session: its id (`cse_…` or `session_…`), the line the cloud session prints when you type `/teleport` in it, or its `claude.ai/code` link (**Paste** takes it from the clipboard). Pick the account that owns the session; the one whose session in this repo changed last is picked for you. The panel then has two commands, each in a code block with the whole of it in fixed-width letters, every step on a line of its own. The mark in a block's upper right corner, two sheets, copies the command:
 
 - **Open it here** is `claude --teleport <id>`, after a `cd` to the repo's folder and with the account named as on a bot's card. It opens the conversation in your terminal. Nothing is kept on this Mac until you say something in it; from then on it is a session like any other, with a bot.
 - **Download only** adds one short question that is asked with no terminal and no tools (`-p … --tools '' --permission-mode plan`). That writes the whole conversation to this Mac. It is one model turn over the whole conversation, which for a long session is large: the one it was tried on read over 900,000 tokens.
 
-Either way the folder must have no uncommitted changes, and teleport switches it to the session's branch. If the answer is `Session not found`, try the other account. The Grid runs neither command and asks nothing of the cloud: it only writes the command. Ordinary claude.ai chats cannot be brought over this way.
+Either way the folder must have no uncommitted changes, and teleport switches it to the session's branch. If the answer is `Session not found`, try the other account. The letters are Menlo, which every Mac has; the app brings no font and no library for this. The Grid runs neither command and asks nothing of the cloud: it only writes the command. Ordinary claude.ai chats cannot be brought over this way.
 
 ![The panel that makes the command for a cloud session](docs/art/world-cloud.png)
 

@@ -82,6 +82,9 @@ namespace TheGrid.Core
                 + (download ? " -p " + Word("Reply with the single word: ok. Do nothing else.") + " --tools '' --permission-mode plan" : "");
         }
 
+        // A command as a code block shows it: every step on a line of its own. A shell reads it the same either way.
+        public static string Shown(string command) => (command ?? "").Replace(" && ", " &&\n");
+
         static string Word(string s)
         {
             foreach (char c in s)
