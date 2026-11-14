@@ -27,6 +27,9 @@ namespace TheGrid
         PullsSnapshot pullsFixed, pullsFrom;   // a snapshot's pull requests from a file; and the ones worldDrawn was built from
         string workspaceFor = "";              // the repo whose workspace list is open, by its root; "" for none
         Vector2 workspaceAt;                   // where the list was asked for, in screen points
+        string cloudFor = "";                  // the repo a cloud session is being brought to, by its root; "" for none
+        List<string> cloudDirs = new List<string>();   // the accounts' folders, as the cloud panel lists them
+        string home = "/home/demo";            // the owner's folder; on a snapshot, a made-up one
         int depotOpen = -1;                    // the plot of the sector whose depot list is open
         Pile pile;
         Vector2 scroll, pileScroll;
@@ -96,7 +99,7 @@ namespace TheGrid
                 if (shotsDir != "") StartCoroutine(Shots());
                 return;
             }
-            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             settingsPath = Path.Combine(Application.persistentDataPath, "settings.json");
             settings = Settings.Load(settingsPath);
             if (!File.Exists(settingsPath)) TrySave(); // so there is a file to edit
@@ -166,6 +169,12 @@ namespace TheGrid
             {
                 workspaceFor = listed.repoRoot;
                 workspaceAt = new Vector2(Screen.width * .3f, Screen.height * .3f);
+            }
+            var brought = worldDrawn.sectors.Find(s => s.name == Arg("-cloud"));   // or with the cloud panel open for that sector, -pasted in its box
+            if (brought != null && brought.repoRoot != "")
+            {
+                workspaceAt = new Vector2(Screen.width * .3f, Screen.height * .3f);
+                OpenCloud(brought.repoRoot, Arg("-pasted"));
             }
             yield return Shot("near.png");
             // A picture of the map after that sector's repo was given a workspace, as a click in the list does.
@@ -297,6 +306,7 @@ namespace TheGrid
                 else DrawPile(area, pileDrawn, now);
             }
             if (workspaceFor != "") DrawWorkspaces(new Rect(0, 0, width + 16, height + 12));
+            if (cloudFor != "") DrawCloud(new Rect(0, 0, width + 16, height + 12));
         }
 
         // The map, and over it who needs the owner and the card of the bot that was clicked. All from the snapshot the lists draw.
@@ -363,7 +373,7 @@ namespace TheGrid
             }
             var depotOf = depotOpen < 0 ? null : worldDrawn.sectors.Find(s => s.plot == depotOpen);
             panels.Place(map, needsYou.Count, card, depotOf);
-            world.Gui(detail, title, panels.Covers, workspaceFor == "");   // while the list of workspaces is open, the map is deaf
+            world.Gui(detail, title, panels.Covers, workspaceFor == "" && cloudFor == "");   // while the list of workspaces or the cloud panel is open, the map is deaf
             if (drawn.errors.Count > 0) GUI.Label(new Rect(map.x + 4, map.y + 4, map.width - 8, 32), string.Join(" | ", drawn.errors), error);
             string notAsked = depotOf == null ? "" : depotOf.repoRoot == "" ? "Sessions with no repo have no pull requests."
                 : fixedSnap != null ? "This snapshot has no pull requests for this repo."
@@ -542,7 +552,38 @@ namespace TheGrid
             if (!names.Contains(current)) names.Add(current);
             string repo = row != null ? row.repoName : Path.GetFileName(workspaceFor.TrimEnd('/'));
             panels.Workspaces(window, GUIUtility.ScreenToGUIPoint(workspaceAt), repo, current, names, detail, title,
-                name => { GiveWorkspace(workspaceFor, name); workspaceFor = ""; }, () => workspaceFor = "");
+                name => { GiveWorkspace(workspaceFor, name); workspaceFor = ""; }, () => workspaceFor = "", () => OpenCloud(workspaceFor, ""));
+        }
+
+        // Opens the panel that brings a cloud session to a repo, in place of the list of workspaces it was asked from.
+        void OpenCloud(string repoRoot, string text)
+        {
+            workspaceFor = "";
+            cloudFor = repoRoot;
+            // The accounts: the folders the collector reads; on a snapshot, which has names only, the accounts in it.
+            if (fixedSnap == null) cloudDirs = settings.EffectiveConfigDirs(home);
+            else
+            {
+                cloudDirs = new List<string>();
+                foreach (var a in drawn.agents)
+                    if (a.account != "" && !cloudDirs.Contains(RosterBuilder.ConfigDir(a.account, home))) cloudDirs.Add(RosterBuilder.ConfigDir(a.account, home));
+            }
+            if (cloudDirs.Count == 0) cloudDirs.Add(RosterBuilder.ConfigDir("claude", home));
+            // Chosen first: the account of the repo's session that changed last.
+            AgentRow last = null;
+            foreach (var a in drawn.agents)
+                if (a.repoRoot == repoRoot && (last == null || a.stateSince > last.stateSince)) last = a;
+            panels.OpenCloud(text, Mathf.Max(0, last == null ? 0 : cloudDirs.FindIndex(d => RosterBuilder.AccountLabel(d) == last.account)));
+        }
+
+        // The open cloud panel, over whichever view is showing, where the list of workspaces was.
+        void DrawCloud(Rect window)
+        {
+            var row = drawn.agents.Find(a => a.repoRoot == cloudFor);
+            string repo = row != null ? row.repoName : Path.GetFileName(cloudFor.TrimEnd('/'));
+            panels.Cloud(window, GUIUtility.ScreenToGUIPoint(workspaceAt), repo, cloudDirs.ConvertAll(RosterBuilder.AccountLabel),
+                (id, account, download) => RosterFormat.Teleport(id, cloudFor, cloudDirs[Mathf.Clamp(account, 0, cloudDirs.Count - 1)], home, cloudDirs.Count > 1, download),
+                detail, title, () => cloudFor = "");
         }
 
         // The collector reads these settings on its own thread; a read that overlaps this change shows up as one error line for one pass.

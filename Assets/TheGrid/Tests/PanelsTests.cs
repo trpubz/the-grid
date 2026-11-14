@@ -12,6 +12,16 @@ namespace TheGrid.Core.Tests
         [SetUp]
         public void Load() => snap = JsonUtility.FromJson<RosterSnapshot>(File.ReadAllText(Path.Combine(Directory.GetCurrentDirectory(), "fixtures", "world", "snapshot.json")));
 
+        // A panel asked for at a point is put there, or as near as keeps it inside the window. One that is larger than the
+        // window keeps its top left corner in sight, where its title and its controls are. The window is 800 by 600.
+        [TestCase(100f, 80f, 200f, 100f, 100f, 80f)]
+        [TestCase(700f, 550f, 200f, 100f, 600f, 500f)]
+        [TestCase(-20f, -5f, 200f, 100f, 0f, 0f)]
+        [TestCase(300f, 300f, 900f, 100f, 0f, 300f)]
+        [TestCase(300f, 300f, 200f, 700f, 300f, 0f)]
+        public void APanelStaysInTheWindow(float x, float y, float wide, float high, float atX, float atY) =>
+            Assert.AreEqual(new Vector2(atX, atY), Panels.Fit(new Vector2(x, y), new Vector2(wide, high), new Rect(0, 0, 800, 600)));
+
         static AgentRow Agent(string state, string activity = "", string raw = "") =>
             new AgentRow { sessionId = "s", name = "gamma-01", account = "one", repoName = "gamma", state = state, activity = activity, rawStatus = raw, stateSince = 1000 };
 
