@@ -243,7 +243,7 @@ namespace TheGrid
         public void Workspaces(Rect window, Vector2 at, string repo, string current, List<string> names, GUIStyle text, GUIStyle strong, Action<string> give, Action close, Action cloud)
         {
             float high = TitleHigh + names.Count * ListRow + 34 + ListRow;
-            var list = new Rect(Mathf.Clamp(at.x, window.x, window.xMax - ListWide), Mathf.Clamp(at.y, window.y, window.yMax - high), ListWide, high);
+            var list = new Rect(Panels.Fit(at, new Vector2(ListWide, high), window), new Vector2(ListWide, high));
             GUI.ModalWindow(0x6c697374, list, id =>
             {
                 var e = Event.current;
@@ -295,9 +295,10 @@ namespace TheGrid
             string id = RosterFormat.CloudId(pasted);
             bool wrong = id == "" && pasted.Trim() != "";
             string open = id == "" ? "" : command(id, cloudAccount, false), download = id == "" ? "" : command(id, cloudAccount, true);
-            float openHigh = CodeHigh(CloudWide - 20, open, text), downloadHigh = CodeHigh(CloudWide - 20, download, text);
+            float wide = Mathf.Min(CloudWide, window.width);   // in a window narrower than the panel, the commands wrap more
+            float openHigh = CodeHigh(wide - 20, open, text), downloadHigh = CodeHigh(wide - 20, download, text);
             float high = TitleHigh + 30 + (wrong ? 36 : 0) + 26 + (id == "" ? 0 : openHigh + downloadHigh + 4 * LineHigh + 24) + 58;
-            var panel = new Rect(Mathf.Clamp(at.x, window.x, window.xMax - CloudWide), Mathf.Clamp(at.y, window.y, window.yMax - high), CloudWide, high);
+            var panel = new Rect(Panels.Fit(at, new Vector2(wide, high), window), new Vector2(wide, high));
             GUI.ModalWindow(0x636c6f75, panel, _ =>
             {
                 var e = Event.current;

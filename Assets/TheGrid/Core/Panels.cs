@@ -29,6 +29,11 @@ namespace TheGrid.Core
     // The words of the two panels drawn over the world. Like the world itself, made from the roster snapshot and nothing else.
     public static class Panels
     {
+        // Where a panel of that size goes when it is asked for at a point: there, or as near as keeps it inside the window.
+        // One larger than the window keeps its top left corner in sight: that is where its title and its controls are.
+        public static Vector2 Fit(Vector2 at, Vector2 size, Rect window) =>
+            new Vector2(Mathf.Max(window.x, Mathf.Min(at.x, window.xMax - size.x)), Mathf.Max(window.y, Mathf.Min(at.y, window.yMax - size.y)));
+
         // Where a list goes that stands over something else on the map's right side: against the right edge, its foot
         // `margin` above `floor`, as high as it `wanted` when there is that much room under `ceiling`, else as high as
         // there is room for, and what does not fit is scrolled. Nothing, when not even `least` fits. Never wider than the
