@@ -197,6 +197,14 @@ namespace TheGrid
                 world.Hurry(.6f);
                 yield return Shot("stairs.png");
             }
+            // A picture of the lists, which a snapshot otherwise never shows.
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-lists") >= 0)
+            {
+                nextWorldOpen = false;
+                yield return null;
+                yield return null;
+                yield return Shot("lists.png");
+            }
             Application.Quit();
         }
 
@@ -488,7 +496,7 @@ namespace TheGrid
             GUILayout.BeginHorizontal();
             var old = GUI.contentColor;
             GUI.contentColor = ColorFor(a.state);
-            GUILayout.Label(LabelFor(a.state), chip, GUILayout.Width(84));
+            GUILayout.Label(LabelFor(a.state), chip, GUILayout.Width(96));
             GUI.contentColor = old;
             GUILayout.Label(a.name, title);
             GUILayout.Label(a.account, dim);
@@ -655,6 +663,10 @@ namespace TheGrid
 
         void MakeStyles()
         {
+            // All text in one family from the Mac: every style below is made from the skin, so the skin's font is theirs.
+            string family = Fonts.Pick(settings.font, Font.GetOSInstalledFontNames());
+            if (family != "") GUI.skin.font = panels.Letters = Font.CreateDynamicFontFromOSFont(family, 12);
+            Debug.Log(family != "" ? "[font] " + family : "[font] no Nerd Font on this Mac and none named in settings.json: text is left as it is");
             var text = new Color(.9f, .93f, .96f);
             var faint = new Color(.55f, .62f, .7f);
             chip = new GUIStyle(GUI.skin.label) { fontSize = 11, fontStyle = FontStyle.Bold, clipping = TextClipping.Clip };
