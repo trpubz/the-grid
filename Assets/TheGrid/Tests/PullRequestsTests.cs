@@ -13,7 +13,7 @@ namespace TheGrid.Core.Tests
         static string Fixture(string name) => File.ReadAllText(Path.Combine(Directory.GetCurrentDirectory(), "fixtures", "github", name));
 
         [Test]
-        public void EveryOpenPullRequestIsADraftInReviewOrForTheOwnerAndSaysWhyInWords()
+        public void EveryOpenPullRequestIsADraftInReviewFailingOrForTheOwnerAndSaysWhyInWords()
         {
             Assert.IsTrue(PullRequests.TryParse(Fixture("pulls.json"), out var pulls, out var problem), problem);
             var got = pulls.ToDictionary(p => p.number, p => p.state + ": " + p.status);
@@ -24,8 +24,8 @@ namespace TheGrid.Core.Tests
                 { 3, "InReview: The review bot is reviewing" },                           // a person's thumbs-up is not a review
                 { 4, "ForOwner: Approved: ready to merge" },
                 { 5, "InReview: Checks are running" },
-                { 6, "InReview: Checks failed" },
-                { 7, "InReview: Conflicts with its base branch" },
+                { 6, "Failing: Checks failed" },                                          // broken, not waiting: someone has to mend it
+                { 7, "Failing: Conflicts with its base branch" },
                 { 8, "InReview: pat is asked to review" },
                 { 9, "ForOwner: Your review is asked for" },                              // before anything else about it
                 { 10, "InReview: Changes are asked for" },
@@ -46,10 +46,10 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
-        public void TheOnesForTheOwnerComeFirstThenThoseInReviewThenDrafts()
+        public void TheOnesForTheOwnerComeFirstThenTheFailingThenThoseInReviewThenDrafts()
         {
             PullRequests.TryParse(Fixture("pulls.json"), out var pulls, out _);
-            CollectionAssert.AreEqual(new[] { 2, 4, 9, 12, 17, 18, 3, 5, 6, 7, 8, 10, 11, 13, 14, 15, 16, 1 }, pulls.Select(p => p.number).ToArray());
+            CollectionAssert.AreEqual(new[] { 2, 4, 9, 12, 17, 18, 6, 7, 3, 5, 8, 10, 11, 13, 14, 15, 16, 1 }, pulls.Select(p => p.number).ToArray());
         }
 
         [Test]

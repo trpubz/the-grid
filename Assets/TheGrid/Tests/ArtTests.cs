@@ -133,6 +133,27 @@ namespace TheGrid.Core.Tests
             Assert.IsTrue(t.GetPixels32().All(c => c.a == 255));
         }
 
+        [Test]
+        public void TheCrateOfAFailingPullRequestIsLitRedAndNoOtherCrateIs()
+        {
+            // One crate to a state, in the state's own order: the game picks a crate by the state's number.
+            Assert.AreEqual(Enum.GetNames(typeof(PullState)).Select(n => n.ToLowerInvariant()).ToArray(),
+                new[] { "draft", "inreview", "failing", "forowner" });
+            Assert.AreEqual(new[] { "crate-draft", "crate-review", "crate-failing", "crate-ready" }, ArtNames.Crates);
+            // Red is the fault badge's red, and means the same on a crate: this is broken. Amber stays "this needs you".
+            Color32 red = Hex(0xff4d4d), amber = Hex(0xffb23e), reviewed = Hex(0xc9fbff);
+            foreach (var name in ArtNames.Crates)
+            {
+                var t = Load(name).texture;
+                if (name == "crate-failing")
+                {
+                    Assert.Greater(Count(t, red), 30, name + " shows too little red to be told from far out");
+                    Assert.AreEqual(0, Count(t, amber) + Count(t, reviewed), name + " carries another crate's light");
+                }
+                else Assert.AreEqual(0, Count(t, red), name + " is red, and is not failing");
+            }
+        }
+
         static Color32 Hex(int rgb) => new Color32((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb, 255);
 
         [Test]

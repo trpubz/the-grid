@@ -315,7 +315,8 @@ def depot():
 
 def crate(name, band=None, lid=None):
     """One open pull request, queued at the depot. A graphite box; what it is waiting for is its light. None: a draft.
-    A band in the building's light, which the game swaps for the depot's: in review. Amber, band and lid: for the owner."""
+    A band in the building's light, which the game swaps for the depot's: in review. Amber, band and lid: for the owner.
+    Red, band and lid, the red of a fault badge: failing."""
     s, h = .56, .4
     box(0, 0, 0, s, s, h, "c0", "g5", "g3")
     box(0, 0, h, s * .78, s * .78, .03, "c1", "g5", "g4")                               # the lid
@@ -355,3 +356,4 @@ def make():
     server_tower(); review_hall(); works(); relay(); depot(); test_workshop()
     server_tower_open(); review_hall_open(); works_open()
     crate("crate-draft"); crate("crate-review", band="cyanw"); crate("crate-ready", band="amber", lid="amber")
+    crate("crate-failing", band="fault", lid="fault")

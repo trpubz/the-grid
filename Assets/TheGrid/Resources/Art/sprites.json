@@ -246,6 +246,13 @@
    "groundY": 14
   },
   {
+   "name": "crate-failing",
+   "width": 48,
+   "height": 48,
+   "groundX": 24,
+   "groundY": 14
+  },
+  {
    "name": "bot-stand-se",
    "width": 40,
    "height": 48,
