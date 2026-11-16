@@ -136,10 +136,11 @@ Every sector has a depot, and in front of it one crate for each open pull reques
 | Crate | The pull request is |
 |---|---|
 | Amber band and lid | **for you**: ready to merge, or your review is asked for |
-| A band in the depot's light | **in review**: checks running or failed, a reviewer or a review bot at work, changes asked for, review comments not yet answered, conflicts, or GitHub still working out whether it merges |
+| Red band and lid | **failing**: its checks failed, or it conflicts with its base branch |
+| A band in the depot's light | **in review**: checks running, a reviewer or a review bot at work, changes asked for, review comments not yet answered, or GitHub still working out whether it merges |
 | No light | a **draft** |
 
-Those for you stand nearest the door. The depot's name says how many are open, and far out a sector's line adds how many are for you. Click the depot for the list: every open pull request with the reason it is where it is, in words. Click a row to open it in your browser.
+Those for you stand nearest the door, then the failing ones. Red is the same in every region: a failing crate does not take the depot's light. The depot's name says how many are open, and far out a sector's line adds how many are for you. Click the depot for the list: every open pull request with the reason it is where it is, in words. Click a row to open it in your browser.
 
 ![The depot's list](docs/art/world-depot.png)
 

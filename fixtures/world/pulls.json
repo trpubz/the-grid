@@ -9,14 +9,14 @@
      "title": "Retry uploads that time out",
      "url": "https://github.com/example/alpha/pull/41",
      "status": "The review bot found nothing: ready to merge",
-     "state": 2
+     "state": 3
     },
     {
      "number": 44,
      "title": "Show sizes in the file list",
      "url": "https://github.com/example/alpha/pull/44",
      "status": "Your review is asked for",
-     "state": 2
+     "state": 3
     },
     {
      "number": 42,
@@ -57,7 +57,7 @@
      "title": "Tidy the build script",
      "url": "https://github.com/example/alpha/pull/12",
      "status": "Checks failed",
-     "state": 1
+     "state": 2
     }
    ]
   }

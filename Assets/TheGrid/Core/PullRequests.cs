@@ -8,7 +8,8 @@ using UnityEngine;
 namespace TheGrid.Core
 {
     // What an open pull request is to the owner. In the order the depot queues them, last first.
-    public enum PullState { Draft, InReview, ForOwner }
+    // Failing: its checks failed or it conflicts with its base branch. It is broken, where one in review only waits.
+    public enum PullState { Draft, InReview, Failing, ForOwner }
 
     // One open pull request of a repo, as the world shows it: a crate at the depot, a row in its list.
     [Serializable]
@@ -87,7 +88,7 @@ namespace TheGrid.Core
         [Serializable] sealed class Reaction { public string content; public Who user; }
 #pragma warning restore 0649
 
-        // The open pull requests in GitHub's answer: those for the owner first, then those in review, then drafts, each
+        // The open pull requests in GitHub's answer: those for the owner first, then the failing, those in review, drafts, each
         // lot in the order they were opened. False, with the reason in words, when the answer is not a list of them.
         public static bool TryParse(string answer, out List<PullRequest> pulls, out string problem)
         {
@@ -133,10 +134,10 @@ namespace TheGrid.Core
                 if (who == owner && owner != "") { state = PullState.ForOwner; status = "Your review is asked for"; return; }
                 if (asked == "") asked = who;
             }
-            if (n.mergeable == "CONFLICTING") { status = "Conflicts with its base branch"; return; }
+            if (n.mergeable == "CONFLICTING") { state = PullState.Failing; status = "Conflicts with its base branch"; return; }
             var commits = n.commits?.nodes;
             string checks = commits != null && commits.Count > 0 ? commits[0].commit?.statusCheckRollup?.state ?? "" : "";
-            if (checks == "FAILURE" || checks == "ERROR") { status = "Checks failed"; return; }
+            if (checks == "FAILURE" || checks == "ERROR") { state = PullState.Failing; status = "Checks failed"; return; }
             if (checks == "PENDING" || checks == "EXPECTED") { status = "Checks are running"; return; }
             bool botReading = false, botClean = false;
             foreach (var r in n.reactions?.nodes ?? new List<Reaction>())

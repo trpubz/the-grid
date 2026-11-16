@@ -15,7 +15,7 @@ namespace TheGrid.Core
         public static readonly string[] Stances = { "stand", "type", "inspect", "off" };                                    // in the order of Stance
         public static readonly string[] Facings = { "se", "ne", "nw", "sw" };
         public static readonly string[] Blocks = { "block-a", "block-b", "block-c" };
-        public static readonly string[] Crates = { "crate-draft", "crate-review", "crate-ready" };   // in the order of PullState
+        public static readonly string[] Crates = { "crate-draft", "crate-review", "crate-failing", "crate-ready" };   // in the order of PullState
         public const string WalkA = "walk-a", WalkB = "walk-b", Signal = "signal";
         // A bot at a job: an arm out to a button or a socket and drawn back; up to a lever and down with it; a core or a
         // drive carried, in two strides.
