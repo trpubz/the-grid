@@ -34,6 +34,14 @@ namespace TheGrid
         [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern IntPtr InitWindow(IntPtr o, IntPtr s, Rect4 r, ulong style, ulong backing, [MarshalAs(UnmanagedType.I1)] bool defer);
         [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern IntPtr InitFrame(IntPtr o, IntPtr s, Rect4 r);
         [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern IntPtr InitSize(IntPtr o, IntPtr s, Pair size);
+        [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern void SendDouble(IntPtr o, IntPtr s, double a);
+        [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern IntPtr SendColor(IntPtr o, IntPtr s, double r, double g, double b, double a);
+        [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern IntPtr SendFamily(IntPtr o, IntPtr s, IntPtr family, ulong traits, long weight, double size);
+        [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern IntPtr SendSizeWeight(IntPtr o, IntPtr s, double size, double weight);
+        [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern IntPtr SendIndex(IntPtr o, IntPtr s, ulong i);
+        [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern ulong GetULong(IntPtr o, IntPtr s);
+        [DllImport(Objc, EntryPoint = "objc_msgSend")] [return: MarshalAs(UnmanagedType.I1)] static extern bool GetBool(IntPtr o, IntPtr s);
+        [DllImport(Objc, EntryPoint = "objc_msgSend")] [return: MarshalAs(UnmanagedType.I1)] static extern bool SendOptions(IntPtr o, IntPtr s, ulong options);
         [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern IntPtr InitBitmap(IntPtr o, IntPtr s, IntPtr planes, long wide, long high, long bitsPerSample,
             long samplesPerPixel, [MarshalAs(UnmanagedType.I1)] bool alpha, [MarshalAs(UnmanagedType.I1)] bool planar, IntPtr colorSpaceName, ulong format, long bytesPerRow, long bitsPerPixel);
 
@@ -95,11 +103,98 @@ namespace TheGrid
         // A layer over the panel's view, at `at` in points from its bottom left corner. Layers, not views, so every click is the view's.
         public static IntPtr AddLayer(IntPtr panel, Rect at)
         {
-            var layer = Send(Class("CALayer"), Sel("layer"));   // the view's layer keeps it
+            var layer = Send(Class("CALayer"), Sel("layer"));
             SendRect(layer, Sel("setFrame:"), Of(at));
             Send(layer, Sel("setMagnificationFilter:"), NSString("nearest"));
-            Send(Send(Send(panel, Sel("contentView")), Sel("layer")), Sel("addSublayer:"), layer);
+            return Attach(panel, layer);
+        }
+
+        static IntPtr Attach(IntPtr panel, IntPtr layer)
+        {
+            Send(Send(Send(panel, Sel("contentView")), Sel("layer")), Sel("addSublayer:"), layer);   // the view's layer keeps it
             return layer;
+        }
+
+        // A plain layer of one colour, its corners rounded.
+        public static IntPtr AddBox(IntPtr panel, Color fill, float radius)
+        {
+            var layer = Send(Class("CALayer"), Sel("layer"));
+            SetFill(layer, fill);
+            SendDouble(layer, Sel("setCornerRadius:"), radius);
+            return Attach(panel, layer);
+        }
+
+        public static void SetFill(IntPtr layer, Color fill) => Send(layer, Sel("setBackgroundColor:"), CGColor(fill));
+
+        public static void SetBorder(IntPtr layer, Color colour, float width)
+        {
+            Send(layer, Sel("setBorderColor:"), CGColor(colour));
+            SendDouble(layer, Sel("setBorderWidth:"), width);
+        }
+
+        // One line of text, cut with an ellipsis where it does not fit, drawn at the screen's own pixels so it is sharp.
+        public static IntPtr AddText(IntPtr panel, IntPtr font, float size, Color colour, bool right)
+        {
+            var layer = Send(Class("CATextLayer"), Sel("layer"));
+            Send(layer, Sel("setFont:"), font);
+            SendDouble(layer, Sel("setFontSize:"), size);
+            Send(layer, Sel("setForegroundColor:"), CGColor(colour));
+            Send(layer, Sel("setAlignmentMode:"), NSString(right ? "right" : "left"));
+            Send(layer, Sel("setTruncationMode:"), NSString("end"));
+            SendDouble(layer, Sel("setContentsScale:"), BackingScale());
+            return Attach(panel, layer);
+        }
+
+        public static void SetText(IntPtr layer, string text) => Send(layer, Sel("setString:"), NSString(text));
+
+        // How wide the text layer's line is, in points.
+        public static float TextWidth(IntPtr layer) => (float)GetPair(layer, Sel("preferredFrameSize")).a;
+
+        // The family's regular face; the system's fixed-width font when AppKit has no family by that name. Use it at once:
+        // nothing keeps it but the layers given it.
+        public static IntPtr Font(string family, float size)
+        {
+            var font = family == "" ? IntPtr.Zero
+                : SendFamily(Send(Class("NSFontManager"), Sel("sharedFontManager")), Sel("fontWithFamily:traits:weight:size:"), NSString(family), 0, 5, size);
+            return font != IntPtr.Zero ? font : SendSizeWeight(Class("NSFont"), Sel("monospacedSystemFontOfSize:weight:"), size, 0);
+        }
+
+        static IntPtr CGColor(Color c) => Send(SendColor(Class("NSColor"), Sel("colorWithSRGBRed:green:blue:alpha:"), c.r, c.g, c.b, c.a), Sel("CGColor"));
+
+        // Core Animation fades every change to a layer; none, for what is changed until this pass is on the screen.
+        public static void NoAnimation() => SendBool(Class("CATransaction"), Sel("setDisableActions:"), true);
+
+        public static void Place(IntPtr layer, Rect at, bool shown)
+        {
+            SendRect(layer, Sel("setFrame:"), Of(at));
+            SendBool(layer, Sel("setHidden:"), !shown);
+        }
+
+        // Where a mouse event happened in its window, in points from the bottom left.
+        public static Vector2 InWindow(IntPtr evt)
+        {
+            var p = GetPair(evt, Sel("locationInWindow"));
+            return new Vector2((float)p.a, (float)p.b);
+        }
+
+        // The running app with this bundle id, in front. False when none runs or macOS turns the request down.
+        public static bool BringForward(string bundleId)
+        {
+            var app = Send(Send(Class("NSRunningApplication"), Sel("runningApplicationsWithBundleIdentifier:"), NSString(bundleId)), Sel("firstObject"));
+            return app != IntPtr.Zero && SendOptions(app, Sel("activateWithOptions:"), 2);   // NSApplicationActivateIgnoringOtherApps
+        }
+
+        // The Grid in front, its window back from the Dock if it was minimised.
+        public static void BringGridForward()
+        {
+            var app = Send(Class("NSApplication"), Sel("sharedApplication"));
+            var windows = Send(app, Sel("windows"));
+            for (ulong i = 0, n = GetULong(windows, Sel("count")); i < n; i++)
+            {
+                var window = SendIndex(windows, Sel("objectAtIndex:"), i);
+                if (GetBool(window, Sel("isMiniaturized"))) Send(window, Sel("deminiaturize:"), IntPtr.Zero);
+            }
+            SendBool(app, Sel("activateIgnoringOtherApps:"), true);
         }
 
         // Shows the image in the layer at once, without Core Animation's fade; no image shows nothing.
