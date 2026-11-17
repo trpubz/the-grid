@@ -42,7 +42,7 @@ Settings live in `~/Library/Application Support/DefaultCompany/The Grid/settings
 | `ghPath` | Path to the `gh` program. Empty means look in `/opt/homebrew/bin`, `/usr/local/bin` and `/usr/bin` |
 | `zellijPath` | Path to the `zellij` program, asked which tab a session is in, and told to go to a tab when you click a session on the program's card. Empty means look in `~/.cargo/bin`, `/opt/homebrew/bin` and `/usr/local/bin` |
 | `codex` | `true` or `false`: read Codex's session files, so that its threads are in the roster and on the map. On unless set to `false` |
-| `program` | `true` or `false`: the program on the desktop, the figure and its card (see [The program on the desktop](#the-program-on-the-desktop)). On unless set to `false`, which turns both off |
+| `program` | `true` or `false`: the program on the desktop, the figure and its card (see [The program on the desktop](#the-program-on-the-desktop)). On unless set to `false`, which turns both off. Read when the app starts |
 | `programPinned` | `true` when the card is pinned up. Set by the pin on the card; starts as `false` |
 | `font` | The font family all text is set in, as Font Book names it. Empty means the first installed family that is a Nerd Font (its name has "Nerd Font" or the word "NF"). Read when the app starts |
 | `workspaces` | Workspace names, in the order the list shows them and regions take their lights. Starts as `Personal`; a workspace made in the app is added at the end |
@@ -213,7 +213,7 @@ The sprites are made by a script; see [tools/art/README.md](tools/art/README.md)
 
 ## The program on the desktop
 
-The program is The Grid's own bot, standing on your desktop with a card of sessions above it. It is there so that you see what needs you while another app is in front. It is on the Mac only, and it is off in picture mode (`-snapshot`).
+The program is The Grid's own bot, standing on your desktop with a card of sessions above it. It is there so that you see what needs you while another app is in front. It is on the Mac only, and it is off in the Unity editor and in picture mode (`-snapshot`).
 
 The bot stands at the bottom right of the main screen, above other apps' windows, on every Space, and also while The Grid's window is in front. It has no window frame and a clear background: you see the bot and nothing round it.
 
@@ -233,9 +233,9 @@ The terminal app is read from the session's own process: the one The Grid alread
 
 The program never takes the keyboard, so you can click it while you type in another app.
 
-**A rule changed.** Until now The Grid ran nothing in a terminal. Now it switches to a session's tab in Zellij when you click that session on the card. It still never types into a terminal or a conversation.
+**What The Grid does in a terminal.** It switches to a session's tab in Zellij when you click that session on the card. It never types into a terminal or a conversation.
 
-Set `program` to `false` in `settings.json` and the bot and the card are gone. `programPinned` holds the pin.
+Set `program` to `false` in `settings.json` and the bot and the card are gone the next time the app starts; `program` is read only then. `programPinned` holds the pin.
 
 ## Checks
 

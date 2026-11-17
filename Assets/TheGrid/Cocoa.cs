@@ -82,6 +82,7 @@ namespace TheGrid
             SendLong(panel, Sel("setLevel:"), 3);
             SendLong(panel, Sel("setCollectionBehavior:"), 1 | 16 | 64 | 256);
             SendBool(panel, Sel("setHidesOnDeactivate:"), false);
+            SendBool(panel, Sel("setCanHide:"), false);   // Cmd-H must not take the bot away
             SendBool(panel, Sel("setFloatingPanel:"), true);
             SendBool(panel, Sel("setBecomesKeyOnlyIfNeeded:"), true);
             SendBool(panel, Sel("setOpaque:"), false);

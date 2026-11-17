@@ -77,6 +77,20 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual("one|" + new string('x', 60), row.key);   // the key is never cut
         }
 
+        [Test]
+        public void ANameIsNeverCutInsideAnEmoji()
+        {
+            var name = new string('x', ProgramCard.NameLetters - 2) + "\U0001F600" + "more letters";
+            var cut = ProgramCard.Of(Only(Agent(name, "Running"))).rows[0].name;
+            Assert.IsTrue(cut.EndsWith("…"));
+            Assert.LessOrEqual(cut.Length, ProgramCard.NameLetters);
+            for (var i = 0; i < cut.Length; i++)
+            {
+                if (char.IsHighSurrogate(cut[i])) Assert.IsTrue(i + 1 < cut.Length && char.IsLowSurrogate(cut[i + 1]), "lone high surrogate at " + i);
+                if (char.IsLowSurrogate(cut[i])) Assert.IsTrue(i > 0 && char.IsHighSurrogate(cut[i - 1]), "lone low surrogate at " + i);
+            }
+        }
+
         static readonly Rect Screen = new Rect(0, 80, 1440, 820);   // a Dock 80 high at the bottom
 
         [Test]

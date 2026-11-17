@@ -679,7 +679,7 @@ namespace TheGrid
         void FlipPin()
         {
             settings.Reload(settingsPath);
-            settings.programPinned = !settings.programPinned;
+            settings.programPinned = !program.Pinned;   // flip what the card shows, not what the file said
             TrySave();
             program.Pinned = settings.programPinned;
         }

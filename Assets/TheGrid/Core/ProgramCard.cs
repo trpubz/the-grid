@@ -131,11 +131,20 @@ namespace TheGrid.Core
                 v.rows.Add(new ProgramRow
                 {
                     key = a.account + "|" + a.sessionId,   // as Panels keys a bot
-                    name = a.name.Length > NameLetters ? a.name.Substring(0, NameLetters - 1) + "…" : a.name,
+                    name = Cut(a.name),
                     word = Word(a), badge = World.BadgeFor(a.state), pid = a.pid
                 });
             }
             return v;
+        }
+
+        // A cut must not leave half an emoji: a lone surrogate cannot be sent to the shell as UTF-8.
+        static string Cut(string name)
+        {
+            if (name.Length <= NameLetters) return name;
+            var keep = NameLetters - 1;
+            if (char.IsHighSurrogate(name[keep - 1])) keep--;
+            return name.Substring(0, keep) + "…";
         }
 
         static string Word(AgentRow a)
