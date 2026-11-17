@@ -47,6 +47,9 @@ namespace TheGrid
         // Where the session of the card that is open lives: asked once when the card opens, on a thread of its own.
         string whereFor = "", whereFixed = "", zellij = "";
         Task<string> where;
+        DesktopProgram program;                  // the bot on the desktop; null where there is none
+        Task<(bool told, string app)> jump;      // a click on one of its card's rows, telling zellij on a thread of its own
+        string jumpKey = "", selectOnOpen = "";  // the row's bot; and the bot to select once the world is drawn
         Deliveries deliveries;      // made when the world is first opened: only what arrives after that is shown
         PileSnapshot deliveredFrom; // the pile snapshot last looked through for deliveries
         string lastSender = "", lastRecipient = "";  // picture mode: the sender and the recipient of the longest ride, how long that ride is and when it ends
@@ -105,6 +108,16 @@ namespace TheGrid
             settingsPath = Path.Combine(Application.persistentDataPath, "settings.json");
             settings = Settings.Load(settingsPath);
             if (!File.Exists(settingsPath)) TrySave(); // so there is a file to edit
+            // The program on the desktop: the macOS player only, never in a picture, and `program: false` in the settings stops it.
+            if (fixedSnap == null && settings.program && Application.platform == RuntimePlatform.OSXPlayer)
+            {
+                program = gameObject.AddComponent<DesktopProgram>();
+                program.Family = Fonts.Pick(settings.font, Font.GetOSInstalledFontNames());
+                program.Pinned = settings.programPinned;
+                program.RowClicked += JumpTo;
+                program.GridWanted += Cocoa.BringGridForward;
+                program.PinClicked += FlipPin;
+            }
             var claude = ClaudeCli.ResolvePath(settings.claudePath, ClaudeCli.UsualPlaces(home));
             // Codex threads come from Codex's own session files, read only; `codex: false` in the settings stops the reading.
             collector = new Collector(settings, home, dir => ClaudeCli.AgentsJson(claude, dir, home), SessionFiles.ChangeStamp,
@@ -231,6 +244,7 @@ namespace TheGrid
         void Update()
         {
             if (collector == null) return;
+            if (jump != null && jump.IsCompleted) Jumped();
             if (!pileLogged && !pile.Latest.reading)
             {
                 pileLogged = true;
@@ -240,6 +254,8 @@ namespace TheGrid
             if (ReferenceEquals(snap, logged) || snap.generatedAt == 0) return;
             if (logged == null) Debug.Log("[roster] first snapshot: " + snap.agents.Count + " agents, " + snap.errors.Count + " errors");
             logged = snap;
+            // From Update, not OnGUI, so the program keeps up while the window is minimised. The same snapshot the lists draw next.
+            program?.Show(ProgramCard.Of(snap));
             var errors = string.Join(" | ", snap.errors);
             if (errors != lastErrors) Debug.Log(errors == "" ? "[roster] errors cleared, " + snap.agents.Count + " agents" : "[roster] errors: " + errors);
             lastErrors = errors;
@@ -347,6 +363,12 @@ namespace TheGrid
                     }
                 }
                 world.Show(worldDrawn, map, scale);
+                if (selectOnOpen != "")
+                {
+                    world.Select(selectOnOpen);   // after Show: a world opened for the first time has no bots before it
+                    world.LookAt(selectOnOpen);
+                    selectOnOpen = "";
+                }
                 card = selected == "" ? null : Panels.Card(drawn, selected, now);
                 if (card == null) whereFor = "";
                 else
@@ -625,6 +647,41 @@ namespace TheGrid
             settings.CycleLight(region.name, region.look);
             if (fixedSnap == null) TrySave();
             worldFrom = null;   // the same roster, lit otherwise: build the world again
+        }
+
+        // A click on a row of the program's card: to the session's tab in zellij, or else to its bot in the world.
+        void JumpTo(ProgramRow row)
+        {
+            int pid = row.pid;
+            string path = zellij;
+            jumpKey = row.key;
+            jump = Task.Run(() =>
+            {
+                bool told = Zellij.Jump(pid, path, Zellij.Run, out var app);
+                return (told, app);
+            });
+        }
+
+        void Jumped()
+        {
+            if (jump.IsFaulted) Debug.LogWarning("[program] could not ask zellij: " + jump.Exception.GetBaseException().Message);
+            var (told, app) = jump.Status == TaskStatus.RanToCompletion ? jump.Result : (false, "");
+            jump = null;
+            if (!told)
+            {
+                Cocoa.BringGridForward();
+                nextWorldOpen = true;
+                selectOnOpen = jumpKey;
+            }
+            else if (app != "" && !Cocoa.BringForward(app)) Debug.Log("[program] macOS did not bring " + app + " forward");
+        }
+
+        void FlipPin()
+        {
+            settings.Reload(settingsPath);
+            settings.programPinned = !program.Pinned;   // flip what the card shows, not what the file said
+            TrySave();
+            program.Pinned = settings.programPinned;
         }
 
         void TrySave()

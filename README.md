@@ -18,7 +18,7 @@ This is an implementation starter. The included Unity component plays a fixed re
 
 ## The roster
 
-The first working piece: a window that lists your live Claude Code sessions on this Mac, and your Codex threads (see [Codex](#codex)), with the one that needs you most on top. It reads what Claude Code already publishes about its own sessions, and Codex's session files, and never writes to an agent app's files. The Grid's own code makes no network calls. It runs two programs of yours: `claude`, to ask for the session list, and `gh`, the GitHub command, to ask GitHub about the open pull requests of the repos on the map (see [The PR depot](#the-pr-depot); it can be turned off).
+The first working piece: a window that lists your live Claude Code sessions on this Mac, and your Codex threads (see [Codex](#codex)), with the one that needs you most on top. It reads what Claude Code already publishes about its own sessions, and Codex's session files, and never writes to an agent app's files. The Grid's own code makes no network calls. It runs three programs of yours: `claude`, to ask for the session list; `gh`, the GitHub command, to ask GitHub about the open pull requests of the repos on the map (see [The PR depot](#the-pr-depot); it can be turned off); and `zellij`, to ask which tab a session is in and, when you click that session on [the program's card](#the-program-on-the-desktop), to go to that tab. It never types into a terminal or a conversation.
 
 - **Run it in the editor:** open the project in Unity 6000.4.3f1, open `Assets/TheGrid/Roster.unity`, press Play.
 - **Build the app:** menu **The Grid > Build Mac App**, then open `Builds/TheGrid.app`.
@@ -40,8 +40,10 @@ Settings live in `~/Library/Application Support/DefaultCompany/The Grid/settings
 | `claudePath` | Path to the `claude` program. Empty means look in `~/.local/bin`, `/opt/homebrew/bin` and `/usr/local/bin` |
 | `pullRequests` | `true` to ask GitHub, through `gh`, about open pull requests; `false` and the app asks nothing of the network. Starts as `true` |
 | `ghPath` | Path to the `gh` program. Empty means look in `/opt/homebrew/bin`, `/usr/local/bin` and `/usr/bin` |
-| `zellijPath` | Path to the `zellij` program, asked which tab a session is in. Empty means look in `~/.cargo/bin`, `/opt/homebrew/bin` and `/usr/local/bin` |
+| `zellijPath` | Path to the `zellij` program, asked which tab a session is in, and told to go to a tab when you click a session on the program's card. Empty means look in `~/.cargo/bin`, `/opt/homebrew/bin` and `/usr/local/bin` |
 | `codex` | `true` or `false`: read Codex's session files, so that its threads are in the roster and on the map. On unless set to `false` |
+| `program` | `true` or `false`: the program on the desktop, the figure and its card (see [The program on the desktop](#the-program-on-the-desktop)). On unless set to `false`, which turns both off. Read when the app starts |
+| `programPinned` | `true` when the card is pinned up. Set by the pin on the card; starts as `false` |
 | `font` | The font family all text is set in, as Font Book names it. Empty means the first installed family that is a Nerd Font (its name has "Nerd Font" or the word "NF"). Read when the app starts |
 | `workspaces` | Workspace names, in the order the list shows them and regions take their lights. Starts as `Personal`; a workspace made in the app is added at the end |
 | `repoWorkspaces` | Which repo belongs to which workspace. A repo not listed is `Personal` |
@@ -173,7 +175,7 @@ Either way the folder must have no uncommitted changes, and teleport switches it
 Two panels lie over the map, down its right side:
 
 - **Needs you** lists every bot that is waiting on you, most urgent first, with what it wants: an answer, an approval, or a look at a failure. Click a row and the view goes to that bot and selects it. Click the title to fold the list away; in a narrow window it starts folded.
-- **The card** of the selected bot says what it is doing, who it is, in which repo and on which ticket, for how long, and what each of its subagents is doing. Click its workspace to give the repo another, as in the lists. When the agent has a pull request, **PR #n** opens it. Under that the card says how to get into the conversation. **The command** that opens it in a terminal: `claude attach <id>` for a background session, which has no window of its own, and `claude --resume <session id>` for any other. The card shows the end of it; **Copy** puts the whole of it on the clipboard, with the `cd` to the session's folder in front and, for an account other than the default one, its `CLAUDE_CONFIG_DIR`. If you have more than one account, the default account's command unsets that variable, so that it works from a terminal set up for another account. And, for a session that runs in a [zellij](https://zellij.dev) pane, **where it already is**: `zellij: <session> › <tab>`. Go there rather than run the command, which would open the conversation a second time. To find that, the app reads the environment of that one process when you click its bot (`ps`), keeps from it the zellij session's name and the pane's number and nothing else, and asks `zellij` for that session's panes. The app runs nothing in a terminal, and types nothing into a conversation and reads nothing from one.
+- **The card** of the selected bot says what it is doing, who it is, in which repo and on which ticket, for how long, and what each of its subagents is doing. Click its workspace to give the repo another, as in the lists. When the agent has a pull request, **PR #n** opens it. Under that the card says how to get into the conversation. **The command** that opens it in a terminal: `claude attach <id>` for a background session, which has no window of its own, and `claude --resume <session id>` for any other. The card shows the end of it; **Copy** puts the whole of it on the clipboard, with the `cd` to the session's folder in front and, for an account other than the default one, its `CLAUDE_CONFIG_DIR`. If you have more than one account, the default account's command unsets that variable, so that it works from a terminal set up for another account. And, for a session that runs in a [zellij](https://zellij.dev) pane, **where it already is**: `zellij: <session> › <tab>`. Go there rather than run the command, which would open the conversation a second time. To find that, the app reads the environment of that one process when you click its bot (`ps`), keeps from it the zellij session's name and the pane's number and nothing else, and asks `zellij` for that session's panes. The app types nothing into a terminal or a conversation, and reads nothing from one. It runs `zellij` to ask where a session is and, when you click a session on [the program's card](#the-program-on-the-desktop), to go to its tab.
 
 ![A narrow window: the list folded, the card across the bottom](docs/art/world-narrow.png)
 
@@ -208,6 +210,32 @@ Add `-shots <folder>` and it saves `far.png` and `near.png` there and quits; `-s
 ```
 
 The sprites are made by a script; see [tools/art/README.md](tools/art/README.md).
+
+## The program on the desktop
+
+The program is The Grid's own bot, standing on your desktop with a card of sessions above it. It is there so that you see what needs you while another app is in front. It is on the Mac only, and it is off in the Unity editor and in picture mode (`-snapshot`).
+
+The bot stands at the bottom right of the main screen, above other apps' windows, on every Space, and also while The Grid's window is in front. It has no window frame and a clear background: you see the bot and nothing round it.
+
+- **Dark or lit.** The bot is dark when no session needs you. When at least one session waits on you (a question, an approval, a failure, or blocked in the background) it is lit, with the amber question badge over its head. A session that has finished does not light it.
+- **The card** shows above the bot while the pointer is near it or over the card, and for a moment after. A pin on the card keeps it up; the pin is remembered.
+- **The rows.** The card holds the first five rows of the roster, in the roster's own order: whoever needs you first. Each row has its badge, its name and its state in a word; for a running session, what it is doing. If there are more, the last line says "+N more".
+
+What a click does:
+
+| Click | What happens |
+|---|---|
+| A row whose session lives in Zellij | The Grid tells `zellij` to go to that session's tab, and brings the terminal app forward. You land on the tab, not on an exact pane: in a split tab you land on the pane last used there |
+| A row whose session does not live in Zellij (a desktop app's session, a plain terminal, a background session) | The Grid's window comes forward on the World view, with that bot selected |
+| "+N more", or the bot | The Grid's window comes forward |
+
+The terminal app is read from the session's own process: the one The Grid already reads to learn its Zellij session. No other process is read.
+
+The program never takes the keyboard, so you can click it while you type in another app.
+
+**What The Grid does in a terminal.** It switches to a session's tab in Zellij when you click that session on the card. It never types into a terminal or a conversation.
+
+Set `program` to `false` in `settings.json` and the bot and the card are gone the next time the app starts; `program` is read only then. `programPinned` holds the pin.
 
 ## Checks
 
