@@ -105,6 +105,12 @@ namespace TheGrid
             settingsPath = Path.Combine(Application.persistentDataPath, "settings.json");
             settings = Settings.Load(settingsPath);
             if (!File.Exists(settingsPath)) TrySave(); // so there is a file to edit
+            // The program on the desktop: the macOS player only, never in a picture, and `program: false` in the settings stops it.
+            if (fixedSnap == null && settings.program && Application.platform == RuntimePlatform.OSXPlayer)
+            {
+                var program = gameObject.AddComponent<DesktopProgram>();
+                program.FigureClicked += () => { program.Lit = !program.Lit; Debug.Log("[program] click"); };   // for now a click only flips it
+            }
             var claude = ClaudeCli.ResolvePath(settings.claudePath, ClaudeCli.UsualPlaces(home));
             // Codex threads come from Codex's own session files, read only; `codex: false` in the settings stops the reading.
             collector = new Collector(settings, home, dir => ClaudeCli.AgentsJson(claude, dir, home), SessionFiles.ChangeStamp,

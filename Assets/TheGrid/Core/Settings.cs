@@ -22,6 +22,8 @@ namespace TheGrid.Core
         public string zellijPath = "";                          // the same
         public bool codex = true;                               // read Codex's session files, so that its threads are in the roster too
         public string font = "";                                // the family all text is set in; empty means: the first Nerd Font this Mac has
+        public bool program = true;                             // the small bot on the desktop that shows who needs the owner
+        public bool programPinned = false;                      // its card stays open, not only while the pointer is near
         public List<string> workspaces = new List<string> { DefaultWorkspace };
         public List<RepoWorkspace> repoWorkspaces = new List<RepoWorkspace>();
         public List<WorkspaceLight> workspaceLights = new List<WorkspaceLight>();   // a light: one of Lights.LookNames
@@ -59,6 +61,8 @@ namespace TheGrid.Core
             zellijPath = fresh.zellijPath;
             font = fresh.font;
             codex = fresh.codex;
+            program = fresh.program;
+            programPinned = fresh.programPinned;
             workspaces = fresh.workspaces;
             repoWorkspaces = fresh.repoWorkspaces;
             workspaceLights = fresh.workspaceLights;
