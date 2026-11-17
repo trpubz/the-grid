@@ -148,5 +148,53 @@ namespace TheGrid.Core.Tests
         [TestCase(true, false, 5000, 0, true)]      // pinned
         public void TheCardShowsWhilePinnedOrNearAndForAShortTimeAfter(bool pinned, bool near, long now, long leftAt, bool shows) =>
             Assert.AreEqual(shows, ProgramCard.Shows(pinned, 3, near, now, leftAt));
+
+        static bool Inside(Rect outer, Rect inner) =>
+            inner.xMin >= outer.xMin && inner.xMax <= outer.xMax && inner.yMin >= outer.yMin && inner.yMax <= outer.yMax;
+
+        // A row of a card: badge or dot at its left, the word at its right and never wider than half the row, the name between
+        // them, overlapping neither, whatever width the word is measured at; the text lines in the middle of the row.
+        [TestCase(0f)]
+        [TestCase(40f)]
+        [TestCase(132f)]
+        [TestCase(500f)]
+        [TestCase(-5f)]
+        public void ARowsPartsSitInsideItBadgeLeftWordRightNameBetween(float measured)
+        {
+            var row = ProgramCard.Layout(Screen, 5, true, true).rows[2];
+            var p = ProgramCard.Parts(row, measured);
+            foreach (var r in new[] { p.badge, p.dot, p.name, p.word }) Assert.IsTrue(Inside(row, r), r + " in " + row);
+            Assert.AreEqual(row.x, p.badge.x);
+            Assert.AreEqual(new Vector2(16, 20), p.badge.size);   // one point to each pixel of the badge's art
+            Assert.AreEqual(row.center.y, p.badge.center.y, 1e-4);
+            Assert.AreEqual(p.badge.center, p.dot.center);         // the dot stands where a badge would
+            Assert.AreEqual(row.xMax, p.word.xMax, 1e-4);
+            Assert.AreEqual(Mathf.Clamp(measured, 0, row.width / 2), p.word.width, 1e-4);
+            Assert.GreaterOrEqual(p.name.xMin, p.badge.xMax);
+            Assert.LessOrEqual(p.name.xMax, p.word.xMin);
+            Assert.IsFalse(p.name.Overlaps(p.word) || p.name.Overlaps(p.badge) || p.name.Overlaps(p.dot));
+            Assert.AreEqual(new[] { 22f, 8f }, new[] { p.name.x - row.x, p.word.xMin - p.name.xMax });   // room for the badge; a gap before the word
+            foreach (var line in new[] { p.name, p.word })
+            {
+                Assert.AreEqual(16, line.height);
+                Assert.AreEqual(row.center.y, line.center.y, 1e-4);
+            }
+        }
+
+        // The pin is a 10 point square in the middle of its place; "+N more" is a line of text in line with the names.
+        [Test]
+        public void ThePinsSquareIsInTheMiddleOfThePinAndTheMoreLineIsInLineWithTheNames()
+        {
+            var l = ProgramCard.Layout(Screen, 5, true, true);
+            var mark = ProgramCard.PinMark(l.pin);
+            Assert.AreEqual(new Vector2(10, 10), mark.size);
+            Assert.AreEqual(l.pin.center, mark.center);
+            var line = ProgramCard.MoreLine(l.more);
+            Assert.IsTrue(Inside(l.more, line));
+            Assert.AreEqual(ProgramCard.Parts(l.rows[0], 40).name.x, line.x);
+            Assert.AreEqual(l.more.xMax, line.xMax, 1e-4);
+            Assert.AreEqual(16, line.height);
+            Assert.AreEqual(l.more.center.y, line.center.y, 1e-4);
+        }
     }
 }

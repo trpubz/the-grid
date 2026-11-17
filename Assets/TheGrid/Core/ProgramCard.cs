@@ -27,6 +27,12 @@ namespace TheGrid.Core
         public List<Rect> rows = new List<Rect>();
     }
 
+    // Where a row's parts sit, in the same points as its row: the badge's picture, or a dot where it has none; the name; the word.
+    public sealed class ProgramRowParts
+    {
+        public Rect badge, dot, name, word;
+    }
+
     public enum ProgramHit { None, Figure, Row, More, Pin }
 
     // The program on the desktop: the card's rows, and the pictures made ready for AppKit.
@@ -40,6 +46,9 @@ namespace TheGrid.Core
         public const float BadgeLift = 45, Margin = 16, CardWidth = 280, RowHeight = 22, Pad = 24;
         public const long HoldMs = 800;
         const float TitleHeight = 28, PinSize = 20, Inset = 8, CardGap = 6, CardFoot = 6;
+        // Inside a row: room for the badge before the name, the gap before the word, a line of text, the dot, the pin's square.
+        const float NameAt = 22, WordGap = 8, LineHeight = 16, DotSize = 6, PinMarkSize = 10;
+        public static readonly Vector2 RowBadgeSize = new Vector2(16, 20);   // one point to each pixel of the badge's art
 
         // The figure stays where it is; the card only adds room above it. `rows` is how many lines the card has.
         public static ProgramLayout Layout(Rect screenVisible, int rows, bool more, bool cardShown)
@@ -62,6 +71,29 @@ namespace TheGrid.Core
             if (more) l.more = new Rect(l.card.x + Inset, y - RowHeight, CardWidth - 2 * Inset, RowHeight);
             return l;
         }
+
+        // A row's parts, given how wide its word is when drawn: the word at the right, never more than half the row, so the
+        // name between the badge and the word keeps some room.
+        public static ProgramRowParts Parts(Rect row, float wordWidth)
+        {
+            float word = Mathf.Clamp(wordWidth, 0, row.width / 2);
+            var badge = new Rect(row.x, row.center.y - RowBadgeSize.y / 2, RowBadgeSize.x, RowBadgeSize.y);
+            return new ProgramRowParts
+            {
+                badge = badge,
+                dot = new Rect(badge.center.x - DotSize / 2, badge.center.y - DotSize / 2, DotSize, DotSize),
+                name = Line(row, row.x + NameAt, row.width - NameAt - word - WordGap),
+                word = Line(row, row.xMax - word, word)
+            };
+        }
+
+        // The pin's square, filled when pinned and hollow when not, in the middle of the pin.
+        public static Rect PinMark(Rect pin) => new Rect(pin.center.x - PinMarkSize / 2, pin.center.y - PinMarkSize / 2, PinMarkSize, PinMarkSize);
+
+        // "+N more", in line with the names.
+        public static Rect MoreLine(Rect more) => Line(more, more.x + NameAt, more.width - NameAt);
+
+        static Rect Line(Rect row, float x, float wide) => new Rect(x, row.center.y - LineHeight / 2, wide, LineHeight);   // in the middle of the row
 
         // What is under a point given inside the frame. The card's parts come before the figure.
         public static ProgramHit Hit(ProgramLayout l, Vector2 inFrame, out int row)

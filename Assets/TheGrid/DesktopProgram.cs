@@ -12,8 +12,7 @@ namespace TheGrid
     // them and hands clicks back. Only the macOS player makes one.
     public sealed class DesktopProgram : MonoBehaviour
     {
-        const float Times = 3, TextSize = 12, NameAt = 22;   // the figure's art pixel in points; the card's text; room for a row's badge
-        static readonly Vector2 RowBadge = ProgramCard.BadgeSize / Times;   // a row's badge, one point to each pixel of its art
+        const float Times = 3, TextSize = 12;   // the figure's art pixel in points; the card's text
         static readonly Color Back = Hex(0x0c1024, .92f), Ink = Hex(0xe4ecff), Faint = Hex(0x8791c4), Clear = new Color(0, 0, 0, 0);
 
         delegate void MouseDownFn(IntPtr self, IntPtr sel, IntPtr evt);
@@ -131,7 +130,7 @@ namespace TheGrid
             Cocoa.Place(badge, layout.badge, view.lit);
             bool card = layout.card.width > 0;
             Cocoa.Place(back, layout.card, card);
-            Cocoa.Place(pin, new Rect(layout.pin.center.x - 5, layout.pin.center.y - 5, 10, 10), card);
+            Cocoa.Place(pin, ProgramCard.PinMark(layout.pin), card);
             Cocoa.SetFill(pin, pinned ? Ink : Clear);
             for (int i = 0; i < ProgramCard.MaxRows; i++)
             {
@@ -139,26 +138,23 @@ namespace TheGrid
                 var r = on ? layout.rows[i] : default;
                 var row = on ? view.rows[i] : null;
                 bool pictured = on && row.badge != Badge.None;
-                Cocoa.Place(icons[i], new Rect(r.x, r.center.y - RowBadge.y / 2, RowBadge.x, RowBadge.y), pictured);
                 if (pictured) Cocoa.SetImage(icons[i], badges[(int)row.badge]);
-                Cocoa.Place(dots[i], new Rect(r.x + RowBadge.x / 2 - 3, r.center.y - 3, 6, 6), on && !pictured);
-                float word = 0;
                 if (on)
                 {
                     Cocoa.SetText(names[i], row.name);
                     Cocoa.SetText(words[i], row.word);
-                    word = Mathf.Min(Cocoa.TextWidth(words[i]), r.width / 2);
                 }
-                Cocoa.Place(words[i], Line(r, r.xMax - word, word), on);
-                Cocoa.Place(names[i], Line(r, r.x + NameAt, r.width - NameAt - word - 8), on);
+                var parts = ProgramCard.Parts(r, on ? Cocoa.TextWidth(words[i]) : 0);
+                Cocoa.Place(icons[i], parts.badge, pictured);
+                Cocoa.Place(dots[i], parts.dot, on && !pictured);
+                Cocoa.Place(words[i], parts.word, on);
+                Cocoa.Place(names[i], parts.name, on);
             }
             bool hasMore = layout.more.width > 0;
             if (hasMore) Cocoa.SetText(more, "+" + view.more + " more");
-            Cocoa.Place(more, Line(layout.more, layout.more.x + NameAt, layout.more.width - NameAt), hasMore);
+            Cocoa.Place(more, ProgramCard.MoreLine(layout.more), hasMore);
             Cocoa.SetFrame(panel, layout.frame);
         }
-
-        static Rect Line(Rect row, float x, float wide) => new Rect(x, row.center.y - 8, wide, 16);   // a line of text, in the middle of its row
 
         static Color Hex(int rgb, float alpha = 1) => new Color((rgb >> 16 & 255) / 255f, (rgb >> 8 & 255) / 255f, (rgb & 255) / 255f, alpha);
 
