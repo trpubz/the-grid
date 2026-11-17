@@ -27,7 +27,8 @@ namespace TheGrid
         [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern void SendRect(IntPtr o, IntPtr s, Rect4 r);
         [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern void SendRectBool(IntPtr o, IntPtr s, Rect4 r, [MarshalAs(UnmanagedType.I1)] bool a);
         [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern void SendPair(IntPtr o, IntPtr s, Pair a);
-        [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern Rect4 GetRect(IntPtr o, IntPtr s);
+        [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern Rect4 GetRectInRegisters(IntPtr o, IntPtr s);
+        [DllImport(Objc, EntryPoint = "objc_msgSend_stret")] static extern void GetRectInMemory(out Rect4 r, IntPtr o, IntPtr s);
         [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern Pair GetPair(IntPtr o, IntPtr s);
         [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern double GetDouble(IntPtr o, IntPtr s);
         [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern IntPtr InitWindow(IntPtr o, IntPtr s, Rect4 r, ulong style, ulong backing, [MarshalAs(UnmanagedType.I1)] bool defer);
@@ -39,6 +40,15 @@ namespace TheGrid
         public static IntPtr Class(string name) => objc_getClass(name);
         public static IntPtr Sel(string name) => sel_registerName(name);
         public static IntPtr NSString(string text) => Send(Class("NSString"), Sel("stringWithUTF8String:"), text);
+
+        // A struct larger than 16 bytes, such as an NSRect, is returned in memory on Intel, through objc_msgSend_stret; Apple
+        // silicon returns it in registers and has no objc_msgSend_stret, so that entry point is looked up only on Intel.
+        static Rect4 GetRect(IntPtr o, IntPtr s)
+        {
+            if (RuntimeInformation.ProcessArchitecture != Architecture.X64) return GetRectInRegisters(o, s);
+            GetRectInMemory(out var r, o, s);
+            return r;
+        }
 
         static Rect4 Of(Rect r) => new Rect4 { x = r.x, y = r.y, w = r.width, h = r.height };
 
