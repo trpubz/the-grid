@@ -42,7 +42,9 @@ namespace TheGrid.Core.Tests
         {
             settings.configDirs.Add(Path.Combine(home, ".claude-two"));
             var asked = new List<string>();
-            using (var c = new Collector(settings, home, dir => { asked.Add(dir); return agentsJson; }))
+            // the second folder has sessions of its own: one both folders list would be one row
+            string two = agentsJson.Replace("\"sessionId\": \"0", "\"sessionId\": \"2");
+            using (var c = new Collector(settings, home, dir => { asked.Add(dir); return dir.EndsWith("-two") ? two : agentsJson; }))
             {
                 var snap = c.Poll(Now);
                 CollectionAssert.AreEqual(settings.configDirs, asked);
