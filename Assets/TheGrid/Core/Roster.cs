@@ -168,8 +168,9 @@ namespace TheGrid.Core
             var liveKeys = new HashSet<string>();
             foreach (var s in live)
             {
-                var key = s.ConfigDir + "|" + s.SessionId;
-                liveKeys.Add(key);
+                // Every config folder lists a background session: it is one row, under the first folder that lists it.
+                var key = s.SessionId;
+                if (!liveKeys.Add(key)) continue;
                 if (!memory.TryGetValue(key, out var m)) memory[key] = m = new Memory();
                 Update(m, s, nowMs);
             }

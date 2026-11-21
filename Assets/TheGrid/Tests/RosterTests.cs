@@ -256,5 +256,34 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual("Offline", gone.state);
             Assert.AreEqual("", gone.activity);
         }
+
+        static LiveSession Background(string sessionId, string configDir) =>
+            new LiveSession { SessionId = sessionId, Id = "bg000009", Name = "beta-nightly", Cwd = "/work/beta", Kind = "background", State = "blocked", Status = "", WaitingFor = "", ConfigDir = configDir };
+
+        [Test]
+        public void ASessionListedByTwoConfigFoldersIsOneRowUnderTheFirst()
+        {
+            var snap = new RosterBuilder(settings).Build(new[] { Background("s-9", "/cfg/.claude"), Background("s-9", "/cfg/.claude-two") }, None, Now);
+            Assert.AreEqual(1, snap.agents.Count);
+            Assert.AreEqual("claude", snap.agents[0].account);
+        }
+
+        [Test]
+        public void ASessionWhoseFirstFolderStopsAnsweringStaysTheSameRow()
+        {
+            var builder = new RosterBuilder(settings);
+            builder.Build(new[] { Background("s-9", "/cfg/.claude"), Background("s-9", "/cfg/.claude-two") }, None, Now);
+            var snap = builder.Build(new[] { Background("s-9", "/cfg/.claude-two") }, None, Now + 2000);
+            Assert.AreEqual(1, snap.agents.Count); // not a new row beside an offline one
+            Assert.AreEqual("BackgroundBlocked", snap.agents[0].state);
+            Assert.AreEqual(Now, snap.agents[0].stateSince);
+        }
+
+        [Test]
+        public void TwoSessionsInTwoConfigFoldersAreTwoRows()
+        {
+            var snap = new RosterBuilder(settings).Build(new[] { Background("s-8", "/cfg/.claude"), Background("s-9", "/cfg/.claude-two") }, None, Now);
+            Assert.AreEqual(2, snap.agents.Count);
+        }
     }
 }
