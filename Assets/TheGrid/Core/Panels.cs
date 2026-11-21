@@ -93,7 +93,7 @@ namespace TheGrid.Core
 
         static string Sector(AgentRow a) => a.repoName == "" ? World.NoProject : a.repoName;
 
-        static string What(AgentRow a)
+        internal static string What(AgentRow a)
         {
             switch (a.state)
             {

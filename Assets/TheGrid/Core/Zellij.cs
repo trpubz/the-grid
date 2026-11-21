@@ -28,7 +28,7 @@ namespace TheGrid.Core
             return name.Success && id.Success;
         }
 
-        [Serializable] sealed class Pane { public int id; public bool is_plugin; public string tab_name; }
+        [Serializable] sealed class Pane { public int id; public bool is_plugin; public int tab_id; public string tab_name; }
         [Serializable] sealed class Panes { public List<Pane> items; }
 
         // The name of the tab a terminal pane is in, from what `zellij action list-panes --tab --json` prints; "" when the
@@ -58,6 +58,44 @@ namespace TheGrid.Core
                 return tab == "" ? session : session + " › " + tab;
             }
             catch (Exception e) when (Expected(e)) { return ""; }
+        }
+
+        // The id of the tab a terminal pane is in; -1 when the pane is not in the list, the list cannot be read, or it has
+        // no ids at all (an older zellij: JsonUtility would read the missing number as 0, which is a real tab).
+        public static int TabIdOf(string panesJson, int pane)
+        {
+            if (panesJson == null || !panesJson.Contains("\"tab_id\"")) return -1;
+            Panes panes;
+            try { panes = JsonUtility.FromJson<Panes>("{\"items\":" + panesJson + "}"); }
+            catch (ArgumentException) { return -1; }
+            return panes?.items?.Find(p => p.id == pane && !p.is_plugin)?.tab_id ?? -1;
+        }
+
+        // The terminal app the process was started from: its bundle id, from `ps eww` output; "" when absent or not plain.
+        public static string TerminalApp(string ps)
+        {
+            var m = Regex.Match(ps ?? "", @"(?:^|\s)__CFBundleIdentifier=([A-Za-z0-9.\-]+)(?:\s|$)");
+            return m.Success ? m.Groups[1].Value : "";
+        }
+
+        // Tells zellij to go to the tab the process's pane is in. True when it was told; `app` is then the terminal's
+        // bundle id, else "". False when the process runs in no zellij pane, zellij is not there, the tab is unknown, or a
+        // program fails. It uses go-to-tab-by-id: from outside zellij, focus-pane-id exits 0 and moves nothing.
+        public static bool Jump(int pid, string zellijPath, Func<string, string, string> run, out string app)
+        {
+            app = "";
+            if (pid <= 0 || string.IsNullOrEmpty(zellijPath)) return false;
+            try
+            {
+                var ps = run("/bin/ps", "eww -o command= -p " + pid);
+                if (!TryPane(ps, out var session, out int pane)) return false;
+                int tab = TabIdOf(run(zellijPath, "--session " + session + " action list-panes --tab --json"), pane);
+                if (tab < 0) return false;
+                run(zellijPath, "--session " + session + " action go-to-tab-by-id " + tab);
+                app = TerminalApp(ps);
+                return true;
+            }
+            catch (Exception e) when (Expected(e)) { return false; }
         }
 
         static bool Expected(Exception e) => e is InvalidOperationException || e is TimeoutException || e is Win32Exception || e is IOException;

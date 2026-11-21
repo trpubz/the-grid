@@ -50,6 +50,19 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
+        public void TheProgramIsOnAndUnpinnedUnlessTheFileSaysOtherwiseAndBothSurviveSaveAndLoad()
+        {
+            var path = file;
+            var s = Settings.Load(path);                    // no file
+            Assert.IsTrue(s.program); Assert.IsFalse(s.programPinned);
+            s.program = false; s.programPinned = true; s.Save(path);
+            var again = Settings.Load(path);
+            Assert.IsFalse(again.program); Assert.IsTrue(again.programPinned);
+            var live = new Settings(); live.Reload(path);   // a hand edit made while the app runs is picked up
+            Assert.IsFalse(live.program); Assert.IsTrue(live.programPinned);
+        }
+
+        [Test]
         public void ARepoIsGivenAWorkspaceWhichIsMadeIfItIsNewAndSurvivesSaveAndLoad()
         {
             var s = Settings.Load(file);   // a first run: Personal alone

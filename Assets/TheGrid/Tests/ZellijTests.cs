@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 
 namespace TheGrid.Core.Tests
@@ -14,6 +15,11 @@ namespace TheGrid.Core.Tests
         const string Panes = "[{\"id\":2,\"is_plugin\":true,\"title\":\"tab-bar\",\"tab_name\":\"shell\",\"exit_status\":null},"
             + "{\"id\":0,\"is_plugin\":false,\"title\":\"zsh\",\"tab_name\":\"shell\",\"exit_status\":null},"
             + "{\"id\":2,\"is_plugin\":false,\"title\":\"claude\",\"tab_name\":\"agents\",\"exit_status\":null}]";
+
+        const string InAPaneOfATerminal = InAPane + " __CFBundleIdentifier=com.example.term";
+        // The same, from a Zellij that gives tab ids: terminal pane 2 is in tab 3, a plugin pane 2 in tab 0.
+        const string PanesWithIds = "[{\"id\":2,\"is_plugin\":true,\"title\":\"tab-bar\",\"tab_id\":0,\"tab_name\":\"shell\"},"
+            + "{\"id\":2,\"is_plugin\":false,\"title\":\"claude\",\"tab_id\":3,\"tab_name\":\"agents\"}]";
 
         [Test]
         public void TheSessionAndPaneAreReadFromTheProcessEnvironmentAndNothingElseIs()
@@ -57,6 +63,46 @@ namespace TheGrid.Core.Tests
             asked.Clear();
             Assert.AreEqual("", Zellij.Where(0, "/opt/zellij", Run));
             Assert.AreEqual(0, asked.Count);
+        }
+
+        [Test]
+        public void TheTabsIdIsThatOfTheTerminalPaneAndThereIsNoneWhenTheListDoesNotGiveIds()
+        {
+            Assert.AreEqual(3, Zellij.TabIdOf(PanesWithIds, 2));
+            Assert.AreEqual(-1, Zellij.TabIdOf(PanesWithIds, 77));
+            Assert.AreEqual(-1, Zellij.TabIdOf(Panes, 2));          // the older list: names, no ids. Not tab 0.
+            Assert.AreEqual(-1, Zellij.TabIdOf("not json", 2));
+        }
+
+        [TestCase(InAPane + " __CFBundleIdentifier=com.example.term", "com.example.term")]
+        [TestCase(InAPane, "")]
+        [TestCase(InAPane + " __CFBundleIdentifier=bad;id", "")]
+        [TestCase(InAPane + " X__CFBundleIdentifier=com.example.other", "")]
+        public void TheTerminalAppIsReadFromTheSessionsOwnProcess(string ps, string app) => Assert.AreEqual(app, Zellij.TerminalApp(ps));
+
+        [Test]
+        public void AJumpTellsZellijToGoToTheSessionsTabAndNamesTheTerminal()
+        {
+            var ran = new List<string>();
+            string Run(string exe, string args) { ran.Add(exe + " " + args); return exe == "/bin/ps" ? InAPaneOfATerminal : args.Contains("list-panes") ? PanesWithIds : ""; }
+            Assert.IsTrue(Zellij.Jump(41, "/z", Run, out var app));
+            Assert.AreEqual("com.example.term", app);
+            Assert.AreEqual("/z --session main action go-to-tab-by-id 3", ran.Last());
+            Assert.IsFalse(ran.Any(r => r.Contains("focus-pane")));   // from outside it moves nothing the owner sees
+        }
+
+        [Test]
+        public void ThereIsNoJumpForASessionNotInZellijWithNoProcessWithNoTabIdOrWhenAProgramFails()
+        {
+            var ran = new List<string>();
+            Func<string, string, string> bare = (exe, args) => { ran.Add(args); return Bare; };
+            Assert.IsFalse(Zellij.Jump(41, "/z", bare, out _)); Assert.AreEqual(1, ran.Count);      // ps only: zellij is not run
+            Assert.IsFalse(Zellij.Jump(0, "/z", bare, out _)); Assert.AreEqual(1, ran.Count);       // a background session: nothing is run
+            Assert.IsFalse(Zellij.Jump(41, "", bare, out _));                                        // no zellij on this Mac
+            Func<string, string, string> old = (exe, args) => exe == "/bin/ps" ? InAPane : args.Contains("list-panes") ? Panes : throw new InvalidOperationException("must not go to a tab");
+            Assert.IsFalse(Zellij.Jump(41, "/z", old, out _));                                       // no tab id: no go-to
+            Func<string, string, string> gone = (exe, args) => throw new InvalidOperationException("no such process");
+            Assert.IsFalse(Zellij.Jump(41, "/z", gone, out _));                                      // the process went away: no exception
         }
     }
 }
