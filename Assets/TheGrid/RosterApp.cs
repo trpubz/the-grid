@@ -68,9 +68,12 @@ namespace TheGrid
         float rowWidth, warnedWidth = -1f;
         string lastErrors = "";
 
+        // Taking pictures: every refresh is drawn, so that waiting two updates is waiting for two drawn frames.
+        static bool pictures;
+
         // About that many frames a second, by drawing only every so many refreshes of the screen.
         internal static void Frames(int perSecond) =>
-            OnDemandRendering.renderFrameInterval = Pace.Interval(Screen.currentResolution.refreshRateRatio.value, perSecond);
+            OnDemandRendering.renderFrameInterval = pictures ? 1 : Pace.Interval(Screen.currentResolution.refreshRateRatio.value, perSecond);
 
         void Start()
         {
@@ -110,7 +113,12 @@ namespace TheGrid
                 whereFixed = Arg("-where");   // nor does it ask zellij where a session lives: for a picture, the card is told
                 shotsDir = Arg("-shots");
                 world.EdgeMoves = shotsDir == "";   // a pointer left at the window's edge does not move the map out of a picture
-                if (shotsDir != "") StartCoroutine(Shots());
+                if (shotsDir != "")
+                {
+                    pictures = true;
+                    Frames(10);
+                    StartCoroutine(Shots());
+                }
                 return;
             }
             home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
