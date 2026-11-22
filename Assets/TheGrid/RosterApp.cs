@@ -5,6 +5,7 @@ using System.IO;
 using System.Threading.Tasks;
 using TheGrid.Core;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace TheGrid
 {
@@ -67,11 +68,19 @@ namespace TheGrid
         float rowWidth, warnedWidth = -1f;
         string lastErrors = "";
 
+        // About that many frames a second, by drawing only every so many refreshes of the screen.
+        internal static void Frames(int perSecond) =>
+            OnDemandRendering.renderFrameInterval = Pace.Interval(Screen.currentResolution.refreshRateRatio.value, perSecond);
+
         void Start()
         {
-            // A lens that sits open all day: 10 frames a second is plenty. With vsync on, targetFrameRate is ignored and the app renders at the display rate.
-            QualitySettings.vSyncCount = 0;
-            Application.targetFrameRate = 10;
+            // A lens that sits open all day: 10 frames a second is plenty. Display sync stays on: frames presented without it made
+            // macOS's window server leak memory until a restart (GRID-51), so fewer frames are drawn by skipping screen refreshes.
+            // shortcut: the screen's speed is asked here and whenever the map is drawn; a window on the lists dragged to a slower
+            // screen draws fewer frames until then. Ask every frame if that is ever seen.
+            QualitySettings.vSyncCount = 1;
+            Frames(10);
+            Debug.Log("[frames] the screen says " + Screen.currentResolution.refreshRateRatio.value + " Hz; a frame every " + OnDemandRendering.renderFrameInterval + " refreshes");
             Application.runInBackground = true;
             if (Camera.main != null)
             {
