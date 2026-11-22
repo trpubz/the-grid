@@ -86,6 +86,41 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual("", m.PrUrl);
         }
 
+        const string Asks = "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"AskUserQuestion\",\"input\":{\"questions\":[" +
+            "{\"question\":\"Which made-up colour?\",\"header\":\"Colour\",\"options\":[{\"label\":\"Red\",\"description\":\"\"}],\"multiSelect\":false}," +
+            "{\"question\":\"And a second made-up one?\"}]}}]}}\n";
+        const string Edits = "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Edit\",\"input\":{}}]}}\n";
+
+        [Test]
+        public void TheOpenQuestionIsTheFirstOneAndACountOfTheRest()
+        {
+            File.AppendAllText(transcript, Edits + Asks);
+            Assert.AreEqual("Which made-up colour? +1", SessionFiles.ReadTranscriptTail(transcript).Question);
+        }
+
+        [Test]
+        public void AQuestionTheAgentHasMovedOnFromIsNotOpen()
+        {
+            File.AppendAllText(transcript, Asks + Edits);
+            Assert.AreEqual("", SessionFiles.ReadTranscriptTail(transcript).Question);
+        }
+
+        [Test]
+        public void ASubagentsQuestionIsNotTheSessions()
+        {
+            File.AppendAllText(transcript, Edits + Asks.Replace("{\"type\":\"assistant\",", "{\"type\":\"assistant\",\"isSidechain\":true,"));
+            Assert.AreEqual("", SessionFiles.ReadTranscriptTail(transcript).Question);
+        }
+
+        [Test]
+        public void AQuestionCallWithNoQuestionsIsNoQuestion()
+        {
+            File.AppendAllText(transcript, Asks.Substring(0, Asks.IndexOf("\"input\"")) + "\"input\":{\"questions\":[]}}]}}\n");
+            Assert.AreEqual("", SessionFiles.ReadTranscriptTail(transcript).Question);
+            File.AppendAllText(transcript, Asks.Substring(0, Asks.IndexOf("\"input\"")) + "\"input\":{}}]}}\n");
+            Assert.AreEqual("", SessionFiles.ReadTranscriptTail(transcript).Question);
+        }
+
         [Test]
         public void MissingTranscriptGivesEmptyMeta()
         {

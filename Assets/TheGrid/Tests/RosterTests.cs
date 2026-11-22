@@ -223,6 +223,17 @@ namespace TheGrid.Core.Tests
             "{\"type\":\"assistant\",\"gitBranch\":\"feature/demo-12-example-change\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"t\",\"name\":\"" + tool + "\",\"input\":" + input + "}]}}\n";
 
         [Test]
+        public void ASessionWaitingOnAQuestionCarriesTheQuestion()
+        {
+            var s = new LiveSession { SessionId = S2, Name = "alpha-02", Cwd = "/work/alpha", Kind = "interactive", Status = "waiting", WaitingFor = "input needed", State = "", ConfigDir = cfg };
+            var builder = new RosterBuilder(settings);
+            File.AppendAllText(transcript, Assistant("AskUserQuestion", "{\"questions\":[{\"question\":\"Which made-up colour?\"}]}"));
+            Assert.AreEqual("Which made-up colour?", builder.Build(new[] { s }, None, Now).agents[0].needs);
+            s.Status = "busy"; s.WaitingFor = "";   // answered and at work; the transcript has not moved yet
+            Assert.AreEqual("", builder.Build(new[] { s }, None, Now + 2000).agents[0].needs);
+        }
+
+        [Test]
         public void ActivityIsGivenOnlyWhileRunning()
         {
             var snap = new RosterBuilder(settings).Build(live, None, Now);
@@ -284,6 +295,24 @@ namespace TheGrid.Core.Tests
         {
             var snap = new RosterBuilder(settings).Build(new[] { Background("s-8", "/cfg/.claude"), Background("s-9", "/cfg/.claude-two") }, None, Now);
             Assert.AreEqual(2, snap.agents.Count);
+        }
+
+        [Test]
+        public void ABlockedBackgroundSessionCarriesWhatItNeeds()
+        {
+            settings.configDirs = new List<string> { cfg };
+            Directory.CreateDirectory(Path.Combine(cfg, "jobs", "bg000009"));
+            File.WriteAllText(Path.Combine(cfg, "jobs", "bg000009", "state.json"), "{\"needs\":\"approve the made-up plan\",\"detail\":\"waiting on a made-up answer\"}");
+            var builder = new RosterBuilder(settings);
+            var s = Background("s-9", cfg);
+            var row = builder.Build(new[] { s }, None, Now).agents[0];
+            Assert.AreEqual("approve the made-up plan", row.needs);
+            Assert.AreEqual("waiting on a made-up answer", row.needsDetail);
+            s.State = "working";   // no longer waiting: what it needed is not shown beside a session at work
+            Assert.AreEqual("", builder.Build(new[] { s }, None, Now + 2000).agents[0].needs);
+            s.State = "blocked";
+            builder.Build(new[] { s }, None, Now + 4000);
+            Assert.AreEqual("", builder.Build(new LiveSession[0], None, Now + 6000).agents[0].needs);   // offline
         }
     }
 }

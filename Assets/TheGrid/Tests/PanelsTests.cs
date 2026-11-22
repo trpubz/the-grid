@@ -32,6 +32,20 @@ namespace TheGrid.Core.Tests
             return s;
         }
 
+        static AgentRow Waiting(string needs, string detail) => new AgentRow { sessionId = "s-1", account = "claude", name = "made-up-job", state = "BackgroundBlocked", needs = needs, needsDetail = detail };
+
+        [Test] public void ARowThatSaysWhatItNeedsSaysItInPlaceOfTheStatesWords() =>
+            Assert.AreEqual("approve the made-up plan", Panels.NeedsYou(Only(Waiting("approve the made-up plan", "")))[0].what);
+        [Test] public void ARowThatSaysNothingKeepsTheStatesWords() =>
+            Assert.AreEqual("Blocked in the background", Panels.NeedsYou(Only(Waiting("", "")))[0].what);
+        [Test] public void TheCardCarriesTheNeedAndTheStatusBehindIt()
+        {
+            var card = Panels.Card(Only(Waiting("approve the made-up plan", "waiting on a made-up answer")), "claude|s-1", 0);
+            Assert.AreEqual("approve the made-up plan", card.needs);
+            Assert.AreEqual("waiting on a made-up answer", card.needsDetail);
+            Assert.AreEqual("", Panels.Card(Only(Waiting("", "")), "claude|s-1", 0).needs);
+        }
+
         [Test]
         public void TheCardCarriesTheWayIntoTheConversation()
         {
@@ -176,6 +190,18 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(default(Rect), Panels.Above(map, floor: 110, ceiling: 75, wide: 330, wanted: 217, least: 47, margin: 8));
             // and a list is never wider than the map has room for
             Assert.AreEqual(184, Panels.Above(new Rect(0, 32, 200, 700), 600, 75, 330, 217, 47, 8).width);
+        }
+
+        // The need and its status share the room the map leaves them, the need first, in whole lines.
+        [Test]
+        public void NeedHeightsShareTheRoom()
+        {
+            Assert.AreEqual(new Vector2(36, 18), Panels.NeedHeights(36, 18, 200, 18));
+            Assert.AreEqual(new Vector2(54, 0), Panels.NeedHeights(90, 36, 60, 18));
+            Assert.AreEqual(new Vector2(36, 36), Panels.NeedHeights(36, 54, 72, 18));
+            Assert.AreEqual(new Vector2(0, 0), Panels.NeedHeights(36, 18, 10, 18));
+            Assert.AreEqual(new Vector2(0, 0), Panels.NeedHeights(36, 18, -40, 18));
+            Assert.AreEqual(new Vector2(0, 0), Panels.NeedHeights(0, 0, 100, 18));
         }
     }
 }

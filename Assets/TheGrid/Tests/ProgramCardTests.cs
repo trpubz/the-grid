@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
@@ -209,6 +210,166 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(l.more.xMax, line.xMax, 1e-4);
             Assert.AreEqual(16, line.height);
             Assert.AreEqual(l.more.center.y, line.center.y, 1e-4);
+        }
+
+        static readonly Func<string, float> Seven = s => s.Length * 7f;   // a font with every letter 7 wide
+
+        [Test]
+        public void AnOpenRowTakesRoomRightUnderItAndNothingBelowMoves()
+        {
+            var closed = ProgramCard.Layout(Screen, 5, true, true);
+            var open = ProgramCard.Layout(Screen, 5, true, true, 2);
+            Assert.AreEqual(closed.frame.height + ProgramCard.OpenHeight, open.frame.height);
+            Assert.AreEqual(closed.frame.y, open.frame.y);
+            Assert.AreEqual(closed.figure, open.figure);
+            Assert.AreEqual(closed.more, open.more);
+            for (int i = 3; i < 5; i++) Assert.AreEqual(closed.rows[i], open.rows[i]);
+            for (int i = 0; i <= 2; i++) Assert.AreEqual(closed.rows[i].y + ProgramCard.OpenHeight, open.rows[i].y);
+            Assert.AreEqual(2, open.openRow);
+            Assert.AreEqual(new Rect(closed.rows[2].x, closed.rows[2].y, closed.rows[2].width, ProgramCard.OpenHeight), open.open);
+            Assert.AreEqual(open.rows[2].y, open.open.yMax);
+            Assert.IsTrue(open.card.Contains(open.open.center) && open.card.Contains(open.pin.center));
+        }
+
+        [Test]
+        public void ThePointerOnARowIsStillOnThatRowOnceItHasOpened()
+        {
+            var closed = ProgramCard.Layout(Screen, 5, true, true);
+            for (int i = 0; i < 5; i++)
+            {
+                var open = ProgramCard.Layout(Screen, 5, true, true, i);
+                Assert.AreEqual(ProgramHit.Row, ProgramCard.Hit(open, closed.rows[i].center, out int row));
+                Assert.AreEqual(i, row);
+                Assert.AreEqual(i, ProgramCard.Hover(open, open.frame.position + closed.rows[i].center));
+            }
+        }
+
+        [Test]
+        public void MovingFromAnOpenRowToTheOneAboveOpensThatOne()
+        {
+            var two = ProgramCard.Layout(Screen, 5, true, true, 2);
+            var at = two.frame.position + two.rows[1].center;   // where row 1 is drawn while row 2 is open
+            Assert.AreEqual(1, ProgramCard.Hover(two, at));
+            Assert.AreEqual(1, ProgramCard.Hover(ProgramCard.Layout(Screen, 5, true, true, 1), at));   // and it is still under the pointer once open
+        }
+
+        [TestCase(-1)] [TestCase(5)] [TestCase(99)]
+        public void AnOpenRowThatIsNotThereIsNoOpenRow(int open)
+        {
+            var l = ProgramCard.Layout(Screen, 5, true, true, open);
+            Assert.AreEqual(ProgramCard.Layout(Screen, 5, true, true).frame, l.frame);
+            Assert.AreEqual(-1, l.openRow);
+            Assert.AreEqual(default(Rect), l.open);
+            Assert.AreEqual(-1, ProgramCard.Layout(Screen, 5, true, false, 2).openRow);   // no card, nothing open
+        }
+
+        [Test]
+        public void ThePointerOffTheRowsIsOnNoRow()
+        {
+            var l = ProgramCard.Layout(Screen, 5, true, true, 2);
+            Assert.AreEqual(-1, ProgramCard.Hover(l, l.frame.position + l.figure.center));
+            Assert.AreEqual(-1, ProgramCard.Hover(l, l.frame.position + l.pin.center));
+            Assert.AreEqual(-1, ProgramCard.Hover(l, l.frame.position - new Vector2(50, 50)));
+        }
+
+        [Test]
+        public void TheOpenPartsLinesAreInsideItTopDownInLineWithTheNames()
+        {
+            var l = ProgramCard.Layout(Screen, 5, true, true, 2);
+            float nameAt = ProgramCard.Parts(l.rows[2], 0).name.x;
+            for (int i = 0; i <= ProgramCard.NeedLines; i++)
+            {
+                var line = ProgramCard.OpenLine(l.open, i);
+                Assert.AreEqual(nameAt, line.x);
+                Assert.AreEqual(l.open.xMax, line.xMax);
+                Assert.IsTrue(line.yMin >= l.open.yMin && line.yMax <= l.open.yMax, "line " + i + " is outside the open part");
+                if (i > 0) Assert.LessOrEqual(line.yMax, ProgramCard.OpenLine(l.open, i - 1).yMin);
+            }
+        }
+
+        [Test]
+        public void WordsAreWrappedAndWhatDoesNotFitEndsInAnEllipsis() =>
+            CollectionAssert.AreEqual(new[] { "merge the", "made-up", "pull…" }, ProgramCard.Wrap("merge the made-up pull request", Seven, 70, 3));
+
+        [Test] public void ShortTextIsOneLine() => CollectionAssert.AreEqual(new[] { "merge it" }, ProgramCard.Wrap("merge it", Seven, 70, 3));
+        [Test] public void NoTextOrNoLinesIsNoLines() { Assert.AreEqual(0, ProgramCard.Wrap("", Seven, 70, 3).Count); Assert.AreEqual(0, ProgramCard.Wrap("merge it", Seven, 70, 0).Count); }
+
+        [Test]
+        public void AWordLongerThanALineIsBroken() =>
+            CollectionAssert.AreEqual(new[] { "abcdefghij", "klmnopqrst", "uvwxyz" }, ProgramCard.Wrap("abcdefghijklmnopqrstuvwxyz", Seven, 70, 3));
+
+        [Test]
+        public void NoLineIsEverWiderThanItsRoom()
+        {
+            var text = string.Join(" ", Enumerable.Range(0, 60).Select(i => new string((char)('a' + i % 26), 1 + i * 7 % 23)));
+            var lines = ProgramCard.Wrap(text, Seven, 70, 3);
+            Assert.AreEqual(3, lines.Count);
+            foreach (var line in lines) Assert.LessOrEqual(Seven(line), 70f, line);
+            Assert.IsTrue(lines[2].EndsWith("…"));
+            Assert.AreEqual(0, ProgramCard.Wrap("abc", Seven, 3, 3).Count);   // room for less than one letter: nothing, and no endless loop
+        }
+
+        [Test]
+        public void AnOpenRowSaysItsFullNameThenWhatItNeeds() =>
+            CollectionAssert.AreEqual(new[] { "A made-up…", "merge it" },
+                ProgramCard.OpenLines(new ProgramRow { full = "A made-up session with a long name", needs = "merge it", word = "Blocked in the background" }, Seven, 70));
+
+        [Test]
+        public void AnOpenRowWithNoNeedSaysItsStateInFull() =>
+            CollectionAssert.AreEqual(new[] { "A made-up…", "Blocked in", "the", "background" },
+                ProgramCard.OpenLines(new ProgramRow { full = "A made-up session with a long name", needs = "", word = "Blocked in the background" }, Seven, 70));
+
+        [Test]
+        public void TheCardsRowsCarryTheFullNameAndTheNeed()
+        {
+            var v = ProgramCard.Of(Only(new AgentRow { sessionId = "s-1", account = "claude", name = "A made-up session with a long name", state = "BackgroundBlocked", needs = "merge it" }));
+            Assert.AreEqual("A made-up session with a long name", v.rows[0].full);
+            Assert.AreEqual("merge it", v.rows[0].needs);
+        }
+
+        [Test]
+        public void ThePointerOnThePinOrBesideTheRowsKeepsTheOpenRow()
+        {
+            var l = ProgramCard.Layout(Screen, 5, true, true, 0);
+            var points = new[] { l.pin.center, new Vector2(l.card.x + 20, l.card.yMax - 5), new Vector2(l.card.x + 2, l.rows[0].center.y) };
+            foreach (var p in points)
+            {
+                int got = ProgramCard.Open(l, l.frame.position + p, 0);
+                Assert.AreEqual(0, got);
+                var again = ProgramCard.Layout(Screen, 5, true, true, got);
+                Assert.AreEqual(0, ProgramCard.Open(again, again.frame.position + p, got));
+            }
+        }
+
+        [Test]
+        public void ThePointerOffTheCardClosesTheRow()
+        {
+            var l = ProgramCard.Layout(Screen, 5, true, true, 2);
+            var off = l.frame.position - new Vector2(50, 50);
+            Assert.AreEqual(-1, ProgramCard.Open(l, l.frame.position + l.figure.center, 2));
+            Assert.AreEqual(-1, ProgramCard.Open(l, off, 2));
+            Assert.IsFalse(ProgramCard.Layout(Screen, 5, true, true, -1).card.Contains(off - ProgramCard.Layout(Screen, 5, true, true, -1).frame.position));
+        }
+
+        [Test]
+        public void MovingBetweenAnyTwoRowsOpensTheRowUnderThePointer()
+        {
+            for (int k = 0; k < 5; k++)
+                for (int j = 0; j < 5; j++)
+                {
+                    var at = ProgramCard.Layout(Screen, 5, true, true, k);
+                    var onScreen = at.frame.position + at.rows[j].center;
+                    Assert.AreEqual(j, ProgramCard.Open(at, onScreen, k), k + " to " + j);
+                    var to = ProgramCard.Layout(Screen, 5, true, true, j);
+                    Assert.AreEqual(j, ProgramCard.Open(to, onScreen, j), k + " to " + j + " once open");
+                }
+        }
+
+        [TestCase(7)] [TestCase(-1)]
+        public void ACurrentRowThatIsNotThereIsDropped(int current)
+        {
+            var l = ProgramCard.Layout(Screen, 5, true, true, 0);
+            Assert.AreEqual(-1, ProgramCard.Open(l, l.frame.position + new Vector2(l.card.x + 20, l.card.yMax - 5), current));
         }
     }
 }

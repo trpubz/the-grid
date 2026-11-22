@@ -8,8 +8,8 @@ namespace TheGrid.Core
 {
     public sealed class SessionFileInfo { public long StatusUpdatedAt; public string Entrypoint = ""; }
 
-    // Activity is "" when the window read holds no record of the agent's own.
-    public sealed class TranscriptMeta { public string Branch = ""; public int PrNumber; public string PrUrl = ""; public string Activity = ""; }
+    // Activity is "" when the window read holds no record of the agent's own. Question is the open question at the end of the transcript, if any.
+    public sealed class TranscriptMeta { public string Branch = ""; public int PrNumber; public string PrUrl = ""; public string Activity = ""; public string Question = ""; }
 
     // Read-only access to files Claude Code writes under a config directory.
     public static class SessionFiles
@@ -20,7 +20,8 @@ namespace TheGrid.Core
         [Serializable] sealed class AssistantLine { public string type; public bool isSidechain; public AssistantMessage message; }
         [Serializable] sealed class AssistantMessage { public List<Block> content; }
         [Serializable] sealed class Block { public string type, name, text; public BlockInput input; }
-        [Serializable] sealed class BlockInput { public string command, skill; }
+        [Serializable] sealed class BlockInput { public string command, skill; public List<AskedQuestion> questions; }
+        [Serializable] sealed class AskedQuestion { public string question; }
 
         // <configDir>/sessions/<pid>.json. Undocumented by Claude Code, so every failure is just "no info".
         public static bool TryReadSessionFile(string configDir, int pid, out SessionFileInfo info)
@@ -103,9 +104,10 @@ namespace TheGrid.Core
             {
                 var line = lines[i];
                 // The newest record of the agent's own decides what it is doing.
-                if (!haveActivity && line.IndexOf("\"assistant\"", StringComparison.Ordinal) >= 0 && TryActivity(line, out var activity))
+                if (!haveActivity && line.IndexOf("\"assistant\"", StringComparison.Ordinal) >= 0 && TryActivity(line, out var activity, out var question))
                 {
                     meta.Activity = activity;
+                    meta.Question = question;
                     haveActivity = true;
                 }
                 bool branchLine = !haveBranch && line.IndexOf("\"gitBranch\"", StringComparison.Ordinal) >= 0;
@@ -122,10 +124,10 @@ namespace TheGrid.Core
         }
 
         // True when the line is an assistant record of the session itself (not a subagent's). Its last tool call decides;
-        // with no tool call, its last text does.
-        static bool TryActivity(string line, out string activity)
+        // with no tool call, its last text does. A last call to AskUserQuestion is the open question.
+        static bool TryActivity(string line, out string activity, out string question)
         {
-            activity = "";
+            activity = question = "";
             AssistantLine r;
             try { r = JsonUtility.FromJson<AssistantLine>(line); }
             catch (ArgumentException) { return false; }
@@ -141,6 +143,12 @@ namespace TheGrid.Core
                 }
             if (tool != null) activity = TheGrid.Core.Activity.Classify(tool.name, tool.input == null ? "" : !string.IsNullOrEmpty(tool.input.command) ? tool.input.command : tool.input.skill, "");
             else activity = TheGrid.Core.Activity.Classify("", "", text != null ? text.text : "");
+            var asked = tool != null && tool.name == "AskUserQuestion" && tool.input != null ? tool.input.questions : null;
+            if (asked != null && asked.Count > 0 && asked[0] != null)
+            {
+                var first = Needs.Clean(asked[0].question);
+                if (first != "") question = asked.Count > 1 ? first + " +" + (asked.Count - 1) : first;
+            }
             return true;
         }
 

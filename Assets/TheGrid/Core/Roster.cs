@@ -12,6 +12,8 @@ namespace TheGrid.Core
         public string sessionId = "", name = "", account = "", app = "", repoRoot = "", repoName = "", branch = "", ticket = "", prUrl = "", state = "", rawStatus = "", workspace = "";
         // What a running agent is doing: reading, editing, testing, reviewing or working. Empty in every other state.
         public string activity = "";
+        // What a blocked session is waiting on and why: the open question from its transcript, or a background session's job file. Empty in every other state.
+        public string needs = "", needsDetail = "";
         public int prNumber;
         public long stateSince;
         // How to get into the conversation: the command to run in a terminal. And the session's process, 0 for a background
@@ -119,7 +121,7 @@ namespace TheGrid.Core
             public bool Seen;
             public string TranscriptPath;
             public long TranscriptStamp;
-            public string Activity = "";
+            public string Activity = "", Question = "";
         }
 
         readonly Settings settings;
@@ -127,6 +129,7 @@ namespace TheGrid.Core
 
         readonly string home;
         bool several;   // the owner has more than one account: asked once for each roster
+        IReadOnlyList<string> configDirs = new List<string>();   // the account folders, asked once for each roster
 
         // home: the folder whose .claude is the default account, which a command need not name.
         public RosterBuilder(Settings settings, string home = null)
@@ -164,7 +167,8 @@ namespace TheGrid.Core
 
         public RosterSnapshot Build(IReadOnlyList<LiveSession> live, IReadOnlyList<string> errors, long nowMs)
         {
-            several = settings.EffectiveConfigDirs(home).Count > 1;
+            configDirs = settings.EffectiveConfigDirs(home);
+            several = configDirs.Count > 1;
             var liveKeys = new HashSet<string>();
             foreach (var s in live)
             {
@@ -186,6 +190,7 @@ namespace TheGrid.Core
                     m.Row.state = AgentState.Offline.ToString();
                     m.Row.rawStatus = "";
                     m.Row.activity = ""; // a session that is gone is not doing anything
+                    m.Row.needs = m.Row.needsDetail = "";
                     m.Row.stateSince = nowMs;
                     m.Row.subagents = new List<SubagentRow>();
                 }
@@ -252,11 +257,22 @@ namespace TheGrid.Core
                     // A pull request once seen is kept: a later tail read may no longer contain its record.
                     if (meta.PrNumber > 0) { row.prNumber = meta.PrNumber; row.prUrl = meta.PrUrl; }
                     m.Activity = meta.Activity;
+                    m.Question = meta.Question;
                 }
             }
             // Only a running agent is doing anything; when the transcript cannot say what, it is just working.
             row.activity = state != AgentState.Running ? "" : m.Activity != "" ? m.Activity : Activity.Working;
             row.subagents = Subagents.ReadActive(m.TranscriptPath, nowMs);
+
+            row.needs = row.needsDetail = "";
+            if (state == AgentState.BlockedOnQuestion) row.needs = m.Question;
+            else if (state == AgentState.BackgroundBlocked)
+            {
+                // The session's own folder first: another folder may list the same job.
+                var dirs = new List<string> { s.ConfigDir };
+                foreach (var d in configDirs) if (d != s.ConfigDir) dirs.Add(d);
+                if (Needs.TryOfJob(dirs, s.Id, out var needs, out var detail)) { row.needs = needs; row.needsDetail = detail; }
+            }
         }
 
         // Changes whenever the file is appended to, so an unchanged transcript is not read again.

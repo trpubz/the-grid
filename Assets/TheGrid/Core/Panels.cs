@@ -24,6 +24,7 @@ namespace TheGrid.Core
         public string enter = "", where = "";
         public int pid;
         public List<string> subagents = new List<string>();        // what each subagent is doing, in the roster's order
+        public string needs = "", needsDetail = "";                // what a waiting session needs, and the status line behind it; "" when none
     }
 
     // The words of the two panels drawn over the world. Like the world itself, made from the roster snapshot and nothing else.
@@ -52,7 +53,7 @@ namespace TheGrid.Core
             var rows = new List<NeedsYouRow>();
             foreach (var a in snap.agents)
                 if (World.NeedsOwner(a.state))
-                    rows.Add(new NeedsYouRow { key = Key(a), sector = Sector(a), name = a.name, badge = World.BadgeFor(a.state), what = What(a) });
+                    rows.Add(new NeedsYouRow { key = Key(a), sector = Sector(a), name = a.name, badge = World.BadgeFor(a.state), what = a.needs != "" ? a.needs : What(a) });
             return rows;
         }
 
@@ -68,6 +69,7 @@ namespace TheGrid.Core
                 since = RosterFormat.Elapsed(a.stateSince, nowMs), ticket = a.ticket,
                 prUrl = RosterFormat.IsWebLink(a.prUrl) ? a.prUrl : "", prNumber = a.prNumber,   // only a web link is ever opened
                 workspace = a.workspace, repoRoot = a.repoRoot, enter = a.enter ?? "", pid = a.pid, subagents = a.subagents.ConvertAll(s => s.description ?? ""),
+                needs = a.needs ?? "", needsDetail = a.needsDetail ?? "",
             };
         }
 
@@ -87,6 +89,14 @@ namespace TheGrid.Core
             for (int i = 0; i < named; i++) said.Add("↳ " + card.subagents[i]);
             if (named < n) said.Add("and " + (n - named) + " more");
             return said;
+        }
+
+        // The card's top (title, who, where) must stay on the map: the need gets the room first, the status what is left, in whole lines.
+        public static Vector2 NeedHeights(float need, float detail, float room, float line)
+        {
+            room = Mathf.Max(0, Mathf.Floor(room / line) * line);
+            float n = Mathf.Min(need, room);
+            return new Vector2(n, Mathf.Min(detail, room - n));
         }
 
         static string Key(AgentRow a) => a.account + "|" + a.sessionId;   // as World.Build keys a bot
