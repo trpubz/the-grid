@@ -56,7 +56,11 @@ namespace TheGrid
                 if (wrapped == null) wrapped = new GUIStyle(text) { wordWrap = true, clipping = TextClipping.Clip };
                 needsHigh = about.needs == "" ? 0 : wrapped.CalcHeight(new GUIContent(about.needs), w - 20);
                 detailHigh = about.needsDetail == "" ? 0 : wrapped.CalcHeight(new GUIContent(about.needsDetail), w - 20);
-                float h = CardHigh + (subagents.Count + Entry(about)) * LineHigh + needsHigh + detailHigh;
+                float rest = CardHigh + (subagents.Count + Entry(about)) * LineHigh;
+                Vector2 kept = Panels.NeedHeights(needsHigh, detailHigh, map.height - 2 * Margin - rest, LineHigh);
+                needsHigh = kept.x;
+                detailHigh = kept.y;
+                float h = rest + needsHigh + detailHigh;
                 card = new Rect(map.xMax - Margin - w, map.yMax - Margin - h, w, h);
             }
             if (depotOf != null)

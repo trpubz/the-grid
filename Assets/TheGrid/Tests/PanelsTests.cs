@@ -191,5 +191,17 @@ namespace TheGrid.Core.Tests
             // and a list is never wider than the map has room for
             Assert.AreEqual(184, Panels.Above(new Rect(0, 32, 200, 700), 600, 75, 330, 217, 47, 8).width);
         }
+
+        // The need and its status share the room the map leaves them, the need first, in whole lines.
+        [Test]
+        public void NeedHeightsShareTheRoom()
+        {
+            Assert.AreEqual(new Vector2(36, 18), Panels.NeedHeights(36, 18, 200, 18));
+            Assert.AreEqual(new Vector2(54, 0), Panels.NeedHeights(90, 36, 60, 18));
+            Assert.AreEqual(new Vector2(36, 36), Panels.NeedHeights(36, 54, 72, 18));
+            Assert.AreEqual(new Vector2(0, 0), Panels.NeedHeights(36, 18, 10, 18));
+            Assert.AreEqual(new Vector2(0, 0), Panels.NeedHeights(36, 18, -40, 18));
+            Assert.AreEqual(new Vector2(0, 0), Panels.NeedHeights(0, 0, 100, 18));
+        }
     }
 }

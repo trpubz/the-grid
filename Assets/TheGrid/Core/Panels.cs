@@ -91,6 +91,14 @@ namespace TheGrid.Core
             return said;
         }
 
+        // The card's top (title, who, where) must stay on the map: the need gets the room first, the status what is left, in whole lines.
+        public static Vector2 NeedHeights(float need, float detail, float room, float line)
+        {
+            room = Mathf.Max(0, Mathf.Floor(room / line) * line);
+            float n = Mathf.Min(need, room);
+            return new Vector2(n, Mathf.Min(detail, room - n));
+        }
+
         static string Key(AgentRow a) => a.account + "|" + a.sessionId;   // as World.Build keys a bot
 
         static string Sector(AgentRow a) => a.repoName == "" ? World.NoProject : a.repoName;
