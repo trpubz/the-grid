@@ -68,8 +68,10 @@ namespace TheGrid.Core.Tests
         [TestCase("../outside")] [TestCase("a/b")] [TestCase("a\\b")] [TestCase("..")] [TestCase("")]
         public void AnIdThatIsNotAPlainNameReadsNothing(string id)
         {
-            Directory.CreateDirectory(Path.Combine(one, "outside"));
-            File.WriteAllText(Path.Combine(one, "outside", "state.json"), Blocked);   // where "../outside" would land
+            Directory.CreateDirectory(Path.Combine(one, "jobs"));
+            var file = Path.Combine(one, "jobs", id, "state.json");   // where the id would land if it were used as it is
+            Directory.CreateDirectory(Path.GetDirectoryName(file));
+            File.WriteAllText(file, Blocked);
             Assert.IsFalse(Needs.TryOfJob(new[] { one }, id, out _, out _));
         }
     }

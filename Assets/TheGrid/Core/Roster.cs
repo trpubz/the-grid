@@ -12,7 +12,7 @@ namespace TheGrid.Core
         public string sessionId = "", name = "", account = "", app = "", repoRoot = "", repoName = "", branch = "", ticket = "", prUrl = "", state = "", rawStatus = "", workspace = "";
         // What a running agent is doing: reading, editing, testing, reviewing or working. Empty in every other state.
         public string activity = "";
-        // What a blocked background session is waiting on and why, from its job file. Empty in every other state.
+        // What a blocked session is waiting on and why: the open question from its transcript, or a background session's job file. Empty in every other state.
         public string needs = "", needsDetail = "";
         public int prNumber;
         public long stateSince;
@@ -129,6 +129,7 @@ namespace TheGrid.Core
 
         readonly string home;
         bool several;   // the owner has more than one account: asked once for each roster
+        IReadOnlyList<string> configDirs = new List<string>();   // the account folders, asked once for each roster
 
         // home: the folder whose .claude is the default account, which a command need not name.
         public RosterBuilder(Settings settings, string home = null)
@@ -166,7 +167,8 @@ namespace TheGrid.Core
 
         public RosterSnapshot Build(IReadOnlyList<LiveSession> live, IReadOnlyList<string> errors, long nowMs)
         {
-            several = settings.EffectiveConfigDirs(home).Count > 1;
+            configDirs = settings.EffectiveConfigDirs(home);
+            several = configDirs.Count > 1;
             var liveKeys = new HashSet<string>();
             foreach (var s in live)
             {
@@ -268,7 +270,7 @@ namespace TheGrid.Core
             {
                 // The session's own folder first: another folder may list the same job.
                 var dirs = new List<string> { s.ConfigDir };
-                foreach (var d in settings.EffectiveConfigDirs(home)) if (d != s.ConfigDir) dirs.Add(d);
+                foreach (var d in configDirs) if (d != s.ConfigDir) dirs.Add(d);
                 if (Needs.TryOfJob(dirs, s.Id, out var needs, out var detail)) { row.needs = needs; row.needsDetail = detail; }
             }
         }

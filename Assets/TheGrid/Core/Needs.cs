@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace TheGrid.Core
 {
-    // What a blocked background session is waiting on, as its job file says it.
+    // What a blocked session is waiting on: a background one as its job file says it, one waiting on a question as the question it asked.
     public static class Needs
     {
         public const int MaxLetters = 300;

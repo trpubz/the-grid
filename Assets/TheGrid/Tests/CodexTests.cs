@@ -148,8 +148,8 @@ namespace TheGrid.Core.Tests
         [Test]
         public void ALongPromptIsCutShort()
         {
-            Write(Id, 1000, Meta(Id, repo), Prompt("  Please look at the fiscal quarter date picker and tell me why it is slow"), Event("task_started", At0));
-            Assert.AreEqual("Please look at the fiscal qu…", Read()[0].name);
+            Write(Id, 1000, Meta(Id, repo), Prompt("  Please look at the made-up report page and tell me why it is slow"), Event("task_started", At0));
+            Assert.AreEqual("Please look at the made-up r…", Read()[0].name);
         }
 
         [Test]

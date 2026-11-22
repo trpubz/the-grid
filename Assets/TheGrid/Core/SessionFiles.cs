@@ -8,7 +8,7 @@ namespace TheGrid.Core
 {
     public sealed class SessionFileInfo { public long StatusUpdatedAt; public string Entrypoint = ""; }
 
-    // Activity is "" when the window read holds no record of the agent's own.
+    // Activity is "" when the window read holds no record of the agent's own. Question is the open question at the end of the transcript, if any.
     public sealed class TranscriptMeta { public string Branch = ""; public int PrNumber; public string PrUrl = ""; public string Activity = ""; public string Question = ""; }
 
     // Read-only access to files Claude Code writes under a config directory.
