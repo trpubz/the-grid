@@ -5,6 +5,7 @@ using System.IO;
 using System.Threading.Tasks;
 using TheGrid.Core;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace TheGrid
 {
@@ -67,11 +68,22 @@ namespace TheGrid
         float rowWidth, warnedWidth = -1f;
         string lastErrors = "";
 
+        // Taking pictures: every refresh is drawn, so that waiting two updates is waiting for two drawn frames.
+        static bool pictures;
+
+        // About that many frames a second, by drawing only every so many refreshes of the screen.
+        internal static void Frames(int perSecond) =>
+            OnDemandRendering.renderFrameInterval = pictures ? 1 : Pace.Interval(Screen.currentResolution.refreshRateRatio.value, perSecond);
+
         void Start()
         {
-            // A lens that sits open all day: 10 frames a second is plenty. With vsync on, targetFrameRate is ignored and the app renders at the display rate.
-            QualitySettings.vSyncCount = 0;
-            Application.targetFrameRate = 10;
+            // A lens that sits open all day: 10 frames a second is plenty. Display sync stays on: frames presented without it made
+            // macOS's window server leak memory until a restart (GRID-51), so fewer frames are drawn by skipping screen refreshes.
+            // shortcut: the screen's speed is asked here and whenever the map is drawn; a window on the lists dragged to a slower
+            // screen draws fewer frames until then. Ask every frame if that is ever seen.
+            QualitySettings.vSyncCount = 1;
+            Frames(10);
+            Debug.Log("[frames] the screen says " + Screen.currentResolution.refreshRateRatio.value + " Hz; a frame every " + OnDemandRendering.renderFrameInterval + " refreshes");
             Application.runInBackground = true;
             if (Camera.main != null)
             {
@@ -101,7 +113,12 @@ namespace TheGrid
                 whereFixed = Arg("-where");   // nor does it ask zellij where a session lives: for a picture, the card is told
                 shotsDir = Arg("-shots");
                 world.EdgeMoves = shotsDir == "";   // a pointer left at the window's edge does not move the map out of a picture
-                if (shotsDir != "") StartCoroutine(Shots());
+                if (shotsDir != "")
+                {
+                    pictures = true;
+                    Frames(10);
+                    StartCoroutine(Shots());
+                }
                 return;
             }
             home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);

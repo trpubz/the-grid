@@ -95,7 +95,7 @@ namespace TheGrid
         public void Hide()
         {
             if (holder != null) holder.gameObject.SetActive(false);
-            Application.targetFrameRate = 10;
+            RosterApp.Frames(10);
         }
 
         // The world as a picture, without a window: what the camera sees, no text. far shows every sector; otherwise the view the world opens on.
@@ -264,7 +264,7 @@ namespace TheGrid
                 }
             }
             // Ten frames a second is plenty for a lens that sits open all day; a walk or a drag gets sixty while it lasts.
-            Application.targetFrameRate = now < fastUntil ? 60 : 10;
+            RosterApp.Frames(now < fastUntil ? 60 : 10);
         }
 
         void PlaceCamera()
