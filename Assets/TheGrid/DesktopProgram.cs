@@ -26,7 +26,8 @@ namespace TheGrid
         public event Action GridWanted, PinClicked;
         public string Family = "";   // the family of The Grid's own text; "" for the system's fixed-width font. Read in Start.
 
-        IntPtr panel, figure, badge, back, pin, more, standing, off;
+        IntPtr panel, figure, badge, back, pin, more, standing, off, ruler;
+        readonly IntPtr[] openText = new IntPtr[ProgramCard.NeedLines + 1];   // the open row's name, then what it needs
         readonly IntPtr[] badges = new IntPtr[ArtNames.Badges.Length];
         readonly IntPtr[] icons = new IntPtr[ProgramCard.MaxRows], dots = new IntPtr[ProgramCard.MaxRows],
             names = new IntPtr[ProgramCard.MaxRows], words = new IntPtr[ProgramCard.MaxRows];
@@ -36,6 +37,7 @@ namespace TheGrid
         float screenDue;
         long nearAt;   // when the pointer was last near: once it has gone, when it left
         bool pinned, shown, dirty = true;
+        int open = -1;   // the row open under the pointer, as last laid out
 
         public bool Pinned
         {
@@ -75,6 +77,8 @@ namespace TheGrid
                 words[i] = Cocoa.AddText(panel, font, TextSize, Faint, true);
             }
             more = Cocoa.AddText(panel, font, TextSize, Faint, false);
+            for (int i = 0; i < openText.Length; i++) openText[i] = Cocoa.AddText(panel, font, TextSize, i == 0 ? Ink : Faint, false);
+            ruler = Cocoa.AddText(panel, font, TextSize, Clear, false);   // never shown: only asked how wide a string is
             Draw();
             Cocoa.Show(panel);
         }
@@ -111,13 +115,16 @@ namespace TheGrid
                 if (visible != screen) { screen = visible; dirty = true; }
             }
             long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            bool near = ProgramCard.Near(layout, Cocoa.PointerOnScreen());
+            var pointer = Cocoa.PointerOnScreen();
+            bool near = ProgramCard.Near(layout, pointer);
             if (near) nearAt = now;
             bool show = ProgramCard.Shows(pinned, view.rows.Count, near, now, nearAt);
-            if (!dirty && show == shown) return;
+            int want = show ? ProgramCard.Open(layout, pointer, open) : -1;
+            if (!dirty && show == shown && want == open) return;
             dirty = false;
             shown = show;
-            layout = ProgramCard.Layout(screen, view.rows.Count, view.more > 0, shown);
+            open = want;
+            layout = ProgramCard.Layout(screen, view.rows.Count, view.more > 0, shown, open);
             Draw();
         }
 
@@ -153,7 +160,21 @@ namespace TheGrid
             bool hasMore = layout.more.width > 0;
             if (hasMore) Cocoa.SetText(more, "+" + view.more + " more");
             Cocoa.Place(more, ProgramCard.MoreLine(layout.more), hasMore);
+            var lines = layout.openRow >= 0
+                ? ProgramCard.OpenLines(view.rows[layout.openRow], Width, ProgramCard.OpenLine(layout.open, 0).width) : null;
+            for (int i = 0; i < openText.Length; i++)
+            {
+                bool has = lines != null && i < lines.Count;
+                if (has) Cocoa.SetText(openText[i], lines[i]);
+                Cocoa.Place(openText[i], ProgramCard.OpenLine(layout.open, i), has);
+            }
             Cocoa.SetFrame(panel, layout.frame);
+        }
+
+        float Width(string text)
+        {
+            Cocoa.SetText(ruler, text);
+            return Cocoa.TextWidth(ruler);
         }
 
         static Color Hex(int rgb, float alpha = 1) => new Color((rgb >> 16 & 255) / 255f, (rgb >> 8 & 255) / 255f, (rgb & 255) / 255f, alpha);
