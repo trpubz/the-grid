@@ -326,5 +326,50 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual("A made-up session with a long name", v.rows[0].full);
             Assert.AreEqual("merge it", v.rows[0].needs);
         }
+
+        [Test]
+        public void ThePointerOnThePinOrBesideTheRowsKeepsTheOpenRow()
+        {
+            var l = ProgramCard.Layout(Screen, 5, true, true, 0);
+            var points = new[] { l.pin.center, new Vector2(l.card.x + 20, l.card.yMax - 5), new Vector2(l.card.x + 2, l.rows[0].center.y) };
+            foreach (var p in points)
+            {
+                int got = ProgramCard.Open(l, l.frame.position + p, 0);
+                Assert.AreEqual(0, got);
+                var again = ProgramCard.Layout(Screen, 5, true, true, got);
+                Assert.AreEqual(0, ProgramCard.Open(again, again.frame.position + p, got));
+            }
+        }
+
+        [Test]
+        public void ThePointerOffTheCardClosesTheRow()
+        {
+            var l = ProgramCard.Layout(Screen, 5, true, true, 2);
+            var off = l.frame.position - new Vector2(50, 50);
+            Assert.AreEqual(-1, ProgramCard.Open(l, l.frame.position + l.figure.center, 2));
+            Assert.AreEqual(-1, ProgramCard.Open(l, off, 2));
+            Assert.IsFalse(ProgramCard.Layout(Screen, 5, true, true, -1).card.Contains(off - ProgramCard.Layout(Screen, 5, true, true, -1).frame.position));
+        }
+
+        [Test]
+        public void MovingBetweenAnyTwoRowsOpensTheRowUnderThePointer()
+        {
+            for (int k = 0; k < 5; k++)
+                for (int j = 0; j < 5; j++)
+                {
+                    var at = ProgramCard.Layout(Screen, 5, true, true, k);
+                    var onScreen = at.frame.position + at.rows[j].center;
+                    Assert.AreEqual(j, ProgramCard.Open(at, onScreen, k), k + " to " + j);
+                    var to = ProgramCard.Layout(Screen, 5, true, true, j);
+                    Assert.AreEqual(j, ProgramCard.Open(to, onScreen, j), k + " to " + j + " once open");
+                }
+        }
+
+        [TestCase(7)] [TestCase(-1)]
+        public void ACurrentRowThatIsNotThereIsDropped(int current)
+        {
+            var l = ProgramCard.Layout(Screen, 5, true, true, 0);
+            Assert.AreEqual(-1, ProgramCard.Open(l, l.frame.position + new Vector2(l.card.x + 20, l.card.yMax - 5), current));
+        }
     }
 }

@@ -120,6 +120,14 @@ namespace TheGrid.Core
         public static int Hover(ProgramLayout l, Vector2 onScreen) =>
             Hit(l, onScreen - l.frame.position, out int row) == ProgramHit.Row ? row : -1;
 
+        // The row to keep open: the one under the pointer, else the current one while the pointer is still on the card, so the card does not shrink away from it.
+        public static int Open(ProgramLayout l, Vector2 onScreen, int current)
+        {
+            int under = Hover(l, onScreen);
+            if (under >= 0) return under;
+            return current >= 0 && current < l.rows.Count && l.card.Contains(onScreen - l.frame.position) ? current : -1;
+        }
+
         // Line 0..NeedLines of the open part, top down, in line with the names and ending at the row's right edge.
         public static Rect OpenLine(Rect open, int line)
         {
