@@ -12,6 +12,8 @@ namespace TheGrid.Core
         public string sessionId = "", name = "", account = "", app = "", repoRoot = "", repoName = "", branch = "", ticket = "", prUrl = "", state = "", rawStatus = "", workspace = "";
         // What a running agent is doing: reading, editing, testing, reviewing or working. Empty in every other state.
         public string activity = "";
+        // What a blocked background session is waiting on and why, from its job file. Empty in every other state.
+        public string needs = "", needsDetail = "";
         public int prNumber;
         public long stateSince;
         // How to get into the conversation: the command to run in a terminal. And the session's process, 0 for a background
@@ -186,6 +188,7 @@ namespace TheGrid.Core
                     m.Row.state = AgentState.Offline.ToString();
                     m.Row.rawStatus = "";
                     m.Row.activity = ""; // a session that is gone is not doing anything
+                    m.Row.needs = m.Row.needsDetail = "";
                     m.Row.stateSince = nowMs;
                     m.Row.subagents = new List<SubagentRow>();
                 }
@@ -257,6 +260,15 @@ namespace TheGrid.Core
             // Only a running agent is doing anything; when the transcript cannot say what, it is just working.
             row.activity = state != AgentState.Running ? "" : m.Activity != "" ? m.Activity : Activity.Working;
             row.subagents = Subagents.ReadActive(m.TranscriptPath, nowMs);
+
+            row.needs = row.needsDetail = "";
+            if (state == AgentState.BackgroundBlocked)
+            {
+                // The session's own folder first: another folder may list the same job.
+                var dirs = new List<string> { s.ConfigDir };
+                foreach (var d in settings.EffectiveConfigDirs(home)) if (d != s.ConfigDir) dirs.Add(d);
+                if (Needs.TryOfJob(dirs, s.Id, out var needs, out var detail)) { row.needs = needs; row.needsDetail = detail; }
+            }
         }
 
         // Changes whenever the file is appended to, so an unchanged transcript is not read again.
