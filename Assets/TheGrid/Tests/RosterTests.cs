@@ -223,6 +223,17 @@ namespace TheGrid.Core.Tests
             "{\"type\":\"assistant\",\"gitBranch\":\"feature/demo-12-example-change\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"t\",\"name\":\"" + tool + "\",\"input\":" + input + "}]}}\n";
 
         [Test]
+        public void ASessionWaitingOnAQuestionCarriesTheQuestion()
+        {
+            var s = new LiveSession { SessionId = S2, Name = "alpha-02", Cwd = "/work/alpha", Kind = "interactive", Status = "waiting", WaitingFor = "input needed", State = "", ConfigDir = cfg };
+            var builder = new RosterBuilder(settings);
+            File.AppendAllText(transcript, Assistant("AskUserQuestion", "{\"questions\":[{\"question\":\"Which made-up colour?\"}]}"));
+            Assert.AreEqual("Which made-up colour?", builder.Build(new[] { s }, None, Now).agents[0].needs);
+            s.Status = "busy"; s.WaitingFor = "";   // answered and at work; the transcript has not moved yet
+            Assert.AreEqual("", builder.Build(new[] { s }, None, Now + 2000).agents[0].needs);
+        }
+
+        [Test]
         public void ActivityIsGivenOnlyWhileRunning()
         {
             var snap = new RosterBuilder(settings).Build(live, None, Now);
