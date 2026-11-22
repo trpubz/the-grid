@@ -32,6 +32,20 @@ namespace TheGrid.Core.Tests
             return s;
         }
 
+        static AgentRow Waiting(string needs, string detail) => new AgentRow { sessionId = "s-1", account = "claude", name = "made-up-job", state = "BackgroundBlocked", needs = needs, needsDetail = detail };
+
+        [Test] public void ARowThatSaysWhatItNeedsSaysItInPlaceOfTheStatesWords() =>
+            Assert.AreEqual("approve the made-up plan", Panels.NeedsYou(Only(Waiting("approve the made-up plan", "")))[0].what);
+        [Test] public void ARowThatSaysNothingKeepsTheStatesWords() =>
+            Assert.AreEqual("Blocked in the background", Panels.NeedsYou(Only(Waiting("", "")))[0].what);
+        [Test] public void TheCardCarriesTheNeedAndTheStatusBehindIt()
+        {
+            var card = Panels.Card(Only(Waiting("approve the made-up plan", "waiting on a made-up answer")), "claude|s-1", 0);
+            Assert.AreEqual("approve the made-up plan", card.needs);
+            Assert.AreEqual("waiting on a made-up answer", card.needsDetail);
+            Assert.AreEqual("", Panels.Card(Only(Waiting("", "")), "claude|s-1", 0).needs);
+        }
+
         [Test]
         public void TheCardCarriesTheWayIntoTheConversation()
         {

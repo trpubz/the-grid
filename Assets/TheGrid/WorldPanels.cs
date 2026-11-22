@@ -24,6 +24,7 @@ namespace TheGrid
         Vector2 depotScroll;
         GUIStyle wrapped, code;
         readonly Texture2D[] crates = new Texture2D[ArtNames.Crates.Length];   // in the order of PullState
+        float needsHigh, detailHigh;                    // how high the card's need and its status are, wrapped to the card
         List<string> subagents = new List<string>();   // the card's lines about subagents, as many as this map has room for
 
         // True when the last Draw saw a click on the card's workspace: the owner wants the repo in its next workspace.
@@ -37,7 +38,7 @@ namespace TheGrid
 
         // Works out where the panels go. Call on every event before the map handles input, so that what is drawn, what is
         // clicked and what the map leaves alone are the same rectangles.
-        public void Place(Rect map, int rows, BotCard about, WorldSector depotOf = null)
+        public void Place(Rect map, int rows, BotCard about, GUIStyle text, WorldSector depotOf = null)
         {
             bool hasCard = about != null;
             bool narrow = map.width < 520;
@@ -52,7 +53,10 @@ namespace TheGrid
                 float w = narrow ? map.width - 2 * Margin : CardWide;
                 // A short map has room for one line about subagents, so that the card never takes most of it.
                 subagents = Panels.SubagentLines(about, map.height < 300 ? SubagentLinesWhenShort : SubagentLines);
-                float h = CardHigh + (subagents.Count + Entry(about)) * LineHigh;
+                if (wrapped == null) wrapped = new GUIStyle(text) { wordWrap = true, clipping = TextClipping.Clip };
+                needsHigh = about.needs == "" ? 0 : wrapped.CalcHeight(new GUIContent(about.needs), w - 20);
+                detailHigh = about.needsDetail == "" ? 0 : wrapped.CalcHeight(new GUIContent(about.needsDetail), w - 20);
+                float h = CardHigh + (subagents.Count + Entry(about)) * LineHigh + needsHigh + detailHigh;
                 card = new Rect(map.xMax - Margin - w, map.yMax - Margin - h, w, h);
             }
             if (depotOf != null)
@@ -163,6 +167,16 @@ namespace TheGrid
                         copiedUntil = Time.unscaledTime + 1.5f;
                     }
                     y += LineHigh;
+                }
+                if (needsHigh > 0)
+                {
+                    GUI.Label(new Rect(card.x + 10, y, card.width - 20, needsHigh), about.needs, wrapped);
+                    y += needsHigh;
+                }
+                if (detailHigh > 0)
+                {
+                    Faint(new Rect(card.x + 10, y, card.width - 20, detailHigh), about.needsDetail, wrapped);
+                    y += detailHigh;
                 }
                 for (int i = 0; i < subagents.Count; i++)
                     Faint(new Rect(card.x + 10, y + i * LineHigh, card.width - 20, 20), subagents[i], text);

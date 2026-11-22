@@ -24,6 +24,7 @@ namespace TheGrid.Core
         public string enter = "", where = "";
         public int pid;
         public List<string> subagents = new List<string>();        // what each subagent is doing, in the roster's order
+        public string needs = "", needsDetail = "";                // what a waiting session needs, and the status line behind it; "" when none
     }
 
     // The words of the two panels drawn over the world. Like the world itself, made from the roster snapshot and nothing else.
@@ -52,7 +53,7 @@ namespace TheGrid.Core
             var rows = new List<NeedsYouRow>();
             foreach (var a in snap.agents)
                 if (World.NeedsOwner(a.state))
-                    rows.Add(new NeedsYouRow { key = Key(a), sector = Sector(a), name = a.name, badge = World.BadgeFor(a.state), what = What(a) });
+                    rows.Add(new NeedsYouRow { key = Key(a), sector = Sector(a), name = a.name, badge = World.BadgeFor(a.state), what = a.needs != "" ? a.needs : What(a) });
             return rows;
         }
 
@@ -68,6 +69,7 @@ namespace TheGrid.Core
                 since = RosterFormat.Elapsed(a.stateSince, nowMs), ticket = a.ticket,
                 prUrl = RosterFormat.IsWebLink(a.prUrl) ? a.prUrl : "", prNumber = a.prNumber,   // only a web link is ever opened
                 workspace = a.workspace, repoRoot = a.repoRoot, enter = a.enter ?? "", pid = a.pid, subagents = a.subagents.ConvertAll(s => s.description ?? ""),
+                needs = a.needs ?? "", needsDetail = a.needsDetail ?? "",
             };
         }
 

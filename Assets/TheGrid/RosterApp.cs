@@ -423,7 +423,7 @@ namespace TheGrid
                 }
             }
             var depotOf = depotOpen < 0 ? null : worldDrawn.sectors.Find(s => s.plot == depotOpen);
-            panels.Place(map, needsYou.Count, card, depotOf);
+            panels.Place(map, needsYou.Count, card, detail, depotOf);
             world.Gui(detail, title, panels.Covers, workspaceFor == "" && cloudFor == "");   // while the list of workspaces or the cloud panel is open, the map is deaf
             if (drawn.errors.Count > 0) GUI.Label(new Rect(map.x + 4, map.y + 4, map.width - 8, 32), string.Join(" | ", drawn.errors), error);
             string notAsked = depotOf == null ? "" : depotOf.repoRoot == "" ? "Sessions with no repo have no pull requests."
