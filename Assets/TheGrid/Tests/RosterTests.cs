@@ -223,6 +223,33 @@ namespace TheGrid.Core.Tests
             "{\"type\":\"assistant\",\"gitBranch\":\"feature/demo-12-example-change\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"t\",\"name\":\"" + tool + "\",\"input\":" + input + "}]}}\n";
 
         [Test]
+        public void AnIdleSessionThatEndedOnAnApiErrorHasFailedUntilItsNextTurn()
+        {
+            File.AppendAllText(transcript, "{\"type\":\"assistant\",\"isApiErrorMessage\":true,\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"API Error\"}]}}\n");
+            var s = Idle(S2, "beta", "/work/none");
+            s.ConfigDir = cfg;
+            var builder = new RosterBuilder(settings, "/cfg");
+            string State() => builder.Build(new[] { s }, None, Now).agents.Find(a => a.sessionId == S2).state;
+            Assert.AreEqual("Errored", State());
+            s.Status = "busy";
+            Assert.AreEqual("Running", State(), "a running session has not failed");
+            s.Status = "waiting"; s.WaitingFor = "permission prompt";
+            Assert.AreEqual("WaitingForPermission", State());
+            s.Status = "idle"; s.WaitingFor = "";
+            File.AppendAllText(transcript, Assistant("Edit", "{}"));
+            Assert.AreEqual("Finished", State());
+        }
+
+        [Test]
+        public void ABackgroundSessionsOwnWordForHowItEndedIsKept()
+        {
+            File.AppendAllText(transcript, "{\"type\":\"assistant\",\"isApiErrorMessage\":true,\"message\":{\"role\":\"assistant\",\"content\":[]}}\n");
+            var s = Idle(S2, "beta", "/work/none");
+            s.ConfigDir = cfg; s.Kind = "background"; s.Status = ""; s.State = "done";
+            Assert.AreEqual("Finished", new RosterBuilder(settings, "/cfg").Build(new[] { s }, None, Now).agents[0].state);
+        }
+
+        [Test]
         public void ASessionWaitingOnAQuestionCarriesTheQuestion()
         {
             var s = new LiveSession { SessionId = S2, Name = "alpha-02", Cwd = "/work/alpha", Kind = "interactive", Status = "waiting", WaitingFor = "input needed", State = "", ConfigDir = cfg };

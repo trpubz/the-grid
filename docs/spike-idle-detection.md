@@ -16,7 +16,7 @@ For Claude Code, yes, and without installing anything. Claude Code already publi
 | Waiting for permission | `status: waiting`, `waitingFor: permission prompt` | Observed live, see below |
 | Finished, awaiting next prompt | `status: idle` | Observed |
 | Background session blocked | `kind: background`, `state: blocked` | Observed |
-| Errored | `state: failed` for background sessions (documented). For interactive sessions no separate signal was found; assistant records carry `isApiErrorMessage` | Partial |
+| Errored | `state: failed` for background sessions (documented). For interactive sessions no separate signal was found; assistant records carry `isApiErrorMessage` | Partial. Since GRID-44 a session at rest whose newest record carries it shows as errored |
 | Offline | Transcript exists, session absent from the live list | Inferred |
 
 **Live test.** A session asked its user a question while a sampler read that session's row every 2 seconds. The row read `waiting / input needed` from the first sample to the last one before the answer (58 seconds), and `busy` on the next sample. The matching `AskUserQuestion` record in the transcript is timestamped at the start of that window, and its result at the end.
@@ -44,7 +44,9 @@ For Claude Code, yes, and without installing anything. Claude Code already publi
 
 Recommended for slice 1: read source 1 for state, use source 2 only for time-in-state, and keep hooks in reserve.
 
-**Do not infer state from the end of a transcript.** A classifier that looked for unanswered tool calls marked most finished sessions as "pending". The cause was not run down; the live list makes the heuristic unnecessary.
+Decided in GRID-44 (2026-11-23): no hooks. Source 2's files are looked at every half second and source 1 is asked when one moves. On eight idle sessions the status was written 0.03 to 1.0 s after the last transcript record (on one later turn 3.0 s), so reading sooner does most of what a `Stop` hook would. Codex's documented `PermissionRequest` input has no field that says whether the owner or the automatic reviewer is asked, so on its own it would report waits that are not the owner's.
+
+**Do not infer state from the end of a transcript.** A classifier that looked for unanswered tool calls marked most finished sessions as "pending". The cause was not run down; the live list makes the heuristic unnecessary. The one exception, since GRID-44: a session the list calls idle whose newest record is marked as an API error.
 
 ## Where the other roster fields come from
 
@@ -117,7 +119,7 @@ Checked again on 2026-11-10 against every transcript on this Mac (599 sends), wh
 | Waiting for permission | Yes |
 | Finished | Yes |
 | Running | Yes |
-| Errored | Background sessions only; interactive needs more work |
+| Errored | Yes (background sessions at first; interactive ones since GRID-44) |
 | Offline | Yes |
 
 ## Still open

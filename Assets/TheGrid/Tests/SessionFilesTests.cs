@@ -156,6 +156,54 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
+        public void ChangeStampMovesWhenABackgroundSessionsJobFileIsAddedRewrittenOrRemoved()
+        {
+            var before = SessionFiles.ChangeStamp(cfg);
+            var job = Path.Combine(cfg, "jobs", "bg000001");
+            Directory.CreateDirectory(job);   // a job with no state file yet
+            Assert.AreEqual(before, SessionFiles.ChangeStamp(cfg));
+            var state = Path.Combine(job, "state.json");
+            File.WriteAllText(state, "{}");
+            var added = SessionFiles.ChangeStamp(cfg);
+            Assert.AreNotEqual(before, added);
+            File.WriteAllText(state, "{\"needs\":\"an answer\"}");
+            Assert.AreNotEqual(added, SessionFiles.ChangeStamp(cfg));
+            Directory.Delete(Path.Combine(cfg, "jobs"), true);
+            Assert.AreEqual(before, SessionFiles.ChangeStamp(cfg));
+        }
+
+        [Test]
+        public void ChangeStampCountsJobFilesInAFolderWithNoSessions()
+        {
+            var other = Path.Combine(cfg, "other");
+            Directory.CreateDirectory(Path.Combine(other, "jobs", "bg000001"));
+            File.WriteAllText(Path.Combine(other, "jobs", "bg000001", "state.json"), "{}");
+            Assert.AreNotEqual("", SessionFiles.ChangeStamp(other));
+        }
+
+        const string ApiError = "{\"type\":\"assistant\",\"isSidechain\":false,\"isApiErrorMessage\":true,\"error\":\"server_error\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"API Error\"}]}}\n";
+        const string TurnDuration = "{\"type\":\"system\",\"subtype\":\"turn_duration\",\"isSidechain\":false}\n";
+
+        [Test]
+        public void AConversationThatEndsOnAnApiErrorSaysSo()
+        {
+            Assert.IsFalse(SessionFiles.ReadTranscriptTail(transcript).ApiError);
+            File.AppendAllText(transcript, ApiError);
+            Assert.IsTrue(SessionFiles.ReadTranscriptTail(transcript).ApiError);
+            File.AppendAllText(transcript, TurnDuration + "{\"type\":\"last-prompt\",\"role\":\"user\"}\n");
+            Assert.IsTrue(SessionFiles.ReadTranscriptTail(transcript).ApiError, "bookkeeping records do not count");
+        }
+
+        [Test]
+        public void AnApiErrorTheConversationHasMovedOnFromIsNotShown()
+        {
+            File.AppendAllText(transcript, ApiError + TurnDuration + "{\"type\":\"user\",\"isSidechain\":false,\"message\":{\"role\":\"user\",\"content\":\"go on\"}}\n");
+            Assert.IsFalse(SessionFiles.ReadTranscriptTail(transcript).ApiError);
+            File.AppendAllText(transcript, "{\"type\":\"user\",\"isSidechain\":true,\"message\":{\"role\":\"user\",\"content\":\"a subagent\"}}\n" + ApiError.Replace("\"isSidechain\":false", "\"isSidechain\":true"));
+            Assert.IsFalse(SessionFiles.ReadTranscriptTail(transcript).ApiError, "a subagent's error is not the session's");
+        }
+
+        [Test]
         public void ReadNewLinesGivesOnlyMarkedCompleteLinesPastTheOffset()
         {
             var p = Path.Combine(cfg, "projects", "p1", "t.jsonl");

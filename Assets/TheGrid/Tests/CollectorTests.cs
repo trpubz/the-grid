@@ -129,10 +129,28 @@ namespace TheGrid.Core.Tests
             int calls = 0;
             using (var c = new Collector(settings, home, dir => { calls++; return IdleJson; }, dir => "same"))
             {
-                var first = c.Poll(Now);
-                var second = c.Poll(Now + 2000);
+                c.Poll(Now);
+                var settled = c.Poll(Now + Collector.SettleMs - 1);
+                var after = c.Poll(Now + Collector.SettleMs);
                 Assert.AreEqual(1, calls);
-                Assert.AreSame(first, second);
+                Assert.AreSame(settled, after);
+            }
+        }
+
+        [Test]
+        public void ARecordThatReachesTheTranscriptAfterTheStatusIsStillSeenSoonWithoutRunningTheCommand()
+        {
+            var project = Path.Combine(home, ".claude", "projects", "p");
+            Directory.CreateDirectory(project);
+            var transcript = Path.Combine(project, "s-1.jsonl");
+            File.WriteAllText(transcript, Assistant("Edit", "{}"));
+            int calls = 0;
+            using (var c = new Collector(settings, home, dir => { calls++; return IdleJson; }, dir => "same"))
+            {
+                Assert.AreEqual("Finished", c.Poll(Now).agents[0].state);
+                File.AppendAllText(transcript, "{\"type\":\"assistant\",\"isApiErrorMessage\":true,\"message\":{\"role\":\"assistant\",\"content\":[]}}\n");
+                Assert.AreEqual("Errored", c.Poll(Now + 2000).agents[0].state);
+                Assert.AreEqual(1, calls);
             }
         }
 
@@ -173,6 +191,54 @@ namespace TheGrid.Core.Tests
                 stamp = 1;
                 c.Poll(Now + 2000);
                 Assert.AreEqual(2, calls);
+            }
+        }
+
+        [Test]
+        public void AMoveIsActedOnBeforeTheNextPollIsDue()
+        {
+            int calls = 0, stamp = 0;
+            using (var c = new Collector(settings, home, dir => { Interlocked.Increment(ref calls); return IdleJson; }, dir => "v" + Volatile.Read(ref stamp)))
+            {
+                c.Start(60000, 20);
+                Assert.IsTrue(SpinWait.SpinUntil(() => Volatile.Read(ref calls) == 1, 5000));
+                Volatile.Write(ref stamp, 1);
+                Assert.IsTrue(SpinWait.SpinUntil(() => Volatile.Read(ref calls) == 2, 1000), "not within a second");
+                Thread.Sleep(200);
+                Assert.AreEqual(2, Volatile.Read(ref calls), "one move, one run");
+            }
+        }
+
+        [Test]
+        public void ASlowPollIsFollowedByTheWholeInterval()
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            long firstEnded = 0, secondBegan = 0;
+            using (var c = new Collector(settings, home, dir =>
+            {
+                if (Volatile.Read(ref firstEnded) != 0) { Interlocked.CompareExchange(ref secondBegan, clock.ElapsedMilliseconds, 0); return IdleJson; }
+                Thread.Sleep(400);
+                Volatile.Write(ref firstEnded, clock.ElapsedMilliseconds);
+                throw new TimeoutException("did not answer");
+            }, dir => "same"))
+            {
+                c.Start(300, 20);
+                Assert.IsTrue(SpinWait.SpinUntil(() => Volatile.Read(ref secondBegan) != 0, 5000));
+                Assert.GreaterOrEqual(Volatile.Read(ref secondBegan) - Volatile.Read(ref firstEnded), 250);
+            }
+        }
+
+        [Test]
+        public void BetweenPollsNothingIsReadWhenNothingMoved()
+        {
+            int calls = 0, reads = 0, checks = 0;
+            using (var c = new Collector(settings, home, dir => { Interlocked.Increment(ref calls); return BusyJson; }, dir => { Interlocked.Increment(ref checks); return "same"; },
+                now => { Interlocked.Increment(ref reads); return null; }))
+            {
+                c.Start(60000, 20);
+                Assert.IsTrue(SpinWait.SpinUntil(() => Volatile.Read(ref checks) > 4, 5000), "the files are not looked at between polls");
+                Assert.AreEqual(1, Volatile.Read(ref calls));
+                Assert.AreEqual(1, Volatile.Read(ref reads), "a poll ran with nothing moved");
             }
         }
 
