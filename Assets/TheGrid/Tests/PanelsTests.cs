@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
@@ -122,6 +123,30 @@ namespace TheGrid.Core.Tests
             a.repoRoot = "/work/gamma";
             for (int i = 0; i < subagents; i++) a.subagents.Add(new SubagentRow { agentId = "a" + i, description = "task " + i, agentType = "general-purpose" });
             return a;
+        }
+
+        [Test]
+        public void TheWorkspacesPanelHasEveryWorkspaceAndEveryRepoOnceUnderItsOwn()
+        {
+            var settings = new Settings { workspaces = new List<string> { "Personal", "Work", "Empty" } };
+            settings.SetWorkspace("/work/gamma", "Work");
+            settings.SetWorkspace("/work/quiet", "Work");
+            settings.CycleLight("Work", 3);
+            var snap = Only(With(0));                                                              // a session in /work/gamma
+            snap.agents.Add(With(0));                                                              // and another
+            snap.agents.Add(new AgentRow { workspace = "Personal" });                              // one with no repo
+            snap.agents.Add(new AgentRow { repoRoot = "/new/repo", repoName = "repo", workspace = "Elsewhere" });   // not on the map yet, in a workspace the settings do not have
+            snap.agents[0].repoName = "Gamma";
+            var groups = Panels.Workspaces(snap, new[] { "", "/work/quiet", "/work/gamma", "/not/listed/" }, settings);
+            CollectionAssert.AreEqual(new[] { "Personal", "Work", "Empty", "Elsewhere" }, groups.ConvertAll(g => g.name));
+            CollectionAssert.AreEqual(new[] { "/not/listed/" }, groups[0].roots);
+            CollectionAssert.AreEqual(new[] { "listed" }, groups[0].repos);
+            CollectionAssert.AreEqual(new[] { "/work/quiet", "/work/gamma" }, groups[1].roots);
+            CollectionAssert.AreEqual(new[] { "quiet", "Gamma" }, groups[1].repos);
+            Assert.AreEqual(0, groups[2].roots.Count);
+            CollectionAssert.AreEqual(new[] { "/new/repo" }, groups[3].roots);
+            Assert.AreEqual(settings.LookFor("Work", 1), groups[1].look);
+            Assert.AreEqual(3, groups[3].look);
         }
 
         [Test]

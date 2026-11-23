@@ -161,6 +161,13 @@ namespace TheGrid.Core
             return all;
         }
 
+        // Every row in the workspace the settings give its repo now. A roster is read on another thread, so one read before a
+        // change may be drawn after it; with the old name in it, the map would make that workspace's region again.
+        public static void Place(RosterSnapshot snap, Settings settings)
+        {
+            foreach (var a in snap.agents) a.workspace = settings.WorkspaceFor(a.repoRoot);
+        }
+
         static AgentState StateOf(AgentRow a) => Enum.TryParse(a.state, out AgentState s) ? s : AgentState.Unknown;
 
         // The folder of the account with that name under `home`: the reverse of AccountLabel, for a snapshot, which has names only.

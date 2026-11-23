@@ -27,6 +27,14 @@ namespace TheGrid.Core
         public string needs = "", needsDetail = "";                // what a waiting session needs, and the status line behind it; "" when none
     }
 
+    // A workspace in the panel of all of them: its look on the map, and its repos, by root and beside that by name.
+    public sealed class WorkspaceGroup
+    {
+        public string name = "";
+        public int look;
+        public List<string> roots = new List<string>(), repos = new List<string>();
+    }
+
     // The words of the two panels drawn over the world. Like the world itself, made from the roster snapshot and nothing else.
     public static class Panels
     {
@@ -97,6 +105,31 @@ namespace TheGrid.Core
             room = Mathf.Max(0, Mathf.Floor(room / line) * line);
             float n = Mathf.Min(need, room);
             return new Vector2(n, Mathf.Min(detail, room - n));
+        }
+
+        // Every workspace, as World.Build orders and lights them, and every repo that has a plot or a session, once.
+        public static List<WorkspaceGroup> Workspaces(RosterSnapshot snap, IEnumerable<string> onMap, Settings settings)
+        {
+            var groups = new List<WorkspaceGroup>();
+            WorkspaceGroup Group(string name)
+            {
+                var g = groups.Find(x => x.name == name);
+                if (g == null) groups.Add(g = new WorkspaceGroup { name = name, look = settings.LookFor(name, groups.Count) });
+                return g;
+            }
+            foreach (var w in settings.workspaces) Group(w);
+            var roots = new List<string>(onMap);
+            foreach (var a in snap.agents) if (!roots.Contains(a.repoRoot)) roots.Add(a.repoRoot);
+            foreach (var root in roots)
+            {
+                var row = snap.agents.Find(a => a.repoRoot == root);
+                // A repo is where its sessions say; with none, where the settings put it. Sessions with no repo are in a workspace, but nothing can be moved.
+                var group = Group(row != null && row.workspace != "" ? row.workspace : settings.WorkspaceFor(root));
+                if (string.IsNullOrEmpty(root)) continue;
+                group.roots.Add(root);
+                group.repos.Add(row != null && row.repoName != "" ? row.repoName : System.IO.Path.GetFileName(root.TrimEnd('/')));
+            }
+            return groups;
         }
 
         static string Key(AgentRow a) => a.account + "|" + a.sessionId;   // as World.Build keys a bot

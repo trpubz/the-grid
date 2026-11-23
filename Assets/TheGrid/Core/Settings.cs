@@ -13,7 +13,7 @@ namespace TheGrid.Core
     [Serializable]
     public sealed class Settings
     {
-        public const string DefaultWorkspace = "Personal";
+        public const string DefaultWorkspace = "Personal";   // as it is called until the owner renames it
 
         public List<string> configDirs = new List<string>();   // empty means: discover
         public string claudePath = "";                          // empty means: look in the usual places
@@ -24,6 +24,7 @@ namespace TheGrid.Core
         public string font = "";                                // the family all text is set in; empty means: the first Nerd Font this Mac has
         public bool program = true;                             // the small bot on the desktop that shows who needs the owner
         public bool programPinned = false;                      // its card stays open, not only while the pointer is near
+        public string defaultWorkspace = DefaultWorkspace;      // the workspace of every repo not listed in repoWorkspaces
         public List<string> workspaces = new List<string> { DefaultWorkspace };
         public List<RepoWorkspace> repoWorkspaces = new List<RepoWorkspace>();
         public List<WorkspaceLight> workspaceLights = new List<WorkspaceLight>();   // a light: one of Lights.LookNames
@@ -46,7 +47,8 @@ namespace TheGrid.Core
             s.font = s.font ?? "";
             s.repoWorkspaces = s.repoWorkspaces ?? new List<RepoWorkspace>();
             s.workspaceLights = s.workspaceLights ?? new List<WorkspaceLight>();
-            if (s.workspaces == null || s.workspaces.Count == 0) s.workspaces = new List<string> { DefaultWorkspace };
+            if (string.IsNullOrEmpty(s.defaultWorkspace)) s.defaultWorkspace = DefaultWorkspace;
+            if (s.workspaces == null || s.workspaces.Count == 0) s.workspaces = new List<string> { s.defaultWorkspace };
             return s;
         }
 
@@ -63,6 +65,7 @@ namespace TheGrid.Core
             codex = fresh.codex;
             program = fresh.program;
             programPinned = fresh.programPinned;
+            defaultWorkspace = fresh.defaultWorkspace;
             workspaces = fresh.workspaces;
             repoWorkspaces = fresh.repoWorkspaces;
             workspaceLights = fresh.workspaceLights;
@@ -100,7 +103,42 @@ namespace TheGrid.Core
             if (!string.IsNullOrEmpty(repoRoot))
                 foreach (var rw in repoWorkspaces)
                     if (rw.repo == repoRoot && !string.IsNullOrEmpty(rw.workspace)) return rw.workspace;
-            return DefaultWorkspace;
+            return defaultWorkspace;
+        }
+
+        // Gives a workspace another name, with its repos, its place in the list and its light. Returns why not, or "" when it
+        // is done. The map's places go by name too: Plots.Rename.
+        public string Rename(string from, string to)
+        {
+            to = (to ?? "").Trim();
+            if (to == from) return "";
+            string why = WhyNot(to, from);
+            if (why != "") return why;
+            workspaceLights.RemoveAll(wl => wl.workspace == to);   // left by a workspace of that name taken out by hand
+            for (int i = 0; i < workspaces.Count; i++) if (workspaces[i] == from) workspaces[i] = to;
+            foreach (var rw in repoWorkspaces) if (rw.workspace == from) rw.workspace = to;
+            foreach (var wl in workspaceLights) if (wl.workspace == from) wl.workspace = to;
+            if (defaultWorkspace == from) defaultWorkspace = to;
+            return "";
+        }
+
+        // Makes a workspace with no repo in it, at the end of the list. Returns why not, or "" when it is done.
+        public string AddWorkspace(string name)
+        {
+            name = (name ?? "").Trim();
+            string why = WhyNot(name, null);
+            if (why == "") workspaces.Add(name);
+            return why;
+        }
+
+        // Why a workspace may not be called that: no name, or one that another than `but` has.
+        string WhyNot(string name, string but)
+        {
+            if (name == "") return "A workspace needs a name.";
+            var used = new List<string>(workspaces) { defaultWorkspace };
+            foreach (var rw in repoWorkspaces) used.Add(rw.workspace);
+            string other = used.Find(w => w != but && string.Equals(w, name, StringComparison.OrdinalIgnoreCase));
+            return other == null ? "" : "“" + other + "” is already a workspace.";
         }
 
         // Gives the repo a workspace by name and returns the name it now has. A name there is no workspace of makes one, at
