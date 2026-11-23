@@ -271,6 +271,9 @@ namespace TheGrid
                 Back(all);
                 Title(all, repo + " · workspace", strong, ref away);
                 string picked = "";
+                // Before the rows: a box that comes and goes before this one would change this one's number, and take its keys.
+                var field = new Rect(8, TitleHigh + names.Count * ListRow + WhyHigh(names.Contains(renaming)) + 5, all.width - 64, 22);
+                if (NewName(field, text, enter)) picked = typed;
                 float y = TitleHigh;
                 foreach (var name in names)
                 {
@@ -278,8 +281,6 @@ namespace TheGrid
                     if (name == current && name != renaming) Fill(new Rect(10, row.y + 9, 6, 6), Lit);   // the one the repo is in
                     if (NameRow(row, name, text, text, enter, rename, ref y) && GUI.Button(new Rect(row.x, row.y, row.width - RenameWide, row.height), GUIContent.none, GUIStyle.none)) picked = name;
                 }
-                var field = new Rect(8, y + 5, all.width - 64, 22);
-                if (NewName(field, text, enter)) picked = typed;
                 var bring = new Rect(1, field.yMax + 6, all.width - 2, ListRow);
                 Fill(new Rect(bring.x, bring.y, bring.width, 1), Edge);
                 GUI.Label(new Rect(24, bring.y + 2, bring.width - 30, 20), "Bring a cloud session here", text);
@@ -310,6 +311,17 @@ namespace TheGrid
                 Back(all);
                 Title(all, "Workspaces", strong, ref away);
                 string picked = "";
+                var field = new Rect(8, TitleHigh + shown + 5, all.width - 64, 22);
+                if (NewName(field, text, enter))   // before the rows, as in the list
+                {
+                    why = add(typed);
+                    if (why == "")
+                    {
+                        StopTyping();
+                        allScroll.y = float.MaxValue;   // the new one is the last; the view holds it to what there is
+                    }
+                }
+                if (renaming == "" && why != "") Say(new Rect(12, field.yMax + 1, all.width - 20, WhyLine), text);
                 var view = new Rect(1, TitleHigh, all.width - 2, shown);
                 float w = view.width - (rows > shown ? 16 : 0);
                 allScroll = GUI.BeginScrollView(view, allScroll, new Rect(0, 0, w, rows));
@@ -335,17 +347,6 @@ namespace TheGrid
                     y += ListRow;
                 }
                 GUI.EndScrollView();
-                var field = new Rect(8, TitleHigh + shown + 5, all.width - 64, 22);
-                if (NewName(field, text, enter))
-                {
-                    why = add(typed);
-                    if (why == "")
-                    {
-                        StopTyping();
-                        allScroll.y = float.MaxValue;   // the new one is the last; the view holds it to what there is
-                    }
-                }
-                if (renaming == "" && why != "") Say(new Rect(12, field.yMax + 1, all.width - 20, WhyLine), text);
                 if (picked == "" && !away) return;
                 StopTyping();
                 if (e.type != EventType.Repaint && e.type != EventType.Layout) e.Use();
@@ -404,6 +405,7 @@ namespace TheGrid
             {
                 why = rename(name, renamed);
                 if (why == "") StopTyping();
+                else GUI.ScrollTo(new Rect(row.x, row.y, row.width, ListRow + WhyLine));   // in a panel that scrolls, the reason is seen
                 if (enter) Event.current.Use();
             }
             else if (why != "")

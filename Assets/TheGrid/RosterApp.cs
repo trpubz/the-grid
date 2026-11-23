@@ -213,6 +213,7 @@ namespace TheGrid
                 OpenCloud(brought.repoRoot, Arg("-pasted"));
             }
             yield return Shot("near.png");
+            workspacesOpen = false;
             // A picture of the map after that sector's repo was given a workspace, as a click in the list does.
             if (listed != null && Arg("-give") != "")
             {

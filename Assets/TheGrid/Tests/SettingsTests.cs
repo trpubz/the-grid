@@ -148,6 +148,8 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual("Home", live.WorkspaceFor("/not/listed"));
             File.WriteAllText(file, "{\"defaultWorkspace\":\"\",\"workspaces\":[]}");
             Assert.AreEqual("Personal", Settings.Load(file).WorkspaceFor("/not/listed"));
+            File.WriteAllText(file, "{\"defaultWorkspace\":\"Home\",\"workspaces\":[]}");
+            CollectionAssert.AreEqual(new[] { "Home" }, Settings.Load(file).workspaces);
         }
 
         [Test]

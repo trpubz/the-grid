@@ -199,10 +199,11 @@ namespace TheGrid.Core.Tests
             plots.MoveRegion("firm", new Vector2Int(400, 0));   // places the owner picked
             plots.MoveSector(Sector(w, "firm/a").plot, new Vector2Int(5, 5));
             var before = Places(World.Build(Of(Three), plots, settings));
+            var path = Path.Combine(tmp, "world.json");
+            plots.SaveIfGrown(path);   // all that is owed but the rename
             var snap = Of(Three);
             Assert.AreEqual("", settings.Rename("firm", "Studio"));
             plots.Rename("firm", "Studio");
-            var path = Path.Combine(tmp, "world.json");
             plots.SaveIfGrown(path);
             plots = Plots.Load(path);
             RosterBuilder.Place(snap, settings);
