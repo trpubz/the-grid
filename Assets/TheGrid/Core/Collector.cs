@@ -53,7 +53,7 @@ namespace TheGrid.Core
     {
         readonly Settings settings;
         readonly string home;
-        // A quiet directory is still asked this often: background sessions leave no session file to watch.
+        // A quiet directory is still asked this often: a background session leaves no session file to watch, only its job file.
         public const long FullRefreshMs = 30000;
         // A record can reach its transcript up to 11 s after its own time (seen), so perhaps after the status it goes with: for
         // this long after the command ran, each poll rebuilds the roster, which reads only transcripts that changed.
@@ -176,10 +176,8 @@ namespace TheGrid.Core
                     try
                     {
                         if (!sincePoll.IsRunning || sincePoll.ElapsedMilliseconds >= intervalMs || Moved())
-                        {
-                            sincePoll.Restart();
-                            Poll(now);
-                        }
+                            try { Poll(now); }
+                            finally { sincePoll.Restart(); }   // from its end: a command that hangs is not started again at once
                     }
                     catch (Exception e)
                     {

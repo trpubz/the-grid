@@ -201,11 +201,30 @@ namespace TheGrid.Core.Tests
             using (var c = new Collector(settings, home, dir => { Interlocked.Increment(ref calls); return IdleJson; }, dir => "v" + Volatile.Read(ref stamp)))
             {
                 c.Start(60000, 20);
-                SpinWait.SpinUntil(() => Volatile.Read(ref calls) == 1, 5000);
+                Assert.IsTrue(SpinWait.SpinUntil(() => Volatile.Read(ref calls) == 1, 5000));
                 Volatile.Write(ref stamp, 1);
                 Assert.IsTrue(SpinWait.SpinUntil(() => Volatile.Read(ref calls) == 2, 1000), "not within a second");
                 Thread.Sleep(200);
                 Assert.AreEqual(2, Volatile.Read(ref calls), "one move, one run");
+            }
+        }
+
+        [Test]
+        public void ASlowPollIsFollowedByTheWholeInterval()
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            long firstEnded = 0, secondBegan = 0;
+            using (var c = new Collector(settings, home, dir =>
+            {
+                if (Volatile.Read(ref firstEnded) != 0) { Interlocked.CompareExchange(ref secondBegan, clock.ElapsedMilliseconds, 0); return IdleJson; }
+                Thread.Sleep(400);
+                Volatile.Write(ref firstEnded, clock.ElapsedMilliseconds);
+                throw new TimeoutException("did not answer");
+            }, dir => "same"))
+            {
+                c.Start(300, 20);
+                Assert.IsTrue(SpinWait.SpinUntil(() => Volatile.Read(ref secondBegan) != 0, 5000));
+                Assert.GreaterOrEqual(Volatile.Read(ref secondBegan) - Volatile.Read(ref firstEnded), 250);
             }
         }
 

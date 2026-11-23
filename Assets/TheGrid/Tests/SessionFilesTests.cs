@@ -190,7 +190,7 @@ namespace TheGrid.Core.Tests
             Assert.IsFalse(SessionFiles.ReadTranscriptTail(transcript).ApiError);
             File.AppendAllText(transcript, ApiError);
             Assert.IsTrue(SessionFiles.ReadTranscriptTail(transcript).ApiError);
-            File.AppendAllText(transcript, TurnDuration + "{\"type\":\"last-prompt\",\"lastPrompt\":\"\\\"user\\\"\"}\n");
+            File.AppendAllText(transcript, TurnDuration + "{\"type\":\"last-prompt\",\"role\":\"user\"}\n");
             Assert.IsTrue(SessionFiles.ReadTranscriptTail(transcript).ApiError, "bookkeeping records do not count");
         }
 

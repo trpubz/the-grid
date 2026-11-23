@@ -46,7 +46,7 @@ Recommended for slice 1: read source 1 for state, use source 2 only for time-in-
 
 Decided in GRID-44 (2026-11-23): no hooks. Source 2's files are looked at every half second and source 1 is asked when one moves. On eight idle sessions the status was written 0.03 to 1.0 s after the last transcript record, so reading sooner does most of what a `Stop` hook would. Codex's documented `PermissionRequest` input has no field that says whether the owner or the automatic reviewer is asked, so on its own it would report waits that are not the owner's.
 
-**Do not infer state from the end of a transcript.** A classifier that looked for unanswered tool calls marked most finished sessions as "pending". The cause was not run down; the live list makes the heuristic unnecessary.
+**Do not infer state from the end of a transcript.** A classifier that looked for unanswered tool calls marked most finished sessions as "pending". The cause was not run down; the live list makes the heuristic unnecessary. The one exception, since GRID-44: a session the list calls idle whose newest record is marked as an API error.
 
 ## Where the other roster fields come from
 
@@ -119,7 +119,7 @@ Checked again on 2026-11-10 against every transcript on this Mac (599 sends), wh
 | Waiting for permission | Yes |
 | Finished | Yes |
 | Running | Yes |
-| Errored | Background sessions only; interactive needs more work |
+| Errored | Yes (background sessions at first; interactive ones since GRID-44) |
 | Offline | Yes |
 
 ## Still open
