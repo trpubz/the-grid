@@ -177,6 +177,35 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
+        public void AMoveIsActedOnBeforeTheNextPollIsDue()
+        {
+            int calls = 0, stamp = 0;
+            using (var c = new Collector(settings, home, dir => { Interlocked.Increment(ref calls); return IdleJson; }, dir => "v" + Volatile.Read(ref stamp)))
+            {
+                c.Start(60000, 20);
+                SpinWait.SpinUntil(() => Volatile.Read(ref calls) == 1, 5000);
+                Volatile.Write(ref stamp, 1);
+                Assert.IsTrue(SpinWait.SpinUntil(() => Volatile.Read(ref calls) == 2, 1000), "not within a second");
+                Thread.Sleep(200);
+                Assert.AreEqual(2, Volatile.Read(ref calls), "one move, one run");
+            }
+        }
+
+        [Test]
+        public void BetweenPollsNothingIsReadWhenNothingMoved()
+        {
+            int calls = 0, reads = 0, checks = 0;
+            using (var c = new Collector(settings, home, dir => { Interlocked.Increment(ref calls); return BusyJson; }, dir => { Interlocked.Increment(ref checks); return "same"; },
+                now => { Interlocked.Increment(ref reads); return null; }))
+            {
+                c.Start(60000, 20);
+                Assert.IsTrue(SpinWait.SpinUntil(() => Volatile.Read(ref checks) > 4, 5000), "the files are not looked at between polls");
+                Assert.AreEqual(1, Volatile.Read(ref calls));
+                Assert.AreEqual(1, Volatile.Read(ref reads), "a poll ran with nothing moved");
+            }
+        }
+
+        [Test]
         public void AfterTheFullRefreshIntervalTheCommandRunsEvenWithNoChange()
         {
             int calls = 0;

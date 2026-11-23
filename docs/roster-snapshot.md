@@ -46,7 +46,7 @@ A subagent has `agentId`, `description` (what it was asked to do) and `agentType
 | `WaitingForPermission` | The agent needs an approval |
 | `WaitingOther` | Waiting on something else, such as an open dialog |
 | `BackgroundBlocked` | A background session that is blocked |
-| `Errored` | A background session that failed |
+| `Errored` | A background session or a Codex turn that failed, or a session at rest whose last turn ended on an API error |
 | `Finished` | The turn ended; the agent has nothing to do |
 | `Unknown` | The status was not recognised; `rawStatus` says what it was |
 | `Running` | Working |

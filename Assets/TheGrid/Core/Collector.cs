@@ -144,22 +144,45 @@ namespace TheGrid.Core
             return all.ToString();
         }
 
-        public void Start(int intervalMs = 2000)
+        // Whether a directory's sessions may have changed since the last poll.
+        bool Moved()
+        {
+            if (changeStampForConfigDir == null) return false;
+            lock (gate)
+                foreach (var dir in settings.EffectiveConfigDirs(home))
+                {
+                    string stamp;
+                    try { stamp = changeStampForConfigDir(dir); } catch (Exception) { continue; }   // the next poll is told
+                    if (!lastStamp.TryGetValue(dir, out var before) || before != stamp) return true;
+                }
+            return false;
+        }
+
+        // Polls every intervalMs, and in between as soon as the files, looked at every checkMs, say that something moved.
+        public void Start(int intervalMs = 2000, int checkMs = 500)
         {
             if (thread != null) return;
             thread = new Thread(() =>
             {
+                var sincePoll = new Stopwatch();   // not running before the first poll
                 while (!stop.IsSet)
                 {
                     long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                    try { Poll(now); }
+                    try
+                    {
+                        if (!sincePoll.IsRunning || sincePoll.ElapsedMilliseconds >= intervalMs || Moved())
+                        {
+                            sincePoll.Restart();
+                            Poll(now);
+                        }
+                    }
                     catch (Exception e)
                     {
                         // Never let the loop die: keep the rows, show the problem.
                         var keep = latest;
                         latest = new RosterSnapshot { generatedAt = now, agents = keep.agents, errors = new List<string> { "collector: " + e.Message } };
                     }
-                    stop.Wait(intervalMs);
+                    stop.Wait(Math.Min(checkMs, intervalMs));
                 }
             }) { IsBackground = true, Name = "TheGrid.Collector" };
             thread.Start();

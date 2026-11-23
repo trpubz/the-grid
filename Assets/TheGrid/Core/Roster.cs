@@ -122,6 +122,7 @@ namespace TheGrid.Core
             public string TranscriptPath;
             public long TranscriptStamp;
             public string Activity = "", Question = "";
+            public bool ApiError;
         }
 
         readonly Settings settings;
@@ -215,7 +216,25 @@ namespace TheGrid.Core
         void Update(Memory m, LiveSession s, long nowMs)
         {
             var row = m.Row;
+            if (m.TranscriptPath == null) m.TranscriptPath = SessionFiles.FindTranscript(s.ConfigDir, s.SessionId);
+            if (m.TranscriptPath != null)
+            {
+                long stamp = Stamp(m.TranscriptPath);
+                if (stamp != m.TranscriptStamp)
+                {
+                    m.TranscriptStamp = stamp;
+                    var meta = SessionFiles.ReadTranscriptTail(m.TranscriptPath);
+                    if (meta.Branch != "") { row.branch = meta.Branch; row.ticket = Ticket.FromBranch(meta.Branch); }
+                    // A pull request once seen is kept: a later tail read may no longer contain its record.
+                    if (meta.PrNumber > 0) { row.prNumber = meta.PrNumber; row.prUrl = meta.PrUrl; }
+                    m.Activity = meta.Activity;
+                    m.Question = meta.Question;
+                    m.ApiError = meta.ApiError;
+                }
+            }
             var state = LiveSessions.Map(s);
+            // The live list says idle for a turn that ended on an API error too. A background session's own state says which.
+            if (state == AgentState.Finished && m.ApiError && s.Kind != "background") state = AgentState.Errored;
             bool firstSight = !m.Seen;
             bool changed = firstSight || state != m.State;
             m.Seen = true;
@@ -245,21 +264,6 @@ namespace TheGrid.Core
             if (since > 0) row.stateSince = since;
             else if (changed) row.stateSince = firstSight && s.StartedAt > 0 ? s.StartedAt : nowMs;
 
-            if (m.TranscriptPath == null) m.TranscriptPath = SessionFiles.FindTranscript(s.ConfigDir, s.SessionId);
-            if (m.TranscriptPath != null)
-            {
-                long stamp = Stamp(m.TranscriptPath);
-                if (stamp != m.TranscriptStamp)
-                {
-                    m.TranscriptStamp = stamp;
-                    var meta = SessionFiles.ReadTranscriptTail(m.TranscriptPath);
-                    if (meta.Branch != "") { row.branch = meta.Branch; row.ticket = Ticket.FromBranch(meta.Branch); }
-                    // A pull request once seen is kept: a later tail read may no longer contain its record.
-                    if (meta.PrNumber > 0) { row.prNumber = meta.PrNumber; row.prUrl = meta.PrUrl; }
-                    m.Activity = meta.Activity;
-                    m.Question = meta.Question;
-                }
-            }
             // Only a running agent is doing anything; when the transcript cannot say what, it is just working.
             row.activity = state != AgentState.Running ? "" : m.Activity != "" ? m.Activity : Activity.Working;
             row.subagents = Subagents.ReadActive(m.TranscriptPath, nowMs);

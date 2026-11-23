@@ -9,13 +9,13 @@ namespace TheGrid.Core
     public sealed class SessionFileInfo { public long StatusUpdatedAt; public string Entrypoint = ""; }
 
     // Activity is "" when the window read holds no record of the agent's own. Question is the open question at the end of the transcript, if any.
-    public sealed class TranscriptMeta { public string Branch = ""; public int PrNumber; public string PrUrl = ""; public string Activity = ""; public string Question = ""; }
+    public sealed class TranscriptMeta { public string Branch = ""; public int PrNumber; public string PrUrl = ""; public string Activity = ""; public string Question = ""; public bool ApiError; }
 
     // Read-only access to files Claude Code writes under a config directory.
     public static class SessionFiles
     {
         [Serializable] sealed class SessionJson { public long statusUpdatedAt; public string entrypoint; }
-        [Serializable] sealed class Line { public string type, gitBranch, prUrl; public int prNumber; }
+        [Serializable] sealed class Line { public string type, gitBranch, prUrl; public int prNumber; public bool isSidechain, isApiErrorMessage; }
         // An assistant record is parsed with its own class: a user record's content is a string, not a list of blocks.
         [Serializable] sealed class AssistantLine { public string type; public bool isSidechain; public AssistantMessage message; }
         [Serializable] sealed class AssistantMessage { public List<Block> content; }
@@ -37,21 +37,25 @@ namespace TheGrid.Core
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is ArgumentException) { return false; }
         }
 
-        // Moves whenever a session file under <configDir>/sessions is rewritten, added or removed. Claude Code rewrites a
-        // session's file when its status changes and leaves it alone while idle, so this tells a poll whether anything happened.
+        // Moves whenever a session file under <configDir>/sessions, or a background session's <configDir>/jobs/<id>/state.json,
+        // is rewritten, added or removed. Claude Code rewrites a session's file when its status changes and leaves it alone
+        // while idle, so this tells a poll whether anything happened.
         public static string ChangeStamp(string configDir)
         {
             try
             {
-                var dir = Path.Combine(configDir, "sessions");
-                if (!Directory.Exists(dir)) return "";
-                var files = Directory.GetFiles(dir, "*.json");
-                Array.Sort(files, StringComparer.Ordinal);
+                var files = new List<string>();
+                var sessions = Path.Combine(configDir, "sessions");
+                if (Directory.Exists(sessions)) files.AddRange(Directory.GetFiles(sessions, "*.json"));
+                var jobs = Path.Combine(configDir, "jobs");
+                if (Directory.Exists(jobs))
+                    foreach (var job in Directory.GetDirectories(jobs)) files.Add(Path.Combine(job, "state.json"));
+                files.Sort(StringComparer.Ordinal);
                 var sb = new StringBuilder();
                 foreach (var f in files)
                 {
                     var fi = new FileInfo(f);
-                    sb.Append(fi.Name).Append(':').Append(fi.LastWriteTimeUtc.Ticks).Append(':').Append(fi.Length).Append(';');
+                    if (fi.Exists) sb.Append(f, configDir.Length, f.Length - configDir.Length).Append(':').Append(fi.LastWriteTimeUtc.Ticks).Append(':').Append(fi.Length).Append(';');
                 }
                 return sb.ToString();
             }
@@ -99,8 +103,8 @@ namespace TheGrid.Core
 
             // Newest first, and stop parsing branch lines once one is found: nearly every line carries the branch.
             var lines = text.Substring(from, end - from).Split('\n');
-            bool haveBranch = false, havePr = false, haveActivity = false;
-            for (int i = lines.Length - 1; i >= 0 && !(haveBranch && havePr && haveActivity); i--)
+            bool haveBranch = false, havePr = false, haveActivity = false, haveLast = false;
+            for (int i = lines.Length - 1; i >= 0 && !(haveBranch && havePr && haveActivity && haveLast); i--)
             {
                 var line = lines[i];
                 // The newest record of the agent's own decides what it is doing.
@@ -112,11 +116,14 @@ namespace TheGrid.Core
                 }
                 bool branchLine = !haveBranch && line.IndexOf("\"gitBranch\"", StringComparison.Ordinal) >= 0;
                 bool prLine = !havePr && line.IndexOf("\"pr-link\"", StringComparison.Ordinal) >= 0;
-                if (!branchLine && !prLine) continue;
+                // The newest record of the conversation says whether it ended on an API error.
+                bool talkLine = !haveLast && (line.IndexOf("\"assistant\"", StringComparison.Ordinal) >= 0 || line.IndexOf("\"user\"", StringComparison.Ordinal) >= 0);
+                if (!branchLine && !prLine && !talkLine) continue;
                 Line r;
                 try { r = JsonUtility.FromJson<Line>(line); }
                 catch (ArgumentException) { continue; }
                 if (r == null) continue;
+                if (talkLine && !r.isSidechain && (r.type == "assistant" || r.type == "user")) { meta.ApiError = r.isApiErrorMessage; haveLast = true; }
                 if (branchLine && !string.IsNullOrEmpty(r.gitBranch)) { meta.Branch = r.gitBranch; haveBranch = true; }
                 if (prLine && r.type == "pr-link" && r.prNumber > 0) { meta.PrNumber = r.prNumber; meta.PrUrl = r.prUrl ?? ""; havePr = true; }
             }
