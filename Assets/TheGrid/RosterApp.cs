@@ -112,7 +112,7 @@ namespace TheGrid
                 if (Arg("-pulls") != "") pullsFixed = JsonUtility.FromJson<PullsSnapshot>(File.ReadAllText(Arg("-pulls")));
                 whereFixed = Arg("-where");   // nor does it ask zellij where a session lives: for a picture, the card is told
                 shotsDir = Arg("-shots");
-                world.EdgeMoves = shotsDir == "";   // a pointer left at the window's edge does not move the map out of a picture
+                world.PointerActs = shotsDir == "";   // a pointer left over the window neither moves the map out of a picture nor names a bot in it
                 if (shotsDir != "")
                 {
                     pictures = true;

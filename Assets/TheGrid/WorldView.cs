@@ -20,7 +20,8 @@ namespace TheGrid
         Transform holder;
         WorldStage stage;
         WorldTraffic traffic;
-        readonly List<Rect> botNames = new List<Rect>();
+        readonly List<Rect> noNames = new List<Rect>();   // where a bot's name may not go
+        readonly List<(Rect plate, string name, GUIStyle style)> named = new List<(Rect, string, GUIStyle)>();   // the bots' names that show
         // The names the owner can take hold of, where each was last drawn: a region's (its workspace's name) and a sector's
         // (its plot). A press on one and a drag moves the region, or the sector within its region.
         readonly List<(Rect plate, string region, int plot)> handles = new List<(Rect, string, int)>();
@@ -173,8 +174,8 @@ namespace TheGrid
 
         public void ZoomBy(int steps) => level = Iso.ClampLevel(level + steps);
 
-        // False to keep the map still under a pointer at its edge: for pictures.
-        public bool EdgeMoves = true;
+        // False for pictures: a pointer at the map's edge does not move it, and one on a bot does not name it.
+        public bool PointerActs = true;
         const float EdgePoints = 28f, EdgeSpeed = 600f;   // how wide the edge is, and how fast the map moves, in the window's points
         float wheel, wheelAt = -10f;                      // what the wheel has turned toward its next level, and when it last zoomed
         Func<Vector2, bool> taken;                        // as the last Gui was told: where panels are, and whether the map listens
@@ -250,7 +251,7 @@ namespace TheGrid
             if (stage.Walking || riding) fastUntil = now + .2f;
             // The pointer resting at an edge of the map moves the map that way: not while something is being dragged, nor
             // over a panel, nor while this is not the window in front.
-            if (EdgeMoves && !deaf && !dragging && Application.isFocused)
+            if (PointerActs && !deaf && !dragging && Application.isFocused)
             {
                 var pointer = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y) / pointScale;
                 var push = taken != null && taken(pointer) ? Vector2.zero : Iso.EdgePan(view, pointer, EdgePoints);
@@ -319,25 +320,38 @@ namespace TheGrid
             // With something open over the whole window, the map takes no press, scroll or key: they are for what is open.
             if (listens) Handle(e, covered);
             if (e.type != EventType.Repaint) return;
+            var pointer = e.mousePosition - view.position;
+            // The map has the pointer: it is over the map and nothing drawn over it, and is not dragging anything.
+            bool pointed = PointerActs && listens && !(dragging && moved) && view.Contains(e.mousePosition) && (covered == null || !covered(e.mousePosition));
 
             if (picture != null) GUI.DrawTexture(new Rect(view.x, view.y, pixelW / pointScale, pixelH / pointScale), picture, ScaleMode.StretchToFill, false);
             GUI.BeginGroup(view);
             if (model.sectors.Count == 0) GUI.Label(new Rect(8, 8, view.width - 16, 20), "No live agent sessions.", label);
             bool up = (int)(Time.unscaledTime / BounceSeconds) % 2 == 0;
-            // Where the bots' names will go: a building's name gives way to them.
-            botNames.Clear();
+            // The bots' names that show, and where they will go: clear of the sectors' names. A building's name gives way to them.
+            noNames.Clear();
+            named.Clear();
             handles.Clear();
             if (!Far)
-                foreach (var sector in model.sectors)
-                    foreach (var b in sector.bots)
-                        if (stage.TryGetBot(b.key, out var at))
-                        {
-                            var plate = Plate(ToView(at - new Vector2(0, 8)), BotName(b), label);
-                            if (plate.width > 0) botNames.Add(plate);
-                        }
+            {
+                foreach (var sector in model.sectors) noNames.Add(Plate(OnLane(sector), sector.name, loud));
+                // A pointer on a sector's name is on the name, as a click there is.
+                string under = pointed && !noNames.Exists(n => n.Contains(pointer)) ? stage.Pick(ToWorld(pointer)) : "";
+                foreach (var key in MapNames.Shown(Selected, under))
+                    foreach (var sector in model.sectors)
+                        foreach (var b in sector.bots)
+                            if (b.key == key && stage.TryGetBot(key, out var at))
+                            {
+                                var style = key == Selected ? loud : label;
+                                var plate = Plate(ToView(at - new Vector2(0, 8)), BotName(b), style);
+                                if (plate.width <= 0) continue;
+                                plate = MapNames.Clear(plate, noNames);
+                                noNames.Add(plate);
+                                named.Add((plate, BotName(b), style));
+                            }
+            }
             foreach (var sector in model.sectors)
             {
-                var o = sector.origin;
                 if (Far)
                 {
                     // Too far to make out bots: the sector's name, how many of its bots need the owner and how many are done.
@@ -353,7 +367,7 @@ namespace TheGrid
                 }
                 // The sector's name lies on the lane along its front. A building's name floats over its roof. A bot at a
                 // door behind a low building has its name there too: then the building goes unnamed, and is known by sight.
-                var onLane = ToView(Iso.Point(o.x + 5.5f, o.y + Iso.PlotTiles + .5f)) - new Vector2(0, 9);
+                var onLane = OnLane(sector);
                 Text(onLane, sector.name, loud);
                 handles.Add((Plate(onLane, sector.name, loud), "", sector.plot));
                 foreach (Structure s in Enum.GetValues(typeof(Structure)))
@@ -365,7 +379,7 @@ namespace TheGrid
                     var plate = Plate(at, called, label);
                     plate = new Rect(plate.x + 6, plate.y + 3, plate.width - 12, plate.height - 6);   // plates that only touch both stay
                     bool taken = false;
-                    foreach (var name in botNames) taken |= name.Overlaps(plate);
+                    foreach (var n in named) taken |= n.plate.Overlaps(plate);
                     if (!taken) Text(at, called, label);
                 }
             }
@@ -381,11 +395,7 @@ namespace TheGrid
                     Text(at, model.regions[r].name, loud);
                 }
             // Bots are named last, over everything: where two sectors meet, a bot's name matters more than a roof's.
-            if (!Far)
-                foreach (var sector in model.sectors)
-                    foreach (var b in sector.bots)
-                        if (stage.TryGetBot(b.key, out var at))
-                            Text(ToView(at - new Vector2(0, 8)), BotName(b), b.key == Selected ? loud : label);
+            foreach (var n in named) Text(new Vector2(n.plate.center.x, n.plate.y), n.name, n.style);
             // Badges go on last of all, over buildings and over names: what a bot needs from the owner is never covered.
             // The three that need the owner bounce; done does not.
             float k = Iso.Zoom[level] / pointScale;
@@ -445,6 +455,9 @@ namespace TheGrid
             sector = heldPlot < 0 ? null : model.sectors.Find(s => s.plot == heldPlot);
             return region >= 0 || sector != null;
         }
+
+        // Where a sector's name is, closer in: on the lane along its front.
+        Vector2 OnLane(WorldSector sector) => ToView(Iso.Point(sector.origin.x + 5.5f, sector.origin.y + Iso.PlotTiles + .5f)) - new Vector2(0, 9);
 
         static string BotName(WorldBot b) => b.subagents > 0 ? b.name + " +" + b.subagents : b.name;
 
