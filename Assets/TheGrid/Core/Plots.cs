@@ -116,6 +116,23 @@ namespace TheGrid.Core
             moved = true;
         }
 
+        // A workspace's other name: its region and its sectors stay where they are. What a workspace of that name left
+        // behind when it went is dropped.
+        public void Rename(string from, string to)
+        {
+            if (from == to) return;
+            int left = placed.IndexOf(to);
+            if (left >= 0)
+            {
+                placed.RemoveAt(left);
+                if (left < origins.Count) origins.RemoveAt(left);
+            }
+            int at = placed.IndexOf(from);
+            if (at >= 0) placed[at] = to;
+            for (int i = 0; i < regions.Count; i++) regions[i] = regions[i] == to ? "" : regions[i] == from ? to : regions[i];
+            moved = true;
+        }
+
         // The owner's moves. Whether a move is allowed is World.CanMoveRegion and World.CanMoveSector's to say.
         public void MoveRegion(string workspace, Vector2Int by)
         {

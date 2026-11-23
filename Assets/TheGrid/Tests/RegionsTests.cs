@@ -181,6 +181,70 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(0, Sector(w, "work/a").bots.Count);
         }
 
+        static Settings HomeFirmWork()
+        {
+            var s = new Settings { workspaces = new List<string> { "home", "firm", "work" }, defaultWorkspace = "home" };
+            foreach (var r in Three) s.SetWorkspace("/" + r, r.Split('/')[0]);
+            return s;
+        }
+
+        static Dictionary<string, Vector2Int> Places(WorldModel w) => w.sectors.ToDictionary(s => s.repoRoot, s => s.origin);
+
+        [Test]
+        public void ARenamedWorkspacesRegionAndSectorsStayWhereTheyAreThroughSaveAndLoad()
+        {
+            var settings = HomeFirmWork();
+            var plots = new Plots();
+            var w = World.Build(Of(Three), plots, settings);
+            plots.MoveRegion("firm", new Vector2Int(400, 0));   // places the owner picked
+            plots.MoveSector(Sector(w, "firm/a").plot, new Vector2Int(5, 5));
+            var before = Places(World.Build(Of(Three), plots, settings));
+            var snap = Of(Three);
+            Assert.AreEqual("", settings.Rename("firm", "Studio"));
+            plots.Rename("firm", "Studio");
+            var path = Path.Combine(tmp, "world.json");
+            plots.SaveIfGrown(path);
+            plots = Plots.Load(path);
+            RosterBuilder.Place(snap, settings);
+            w = World.Build(snap, plots, settings);
+            CollectionAssert.AreEquivalent(before, Places(w));
+            CollectionAssert.AreEqual(new[] { "home", "Studio", "work" }, w.regions.Select(r => r.name).ToArray());
+            Assert.AreEqual("Studio", Sector(w, "firm/a").workspace);
+        }
+
+        [Test]
+        public void ARosterReadUnderTheOldNameMovesNothingWhenDrawnAfterTheRename()
+        {
+            var settings = HomeFirmWork();
+            var plots = new Plots();
+            World.Build(Of(Three), plots, settings);
+            var before = Places(World.Build(Of(Three), plots, settings));
+            settings.Rename("firm", "Studio");
+            plots.Rename("firm", "Studio");
+            var late = Of(Three);   // says firm
+            RosterBuilder.Place(late, settings);
+            CollectionAssert.AreEquivalent(before, Places(World.Build(late, plots, settings)));
+            CollectionAssert.DoesNotContain(plots.placed, "firm");
+        }
+
+        [Test]
+        public void ARenamedRegionTakesNoPlaceLeftByOneOfThatNameBefore()
+        {
+            var plots = new Plots();
+            plots.SetOrigin("Studio", new Vector2Int(9, 9));   // its workspace has gone
+            plots.SetOrigin("firm", new Vector2Int(40, 40));
+            plots.SetCell(0, "firm", new Vector2Int(1, 2));
+            plots.SetCell(1, "Studio", new Vector2Int(1, 2));
+            plots.Rename("firm", "Studio");
+            Assert.IsTrue(plots.TryOrigin("Studio", out var at));
+            Assert.AreEqual(new Vector2Int(40, 40), at);
+            CollectionAssert.AreEqual(new[] { "Studio" }, plots.placed);
+            Assert.AreEqual(1, plots.origins.Count);
+            Assert.IsTrue(plots.TryCell(0, "Studio", out var cell));
+            Assert.AreEqual(new Vector2Int(1, 2), cell);
+            Assert.IsFalse(plots.TryCell(1, "Studio", out _));
+        }
+
         [Test]
         public void OnAFirstRunARepoWithNobodyInItIsGivenANewWorkspaceAndStandsInARegionOfItsOwn()
         {

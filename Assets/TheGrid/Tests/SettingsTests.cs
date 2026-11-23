@@ -106,6 +106,85 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(1, again.LookFor("Work", 1));
         }
 
+        static Settings TwoWorkspaces()
+        {
+            var s = new Settings { workspaces = new List<string> { "Personal", "Work", "Play" } };
+            s.SetWorkspace("/work/alpha", "Work");
+            s.SetWorkspace("/work/beta", "Work");
+            s.SetWorkspace("/work/gamma", "Play");
+            s.CycleLight("Work", 1);
+            return s;
+        }
+
+        [Test]
+        public void ARenamedWorkspaceKeepsItsReposItsPlaceAndItsLightThroughSaveAndLoad()
+        {
+            var s = TwoWorkspaces();
+            Assert.AreEqual("", s.Rename("Work", "  Studio "));
+            s.Save(file);
+            s = Settings.Load(file);
+            CollectionAssert.AreEqual(new[] { "Personal", "Studio", "Play" }, s.workspaces);
+            Assert.AreEqual("Studio", s.WorkspaceFor("/work/alpha"));
+            Assert.AreEqual("Studio", s.WorkspaceFor("/work/beta"));
+            Assert.AreEqual("Play", s.WorkspaceFor("/work/gamma"));
+            Assert.AreEqual(2, s.LookFor("Studio", 1));
+            Assert.AreEqual("", s.Rename("Studio", "STUDIO"), "only the case of its own name");
+            Assert.AreEqual("STUDIO", s.WorkspaceFor("/work/alpha"));
+            Assert.AreEqual("", s.Rename("STUDIO", "STUDIO"));
+        }
+
+        [Test]
+        public void TheWorkspaceOfReposNotListedCanBeRenamedAndTheyFollowIt()
+        {
+            var s = TwoWorkspaces();
+            Assert.AreEqual("", s.Rename("Personal", "Home"));
+            s.Save(file);
+            s = Settings.Load(file);
+            Assert.AreEqual("Home", s.WorkspaceFor("/not/listed"));
+            Assert.AreEqual("Home", s.WorkspaceFor(""));
+            CollectionAssert.AreEqual(new[] { "Home", "Work", "Play" }, s.workspaces);
+            var live = new Settings();
+            live.Reload(file);
+            Assert.AreEqual("Home", live.WorkspaceFor("/not/listed"));
+            File.WriteAllText(file, "{\"defaultWorkspace\":\"\",\"workspaces\":[]}");
+            Assert.AreEqual("Personal", Settings.Load(file).WorkspaceFor("/not/listed"));
+        }
+
+        [Test]
+        public void ANameInUseOrEmptyIsRefusedWithAReasonAndNothingChanges()
+        {
+            var s = TwoWorkspaces();
+            string before = UnityEngine.JsonUtility.ToJson(s);
+            Assert.AreEqual("“Play” is already a workspace.", s.Rename("Work", "play"));
+            Assert.AreEqual("A workspace needs a name.", s.Rename("Work", "  "));
+            Assert.AreEqual("A workspace needs a name.", s.Rename("Work", null));
+            Assert.AreEqual("“Personal” is already a workspace.", s.AddWorkspace("PERSONAL"));
+            Assert.AreEqual("A workspace needs a name.", s.AddWorkspace(""));
+            Assert.AreEqual(before, UnityEngine.JsonUtility.ToJson(s));
+            // a name only a repo or the default has, after the list was edited by hand, is in use too
+            s.workspaces = new List<string> { "Work" };
+            Assert.AreEqual("“Play” is already a workspace.", s.Rename("Work", "Play"));
+            Assert.AreEqual("“Personal” is already a workspace.", s.AddWorkspace("personal"));
+        }
+
+        [Test]
+        public void AWorkspaceIsMadeWithNoRepoAndComesLast()
+        {
+            var s = TwoWorkspaces();
+            Assert.AreEqual("", s.AddWorkspace("  Open source "));
+            CollectionAssert.AreEqual(new[] { "Personal", "Work", "Play", "Open source" }, s.workspaces);
+        }
+
+        [Test]
+        public void ARenamedWorkspaceTakesNoLightLeftByOneOfThatNameBefore()
+        {
+            var s = TwoWorkspaces();
+            s.workspaceLights.Add(new WorkspaceLight { workspace = "Studio", light = "ember" });   // its workspace was taken out by hand
+            Assert.AreEqual("", s.Rename("Work", "Studio"));
+            Assert.AreEqual(2, s.LookFor("Studio", 1));
+            Assert.AreEqual(1, s.workspaceLights.Count);
+        }
+
         [Test]
         public void ASessionWithNoRepoCannotBeAssigned()
         {
