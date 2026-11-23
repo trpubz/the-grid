@@ -129,10 +129,28 @@ namespace TheGrid.Core.Tests
             int calls = 0;
             using (var c = new Collector(settings, home, dir => { calls++; return IdleJson; }, dir => "same"))
             {
-                var first = c.Poll(Now);
-                var second = c.Poll(Now + 2000);
+                c.Poll(Now);
+                var settled = c.Poll(Now + Collector.SettleMs - 1);
+                var after = c.Poll(Now + Collector.SettleMs);
                 Assert.AreEqual(1, calls);
-                Assert.AreSame(first, second);
+                Assert.AreSame(settled, after);
+            }
+        }
+
+        [Test]
+        public void ARecordThatReachesTheTranscriptAfterTheStatusIsStillSeenSoonWithoutRunningTheCommand()
+        {
+            var project = Path.Combine(home, ".claude", "projects", "p");
+            Directory.CreateDirectory(project);
+            var transcript = Path.Combine(project, "s-1.jsonl");
+            File.WriteAllText(transcript, Assistant("Edit", "{}"));
+            int calls = 0;
+            using (var c = new Collector(settings, home, dir => { calls++; return IdleJson; }, dir => "same"))
+            {
+                Assert.AreEqual("Finished", c.Poll(Now).agents[0].state);
+                File.AppendAllText(transcript, "{\"type\":\"assistant\",\"isApiErrorMessage\":true,\"message\":{\"role\":\"assistant\",\"content\":[]}}\n");
+                Assert.AreEqual("Errored", c.Poll(Now + 2000).agents[0].state);
+                Assert.AreEqual(1, calls);
             }
         }
 

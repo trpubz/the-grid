@@ -55,6 +55,9 @@ namespace TheGrid.Core
         readonly string home;
         // A quiet directory is still asked this often: background sessions leave no session file to watch.
         public const long FullRefreshMs = 30000;
+        // A record can reach its transcript up to 11 s after its own time (seen), so perhaps after the status it goes with: for
+        // this long after the command ran, each poll rebuilds the roster, which reads only transcripts that changed.
+        public const long SettleMs = 12000;
 
         readonly Func<string, string> agentsJsonForConfigDir;
         readonly Func<string, string> changeStampForConfigDir;
@@ -65,6 +68,7 @@ namespace TheGrid.Core
         readonly Dictionary<string, List<LiveSession>> lastGood = new Dictionary<string, List<LiveSession>>();
         readonly Dictionary<string, string> lastStamp = new Dictionary<string, string>();
         readonly Dictionary<string, long> lastRunAt = new Dictionary<string, long>();
+        long settledAt;
         readonly HashSet<string> failed = new HashSet<string>();
         readonly object gate = new object();
         readonly ManualResetEventSlim stop = new ManualResetEventSlim(false);
@@ -104,6 +108,7 @@ namespace TheGrid.Core
                     {
                         anyRead = true;
                         lastRunAt[dir] = nowMs;
+                        settledAt = nowMs + SettleMs;
                         lastStamp[dir] = stamp;
                         List<LiveSession> sessions = null;
                         string error;
@@ -115,7 +120,7 @@ namespace TheGrid.Core
                     // A failed read reuses the last good one, so a hiccup never looks like every agent going offline.
                     if (lastGood.TryGetValue(dir, out var keep)) live.AddRange(keep);
                 }
-                // Nothing changed and nobody is working: no command run, no files read. While an agent runs, the roster is
+                // Nothing changed lately and nobody is working: no command run, no files read. While an agent runs, the roster is
                 // rebuilt from the last session lists so its activity keeps up; only transcripts that changed are read again.
                 // The other app's rows: a failed read keeps the last ones and says so.
                 var more = othersLast;
@@ -127,7 +132,7 @@ namespace TheGrid.Core
                         anyRead = true;
                     }
                 string moreIs = Signature(more);
-                if (!anyRead && moreIs == othersWere && !live.Exists(s => LiveSessions.Map(s) == AgentState.Running)) return latest;
+                if (!anyRead && nowMs >= settledAt && moreIs == othersWere && !live.Exists(s => LiveSessions.Map(s) == AgentState.Running)) return latest;
                 othersLast = more;
                 othersWere = moreIs;
                 return latest = RosterBuilder.With(builder.Build(live, errors, nowMs), more);

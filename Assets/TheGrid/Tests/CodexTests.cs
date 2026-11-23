@@ -254,9 +254,10 @@ namespace TheGrid.Core.Tests
                 Assert.AreEqual("codex", first.agents[0].account);
                 Assert.AreEqual("BlockedOnQuestion", first.agents[0].state);
                 Assert.AreEqual("Finished", first.agents[1].state);
-                Assert.AreSame(first, c.Poll(Now + 2000), "nothing changed");
+                first = c.Poll(Now + Collector.SettleMs - 1);
+                Assert.AreSame(first, c.Poll(Now + Collector.SettleMs), "nothing changed");
                 Write(Id, 1000, Meta(Id, repo), Prompt("hello"), Event("task_started", At0), Said(Asked), Prompt("this one"), Event("task_complete", At5));
-                var second = c.Poll(Now + 4000);
+                var second = c.Poll(Now + Collector.SettleMs + 2000);
                 Assert.AreNotSame(first, second);
                 Assert.AreEqual("Finished", second.agents.Find(a => a.account == "codex").state);
             }
