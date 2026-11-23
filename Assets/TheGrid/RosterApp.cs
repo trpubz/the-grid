@@ -27,6 +27,7 @@ namespace TheGrid
         PullReader pullReader;                 // asks GitHub about open pull requests, while that is turned on; null on a snapshot
         PullsSnapshot pullsFixed, pullsFrom;   // a snapshot's pull requests from a file; and the ones worldDrawn was built from
         string workspaceFor = "";              // the repo whose workspace list is open, by its root; "" for none
+        bool workspacesOpen;                   // the panel of all workspaces
         Vector2 workspaceAt;                   // where the list was asked for, in screen points
         string cloudFor = "";                  // the repo a cloud session is being brought to, by its root; "" for none
         List<string> cloudDirs = new List<string>();   // the accounts' folders, as the cloud panel lists them
@@ -204,6 +205,7 @@ namespace TheGrid
                 workspaceFor = listed.repoRoot;
                 workspaceAt = new Vector2(Screen.width * .3f, Screen.height * .3f);
             }
+            workspacesOpen = Arg("-workspaces") == "open";   // or with the panel of all workspaces
             var brought = worldDrawn.sectors.Find(s => s.name == Arg("-cloud"));   // or with the cloud panel open for that sector, -pasted in its box
             if (brought != null && brought.repoRoot != "")
             {
@@ -295,6 +297,7 @@ namespace TheGrid
             if (Event.current.type == EventType.Layout)
             {
                 drawn = fixedSnap ?? collector.Latest;
+                if (fixedSnap == null) RosterBuilder.Place(drawn, settings);
                 if (pile != null) pileDrawn = pile.Latest;
                 tab = nextTab;
                 worldOpen = nextWorldOpen;
@@ -320,11 +323,12 @@ namespace TheGrid
             {
                 int unticked = 0;
                 foreach (var r in pileDrawn.rows) if (!r.ticked) unticked++;
-                int picked = GUILayout.Toolbar(worldOpen ? 2 : tab, new[] { "Agents (" + drawn.agents.Count + ")", "Messages (" + unticked + ")", "World" }, button);
+                int picked = GUILayout.Toolbar(worldOpen ? 2 : tab, new[] { "Agents (" + drawn.agents.Count + ")", "Messages (" + unticked + ")", "World" }, button, GUILayout.MaxWidth(width - 190));   // the buttons beside it stay in the window
                 nextWorldOpen = picked == 2;
                 if (picked < 2) nextTab = picked;
             }
             GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Workspaces", button, GUILayout.Width(100))) workspacesOpen = true;
             if (worldOpen)
             {
                 if (GUILayout.Button("−", button, GUILayout.Width(28))) world.ZoomBy(-1);
@@ -350,8 +354,11 @@ namespace TheGrid
                 else if (tab == 0) DrawRoster(area, drawn, now);
                 else DrawPile(area, pileDrawn, now);
             }
-            if (workspaceFor != "") DrawWorkspaces(new Rect(0, 0, width + 16, height + 12));
-            if (cloudFor != "") DrawCloud(new Rect(0, 0, width + 16, height + 12));
+            var window = new Rect(0, 0, width + 16, height + 12);
+            if (workspaceFor != "") DrawWorkspaces(window);
+            else if (workspacesOpen && cloudFor == "")   // a repo's list, or what that opened, stands in its place until it is put away
+                panels.AllWorkspaces(window, Panels.Workspaces(drawn, plots.repos, settings), detail, title, OpenWorkspaces, RenameWorkspace, AddWorkspace, () => workspacesOpen = false);
+            if (cloudFor != "") DrawCloud(window);
         }
 
         // The map, and over it who needs the owner and the card of the bot that was clicked. All from the snapshot the lists draw.
@@ -369,16 +376,7 @@ namespace TheGrid
                     pullReader?.Watch(plots.repos);   // a repo new to the map is asked about at once
                     needsYou = Panels.NeedsYou(drawn);
                 }
-                if (fixedSnap == null)
-                {
-                    // A failed write is tried again on the next pass, so new plots are not lost when the disk recovers; it is logged once, not ten times a second.
-                    try { plots.SaveIfGrown(plotsPath); }
-                    catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
-                    {
-                        if (plotsWarned != plots.repos.Count) Debug.LogWarning("[world] could not save plots, will keep trying: " + e.Message);
-                        plotsWarned = plots.repos.Count;
-                    }
-                }
+                if (fixedSnap == null) TrySavePlots();
                 world.Show(worldDrawn, map, scale);
                 if (selectOnOpen != "")
                 {
@@ -424,7 +422,7 @@ namespace TheGrid
             }
             var depotOf = depotOpen < 0 ? null : worldDrawn.sectors.Find(s => s.plot == depotOpen);
             panels.Place(map, needsYou.Count, card, detail, depotOf);
-            world.Gui(detail, title, panels.Covers, workspaceFor == "" && cloudFor == "");   // while the list of workspaces or the cloud panel is open, the map is deaf
+            world.Gui(detail, title, panels.Covers, workspaceFor == "" && cloudFor == "" && !workspacesOpen);   // while one of the panels that stand over everything is open, the map is deaf
             if (drawn.errors.Count > 0) GUI.Label(new Rect(map.x + 4, map.y + 4, map.width - 8, 32), string.Join(" | ", drawn.errors), error);
             string notAsked = depotOf == null ? "" : depotOf.repoRoot == "" ? "Sessions with no repo have no pull requests."
                 : fixedSnap != null ? "This snapshot has no pull requests for this repo."
@@ -603,7 +601,7 @@ namespace TheGrid
             if (!names.Contains(current)) names.Add(current);
             string repo = row != null ? row.repoName : Path.GetFileName(workspaceFor.TrimEnd('/'));
             panels.Workspaces(window, GUIUtility.ScreenToGUIPoint(workspaceAt), repo, current, names, detail, title,
-                name => { GiveWorkspace(workspaceFor, name); workspaceFor = ""; }, () => workspaceFor = "", () => OpenCloud(workspaceFor, ""));
+                name => { GiveWorkspace(workspaceFor, name); workspaceFor = ""; }, RenameWorkspace, () => workspaceFor = "", () => OpenCloud(workspaceFor, ""));
         }
 
         // Opens the panel that brings a cloud session to a repo, in place of the list of workspaces it was asked from.
@@ -640,12 +638,7 @@ namespace TheGrid
         // The collector reads these settings on its own thread; a read that overlaps this change shows up as one error line for one pass.
         void GiveWorkspace(string repoRoot, string name)
         {
-            // On a snapshot the repo changes workspace for as long as the app is open: there is no settings file to keep it in.
-            if (fixedSnap == null) settings.Reload(settingsPath); // pick up what was changed by hand since the app started
-            pullReader?.Wake();                                   // and the pull request setting: off stops the asking, on starts it
-            // Every workspace in use is in the list first, so that a new one comes after them all and takes the next light.
-            foreach (var a in drawn.agents)
-                if (a.workspace != "" && !settings.workspaces.Contains(a.workspace)) settings.workspaces.Add(a.workspace);
+            BeforeWorkspaces();
             string given = settings.SetWorkspace(repoRoot, name);
             if (fixedSnap == null) TrySave();
             // The lists and the card show it at once; the collector's next pass will say the same.
@@ -653,6 +646,49 @@ namespace TheGrid
                 if (a.repoRoot == repoRoot) a.workspace = given;
             pile?.Refresh();   // the cross-workspace flags follow the new assignment
             worldFrom = null;  // the same roster, in other regions: build the world again
+        }
+
+        // Before any change to the workspaces.
+        void BeforeWorkspaces()
+        {
+            // On a snapshot a change lasts for as long as the app is open: there is no settings file to keep it in.
+            if (fixedSnap == null)
+            {
+                settings.Reload(settingsPath);   // pick up what was changed by hand since the app started
+                RosterBuilder.Place(drawn, settings);
+            }
+            pullReader?.Wake();   // and the pull request setting: off stops the asking, on starts it
+            // Every workspace in use is in the list first, so that a new one comes after them all and takes the next light.
+            foreach (var g in Panels.Workspaces(drawn, plots.repos, settings))
+                if (!settings.workspaces.Contains(g.name)) settings.workspaces.Add(g.name);
+        }
+
+        // Says why not, or "" when it is done.
+        string RenameWorkspace(string from, string to)
+        {
+            BeforeWorkspaces();
+            string why = settings.Rename(from, to);
+            if (why != "") return why;
+            to = to.Trim();
+            plots.Rename(from, to);
+            if (fixedSnap == null)
+            {
+                TrySave();
+                TrySavePlots();   // now, also when the map is not open: under the old name its places would be lost at the next start
+            }
+            foreach (var a in drawn.agents)
+                if (a.workspace == from) a.workspace = to;
+            pile?.Refresh();
+            worldFrom = null;
+            return "";
+        }
+
+        string AddWorkspace(string name)
+        {
+            BeforeWorkspaces();
+            string why = settings.AddWorkspace(name);
+            if (why == "" && fixedSnap == null) TrySave();
+            return why;
         }
 
         // A click on a region's name: the region takes the next light, and keeps it.
@@ -699,6 +735,17 @@ namespace TheGrid
             settings.programPinned = !program.Pinned;   // flip what the card shows, not what the file said
             TrySave();
             program.Pinned = settings.programPinned;
+        }
+
+        // A failed write is tried again when the map is next drawn, so new plots are not lost when the disk recovers; it is logged once, not ten times a second.
+        void TrySavePlots()
+        {
+            try { plots.SaveIfGrown(plotsPath); }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+            {
+                if (plotsWarned != plots.repos.Count) Debug.LogWarning("[world] could not save plots, will keep trying: " + e.Message);
+                plotsWarned = plots.repos.Count;
+            }
         }
 
         void TrySave()

@@ -257,44 +257,189 @@ namespace TheGrid
         // The list a repo's workspace is picked from, drawn over everything else, at `at` or as near as fits the window. A
         // click on a workspace gives it to the repo; a name typed in the last line makes a new one. `give` is called with
         // the name, `close` when the owner puts the list away. Until one of them is, nothing under the list takes a click.
+        // `rename` is called with a workspace's name and its new one, and says why not, or "".
         // Its last line is not a workspace: `cloud` is called when the owner wants a cloud session brought to this repo.
-        public void Workspaces(Rect window, Vector2 at, string repo, string current, List<string> names, GUIStyle text, GUIStyle strong, Action<string> give, Action close, Action cloud)
+        public void Workspaces(Rect window, Vector2 at, string repo, string current, List<string> names, GUIStyle text, GUIStyle strong, Action<string> give, Func<string, string, string> rename, Action close, Action cloud)
         {
-            float high = TitleHigh + names.Count * ListRow + 34 + ListRow;
+            float high = TitleHigh + names.Count * ListRow + WhyHigh(names.Contains(renaming)) + 34 + ListRow;
             var list = new Rect(Panels.Fit(at, new Vector2(ListWide, high), window), new Vector2(ListWide, high));
             GUI.ModalWindow(0x6c697374, list, id =>
             {
                 var e = Event.current;
                 var all = new Rect(0, 0, list.width, list.height);
-                bool away = e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape || e.type == EventType.MouseDown && !all.Contains(e.mousePosition);
-                // Seen before the text field is drawn, which may take the key for itself.
-                bool enter = e.type == EventType.KeyDown && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter);
+                Keys(e, all, out bool away, out bool enter);
                 Back(all);
-                GUI.Label(new Rect(8, 3, all.width - 40, 22), repo + " · workspace", strong);
-                GUI.Label(new Rect(all.width - 22, 3, 16, 22), "×", strong);
-                away |= GUI.Button(new Rect(all.width - 30, 0, 30, TitleHigh), GUIContent.none, GUIStyle.none);
+                Title(all, repo + " · workspace", strong, ref away);
                 string picked = "";
-                for (int i = 0; i < names.Count; i++)
+                float y = TitleHigh;
+                foreach (var name in names)
                 {
-                    var row = new Rect(1, TitleHigh + i * ListRow, all.width - 2, ListRow);
-                    if (names[i] == current) Fill(new Rect(10, row.y + 9, 6, 6), Lit);   // the one the repo is in
-                    GUI.Label(new Rect(24, row.y + 2, row.width - 30, 20), names[i], text);
-                    if (GUI.Button(row, GUIContent.none, GUIStyle.none)) picked = names[i];
+                    var row = new Rect(1, y, all.width - 2, ListRow);
+                    if (name == current && name != renaming) Fill(new Rect(10, row.y + 9, 6, 6), Lit);   // the one the repo is in
+                    if (NameRow(row, name, text, text, enter, rename, ref y) && GUI.Button(new Rect(row.x, row.y, row.width - RenameWide, row.height), GUIContent.none, GUIStyle.none)) picked = name;
                 }
-                var field = new Rect(8, TitleHigh + names.Count * ListRow + 5, all.width - 64, 22);
-                typed = GUI.TextField(field, typed, 24);
-                if (typed == "") Faint(new Rect(field.x + 5, field.y + 1, field.width - 6, 20), "New workspace", text);
-                bool add = GUI.Button(new Rect(all.width - 50, field.y, 42, 22), "Add");
-                if ((enter || add) && typed.Trim() != "") picked = typed;
+                var field = new Rect(8, y + 5, all.width - 64, 22);
+                if (NewName(field, text, enter)) picked = typed;
                 var bring = new Rect(1, field.yMax + 6, all.width - 2, ListRow);
                 Fill(new Rect(bring.x, bring.y, bring.width, 1), Edge);
                 GUI.Label(new Rect(24, bring.y + 2, bring.width - 30, 20), "Bring a cloud session here", text);
                 bool toCloud = picked == "" && GUI.Button(bring, GUIContent.none, GUIStyle.none);
                 if (picked == "" && !away && !toCloud) return;
-                typed = "";
+                StopTyping();
                 if (e.type != EventType.Repaint && e.type != EventType.Layout) e.Use();
                 if (picked != "") give(picked); else if (toCloud) cloud(); else close();
             }, GUIContent.none, GUIStyle.none);
+        }
+
+        // Every workspace with its repos, drawn over everything else as the list is. A click on a repo calls `pick` with its
+        // root. `rename` as in the list; `add` is called with a new workspace's name, and says why not, or "".
+        public void AllWorkspaces(Rect window, List<WorkspaceGroup> groups, GUIStyle text, GUIStyle strong, Action<string> pick, Func<string, string, string> rename, Func<string, string> add, Action close)
+        {
+            float rows = WhyHigh(groups.Exists(g => g.name == renaming));
+            foreach (var g in groups) rows += GroupGap + (1 + Mathf.Max(1, g.roots.Count)) * ListRow;
+            float foot = 34 + WhyHigh(renaming == "");
+            float shown = Mathf.Min(rows, Mathf.Max(ListRow, window.height - 2 * AllTop - TitleHigh - foot));
+            var size = new Vector2(Mathf.Min(AllWide, window.width - 16), TitleHigh + shown + foot);
+            // Beside the "Needs you" panel, where there is room for both.
+            var panel = new Rect(Panels.Fit(new Vector2(window.width - size.x - Wide - 2 * Margin - 8, AllTop), size, window), size);
+            GUI.ModalWindow(0x616c6c77, panel, id =>
+            {
+                var e = Event.current;
+                var all = new Rect(0, 0, panel.width, panel.height);
+                Keys(e, all, out bool away, out bool enter);
+                Back(all);
+                Title(all, "Workspaces", strong, ref away);
+                string picked = "";
+                var view = new Rect(1, TitleHigh, all.width - 2, shown);
+                float w = view.width - (rows > shown ? 16 : 0);
+                allScroll = GUI.BeginScrollView(view, allScroll, new Rect(0, 0, w, rows));
+                float y = 0;
+                for (int i = 0; i < groups.Count; i++)
+                {
+                    var g = groups[i];
+                    if (i > 0) Fill(new Rect(0, y + GroupGap / 2, w, 1), Edge);
+                    y += GroupGap;
+                    var row = new Rect(0, y, w, ListRow);
+                    int light = Lights.Family(Lights.Primary(g.look))[1];
+                    if (g.name != renaming) Fill(new Rect(9, row.y + 8, 8, 8), new Color32((byte)(light >> 16), (byte)(light >> 8), (byte)light, 255));
+                    NameRow(row, g.name, strong, text, enter, rename, ref y);
+                    for (int r = 0; r < g.roots.Count; r++, y += ListRow)
+                    {
+                        var repo = new Rect(0, y, w, ListRow);
+                        if (repo.Contains(e.mousePosition)) Fill(repo, Hover);
+                        GUI.Label(new Rect(32, y + 2, w - 36, 20), g.repos[r] + " ▾", text);
+                        if (GUI.Button(repo, GUIContent.none, GUIStyle.none)) picked = g.roots[r];
+                    }
+                    if (g.roots.Count > 0) continue;
+                    Faint(new Rect(32, y + 2, w - 36, 20), "no repo yet", text);
+                    y += ListRow;
+                }
+                GUI.EndScrollView();
+                var field = new Rect(8, TitleHigh + shown + 5, all.width - 64, 22);
+                if (NewName(field, text, enter))
+                {
+                    why = add(typed);
+                    if (why == "")
+                    {
+                        StopTyping();
+                        allScroll.y = float.MaxValue;   // the new one is the last; the view holds it to what there is
+                    }
+                }
+                if (renaming == "" && why != "") Say(new Rect(12, field.yMax + 1, all.width - 20, 20), text);
+                if (picked == "" && !away) return;
+                StopTyping();
+                if (e.type != EventType.Repaint && e.type != EventType.Layout) e.Use();
+                if (picked != "") pick(picked); else close();
+            }, GUIContent.none, GUIStyle.none);
+        }
+
+        // Read before a text field is drawn, which may take a key for itself. Escape first gives up a rename.
+        void Keys(Event e, Rect all, out bool away, out bool enter)
+        {
+            bool escape = e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape;
+            enter = e.type == EventType.KeyDown && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter);
+            away = e.type == EventType.MouseDown && !all.Contains(e.mousePosition);
+            if (escape && renaming != "")
+            {
+                StopTyping();
+                e.Use();
+            }
+            else away |= escape;
+        }
+
+        static void Title(Rect all, string words, GUIStyle strong, ref bool away)
+        {
+            GUI.Label(new Rect(8, 3, all.width - 40, 22), words, strong);
+            GUI.Label(new Rect(all.width - 22, 3, 16, 22), "×", strong);
+            away |= GUI.Button(new Rect(all.width - 30, 0, 30, TitleHigh), GUIContent.none, GUIStyle.none);
+        }
+
+        // One workspace's line: its name and "rename", or, while it is being renamed, a box with the new name. Moves y past
+        // it. True when the name is shown, so that the line may be clicked.
+        bool NameRow(Rect row, string name, GUIStyle style, GUIStyle text, bool enter, Func<string, string, string> rename, ref float y)
+        {
+            y += ListRow;
+            if (name != renaming)
+            {
+                GUI.Label(new Rect(24, row.y + (style == text ? 2 : 1), row.width - 24 - RenameWide, 22), name, style);
+                var pen = new Rect(row.xMax - RenameWide, row.y, RenameWide, row.height);
+                if (pen.Contains(Event.current.mousePosition)) GUI.Label(new Rect(pen.x, pen.y + 2, pen.width, 20), "rename", text);
+                else Faint(new Rect(pen.x, pen.y + 2, pen.width, 20), "rename", text);
+                if (GUI.Button(pen, GUIContent.none, GUIStyle.none))
+                {
+                    StopTyping();
+                    renaming = renamed = name;
+                    focus = true;
+                }
+                return true;
+            }
+            GUI.SetNextControlName("rename");
+            renamed = GUI.TextField(new Rect(18, row.y + 1, row.width - 80, 22), renamed, 24);
+            if (focus && Event.current.type == EventType.Repaint)
+            {
+                GUI.FocusControl("rename");
+                focus = false;
+            }
+            if (GUI.Button(new Rect(row.xMax - 56, row.y + 1, 50, 22), "Keep") || enter)
+            {
+                why = rename(name, renamed);
+                if (why == "") StopTyping();
+                if (enter) Event.current.Use();
+            }
+            else if (why != "")
+            {
+                Say(new Rect(22, y, row.width - 26, 20), text);
+                y += WhyLine;
+            }
+            return false;
+        }
+
+        // The line a new workspace is named on. True when the owner is done with the name.
+        bool NewName(Rect field, GUIStyle text, bool enter)
+        {
+            string was = typed;
+            typed = GUI.TextField(field, typed, 24);
+            if (typed != was) renaming = why = "";
+            if (typed == "") Faint(new Rect(field.x + 5, field.y + 1, field.width - 6, 20), "New workspace", text);
+            bool done = GUI.Button(new Rect(field.xMax + 6, field.y, 42, 22), "Add") || enter;
+            return done && renaming == "" && typed.Trim() != "";
+        }
+
+        // What a rename or a new name was refused for.
+        void Say(Rect at, GUIStyle text)
+        {
+            var old = GUI.color;
+            GUI.color = Refused;
+            GUI.Label(at, why, text);
+            GUI.color = old;
+        }
+
+        float WhyHigh(bool here) => here && why != "" ? WhyLine : 0;
+
+        void StopTyping()
+        {
+            typed = renaming = renamed = why = "";
+            GUIUtility.keyboardControl = 0;   // else the next box in line would have the keys, and the old box's text
         }
 
         // Starts the cloud panel afresh: what is in its box, and which account is chosen.
@@ -417,7 +562,13 @@ namespace TheGrid
         float copiedUntil;
 
         const float ListWide = 280, ListRow = 24, CloudWide = 520, CodePad = 8, CopyRoom = 22;
+        const float AllWide = 330, AllTop = 36, GroupGap = 8, RenameWide = 60, WhyLine = 20;
+        static readonly Color Hover = new Color32(0x15, 0x1b, 0x38, 255), Refused = new Color32(0xff, 0x6b, 0x6b, 255);
         string typed = "";   // the name of a new workspace, as far as it has been typed
+        string renaming = "", renamed = "";   // the workspace being renamed, "" for none, and its new name so far
+        string why = "";     // why the last name was refused
+        bool focus;          // the rename box has just opened and takes the keys
+        Vector2 allScroll;
         string pasted = "";  // what the owner put in the cloud panel's box
         int cloudAccount;    // and the account chosen there
 
