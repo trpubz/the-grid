@@ -345,7 +345,7 @@ namespace TheGrid
                         allScroll.y = float.MaxValue;   // the new one is the last; the view holds it to what there is
                     }
                 }
-                if (renaming == "" && why != "") Say(new Rect(12, field.yMax + 1, all.width - 20, 20), text);
+                if (renaming == "" && why != "") Say(new Rect(12, field.yMax + 1, all.width - 20, WhyLine), text);
                 if (picked == "" && !away) return;
                 StopTyping();
                 if (e.type != EventType.Repaint && e.type != EventType.Layout) e.Use();
@@ -408,7 +408,7 @@ namespace TheGrid
             }
             else if (why != "")
             {
-                Say(new Rect(22, y, row.width - 26, 20), text);
+                Say(new Rect(22, y, row.width - 26, WhyLine), text);
                 y += WhyLine;
             }
             return false;
@@ -425,7 +425,7 @@ namespace TheGrid
             return done && renaming == "" && typed.Trim() != "";
         }
 
-        // What a rename or a new name was refused for.
+        // What a rename or a new name was refused for: two lines, when the name in it is long.
         void Say(Rect at, GUIStyle text)
         {
             var old = GUI.color;
@@ -562,7 +562,7 @@ namespace TheGrid
         float copiedUntil;
 
         const float ListWide = 280, ListRow = 24, CloudWide = 520, CodePad = 8, CopyRoom = 22;
-        const float AllWide = 330, AllTop = 36, GroupGap = 8, RenameWide = 60, WhyLine = 20;
+        const float AllWide = 330, AllTop = 36, GroupGap = 8, RenameWide = 60, WhyLine = 36;
         static readonly Color Hover = new Color32(0x15, 0x1b, 0x38, 255), Refused = new Color32(0xff, 0x6b, 0x6b, 255);
         string typed = "";   // the name of a new workspace, as far as it has been typed
         string renaming = "", renamed = "";   // the workspace being renamed, "" for none, and its new name so far
