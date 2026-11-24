@@ -24,8 +24,9 @@ namespace TheGrid.Core
         [Serializable] sealed class Block { public string type, name, text; public BlockInput input; }
         [Serializable] sealed class BlockInput { public string command, skill, ask; public List<AskedQuestion> questions; }
         [Serializable] sealed class AskedQuestion { public string question; }
-        // Only a user record is parsed for who it came from, so another record's own "origin" cannot spoil its line.
-        [Serializable] sealed class UserLine { public string type; public bool isSidechain; public Origin origin; }
+        // Who a message came from is parsed with its own class, so another record's own "origin" cannot spoil its line.
+        [Serializable] sealed class UserLine { public string type; public bool isSidechain; public Origin origin; public Attachment attachment; }
+        [Serializable] sealed class Attachment { public Origin origin; }
         [Serializable] sealed class Origin { public string kind; }
 
         // <configDir>/sessions/<pid>.json. Undocumented by Claude Code, so every failure is just "no info".
@@ -189,13 +190,16 @@ namespace TheGrid.Core
             return true;
         }
 
-        // True when the line is a message from a person. What another session or the app itself says in their place has another origin, or none.
+        // True when the line is a message from a person: a user record or, sent while the session is at work, an attachment that
+        // holds it. What another session or the app itself says in their place has another origin, or none.
         static bool IsPersons(string line)
         {
             try
             {
                 var r = JsonUtility.FromJson<UserLine>(line);
-                return r != null && r.type == "user" && !r.isSidechain && r.origin != null && r.origin.kind == "human";
+                if (r == null || r.isSidechain) return false;
+                var from = r.type == "user" ? r.origin : r.type == "attachment" && r.attachment != null ? r.attachment.origin : null;
+                return from != null && from.kind == "human";
             }
             catch (ArgumentException) { return false; }
         }

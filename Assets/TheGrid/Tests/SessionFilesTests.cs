@@ -151,6 +151,19 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual("", EndQuestion(Edits + ToolResult), "the answer's own turn does not reopen it");
         }
 
+        // A message sent while the session is at work is kept as an attachment, with where it came from inside.
+        static string Queued(string kind) =>
+            "{\"type\":\"attachment\",\"isSidechain\":false,\"attachment\":{\"type\":\"queued_command\",\"prompt\":\"the second\",\"commandMode\":\"prompt\",\"origin\":{\"kind\":\"" + kind + "\"}}}\n";
+
+        [Test]
+        public void APersonsMessageDuringAnAutomaticTurnClosesTheQuestion()
+        {
+            var turn = TurnEnd(EndAsks) + Closing + From("task-notification") + Edits;
+            Assert.AreEqual("Which made-up fix first?", EndQuestion(turn + Queued("peer") + Queued("task-notification") + Closing));
+            Assert.AreEqual("", EndQuestion(Queued("human") + Edits + Closing));
+            Assert.AreEqual("Which made-up fix first?", EndQuestion(Queued("human") + TurnEnd(EndAsks) + Closing), "it came before the question");
+        }
+
         [TestCase("task-notification")]
         [TestCase("peer")]
         [TestCase("")]
