@@ -260,6 +260,63 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual("", builder.Build(new[] { s }, None, Now + 2000).agents[0].needs);
         }
 
+        const string TurnEnd = "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"mcp__demo__wrap_up\",\"input\":{\"ask\":\"Which made-up fix first?\"}}]}}\n";
+        const string Person = "{\"type\":\"user\",\"origin\":{\"kind\":\"human\"},\"message\":{\"role\":\"user\",\"content\":\"the second\"}}\n";
+
+        [Test]
+        public void AnIdleSessionThatEndedItsTurnOnAQuestionNeedsTheOwnerUntilAnswered()
+        {
+            File.AppendAllText(transcript, TurnEnd);
+            var s = Idle(S2, "beta", "/work/none");
+            s.ConfigDir = cfg;
+            var builder = new RosterBuilder(settings, "/cfg");
+            string Row()
+            {
+                var r = builder.Build(new[] { s }, None, Now).agents.Find(a => a.sessionId == S2);
+                return r.state + "|" + r.needs + "|" + r.rawStatus;
+            }
+            Assert.AreEqual("BlockedOnQuestion|Which made-up fix first?|idle", Row());
+            s.Status = "busy";
+            Assert.AreEqual("Running||busy", Row(), "a session at work shows as working, whatever it asked");
+            s.Status = "idle";
+            Assert.AreEqual("BlockedOnQuestion|Which made-up fix first?|idle", Row(), "an automatic turn answered nothing");
+            File.AppendAllText(transcript, Person + Assistant("Edit", "{}"));
+            Assert.AreEqual("Finished||idle", Row());
+        }
+
+        [Test]
+        public void AnOldTurnsQuestionIsNotGivenForTheOneASessionWaitsOnNow()
+        {
+            File.AppendAllText(transcript, TurnEnd);
+            var s = Idle(S2, "beta", "/work/none");
+            s.ConfigDir = cfg; s.Status = "waiting"; s.WaitingFor = "input needed";
+            var row = new RosterBuilder(settings, "/cfg").Build(new[] { s }, None, Now).agents[0];
+            Assert.AreEqual("BlockedOnQuestion", row.state);
+            Assert.AreEqual("", row.needs);
+        }
+
+        [Test]
+        public void ATurnThatEndedOnAnApiErrorHasFailedWhateverItAskedBefore()
+        {
+            File.AppendAllText(transcript, TurnEnd + "{\"type\":\"assistant\",\"isApiErrorMessage\":true,\"message\":{\"role\":\"assistant\",\"content\":[]}}\n");
+            var s = Idle(S2, "beta", "/work/none");
+            s.ConfigDir = cfg;
+            var row = new RosterBuilder(settings, "/cfg").Build(new[] { s }, None, Now).agents[0];
+            Assert.AreEqual("Errored", row.state);
+            Assert.AreEqual("", row.needs);
+        }
+
+        [Test]
+        public void ABackgroundSessionThatIsDoneAsksNothing()
+        {
+            File.AppendAllText(transcript, TurnEnd);
+            var s = Idle(S2, "beta", "/work/none");
+            s.ConfigDir = cfg; s.Kind = "background"; s.Status = ""; s.State = "done";
+            var row = new RosterBuilder(settings, "/cfg").Build(new[] { s }, None, Now).agents[0];
+            Assert.AreEqual("Finished", row.state);
+            Assert.AreEqual("", row.needs);
+        }
+
         [Test]
         public void ActivityIsGivenOnlyWhileRunning()
         {

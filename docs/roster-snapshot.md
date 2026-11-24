@@ -27,7 +27,7 @@ The exact JSON is pinned by a test against [`fixtures/roster/snapshot.json`](../
 | `prNumber`, `prUrl` | Pull request; `0` and empty when none | Pull request record in the transcript. Once seen it is kept |
 | `state` | One of the states below | Mapped from the live session list |
 | `activity` | What a running agent is doing: `reading`, `editing`, `testing`, `reviewing`, or `working` when it cannot be told. Empty in every other state | The newest record of the agent's own in its transcript: the last tool it used, or keywords in what it said |
-| `needs` | What a blocked session is waiting on, one line of at most 300 letters. Empty in every other state, and when the source says nothing | A blocked background session: `needs` in `<config folder>/jobs/<short id>/state.json`, the session's own folder first. A session waiting on a question: the first question of its open `AskUserQuestion` call in the transcript, followed by ` +N` when the call holds N more |
+| `needs` | What a blocked session is waiting on, one line of at most 300 letters. Empty in every other state, and when the source says nothing | A blocked background session: `needs` in `<config folder>/jobs/<short id>/state.json`, the session's own folder first. A session waiting on a question: the first question of its open `AskUserQuestion` call in the transcript, followed by ` +N` when the call holds N more. A session whose turn ended on a question: the `ask` of the newest end-of-turn call (a tool whose name ends with `wrap_up`) in the transcript, while no message from a person comes after it |
 | `needsDetail` | Why it is waiting, cleaned the same way. Empty when none | `detail` in the same file |
 | `rawStatus` | The agent app's own words, such as `waiting / input needed` | Live session list |
 | `workspace` | Workspace the repo is assigned to; `Personal` when unassigned | Settings |
@@ -42,7 +42,7 @@ A subagent has `agentId`, `description` (what it was asked to do) and `agentType
 
 | `state` | Meaning |
 |---|---|
-| `BlockedOnQuestion` | The agent asked a person something and cannot continue |
+| `BlockedOnQuestion` | The agent asked a person something and cannot continue, or a session at rest ended its turn on a question no person has answered |
 | `WaitingForPermission` | The agent needs an approval |
 | `WaitingOther` | Waiting on something else, such as an open dialog |
 | `BackgroundBlocked` | A background session that is blocked |

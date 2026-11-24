@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using UnityEngine;
 
 namespace TheGrid.Core
@@ -9,7 +10,8 @@ namespace TheGrid.Core
     public sealed class SessionFileInfo { public long StatusUpdatedAt; public string Entrypoint = ""; }
 
     // Activity is "" when the window read holds no record of the agent's own. Question is the open question at the end of the transcript, if any.
-    public sealed class TranscriptMeta { public string Branch = ""; public int PrNumber; public string PrUrl = ""; public string Activity = ""; public string Question = ""; public bool ApiError; }
+    // EndQuestion is the one a desktop session's last turn ended on, while no person has answered it.
+    public sealed class TranscriptMeta { public string Branch = ""; public int PrNumber; public string PrUrl = ""; public string Activity = ""; public string Question = "", EndQuestion = ""; public bool ApiError; }
 
     // Read-only access to files Claude Code writes under a config directory.
     public static class SessionFiles
@@ -20,8 +22,11 @@ namespace TheGrid.Core
         [Serializable] sealed class AssistantLine { public string type; public bool isSidechain; public AssistantMessage message; }
         [Serializable] sealed class AssistantMessage { public List<Block> content; }
         [Serializable] sealed class Block { public string type, name, text; public BlockInput input; }
-        [Serializable] sealed class BlockInput { public string command, skill; public List<AskedQuestion> questions; }
+        [Serializable] sealed class BlockInput { public string command, skill, ask; public List<AskedQuestion> questions; }
         [Serializable] sealed class AskedQuestion { public string question; }
+        // Only a user record is parsed for who it came from, so another record's own "origin" cannot spoil its line.
+        [Serializable] sealed class UserLine { public string type; public bool isSidechain; public Origin origin; }
+        [Serializable] sealed class Origin { public string kind; }
 
         // <configDir>/sessions/<pid>.json. Undocumented by Claude Code, so every failure is just "no info".
         public static bool TryReadSessionFile(string configDir, int pid, out SessionFileInfo info)
@@ -103,8 +108,8 @@ namespace TheGrid.Core
 
             // Newest first, and stop parsing branch lines once one is found: nearly every line carries the branch.
             var lines = text.Substring(from, end - from).Split('\n');
-            bool haveBranch = false, havePr = false, haveActivity = false, haveLast = false;
-            for (int i = lines.Length - 1; i >= 0 && !(haveBranch && havePr && haveActivity && haveLast); i--)
+            bool haveBranch = false, havePr = false, haveActivity = false, haveLast = false, haveEnd = false;
+            for (int i = lines.Length - 1; i >= 0 && !(haveBranch && havePr && haveActivity && haveLast && haveEnd); i--)
             {
                 var line = lines[i];
                 // The newest record of the agent's own decides what it is doing.
@@ -114,6 +119,13 @@ namespace TheGrid.Core
                     meta.Question = question;
                     haveActivity = true;
                 }
+                // The newer of a turn's end and a person's message says whether a question is open.
+                if (!haveEnd && line.IndexOf("wrap_up\"", StringComparison.Ordinal) >= 0 && TryTurnEnd(line, out var ask))
+                {
+                    meta.EndQuestion = ask;
+                    haveEnd = true;
+                }
+                else if (!haveEnd && line.IndexOf("\"human\"", StringComparison.Ordinal) >= 0 && IsPersons(line)) haveEnd = true;
                 bool branchLine = !haveBranch && line.IndexOf("\"gitBranch\"", StringComparison.Ordinal) >= 0;
                 bool prLine = !havePr && line.IndexOf("\"pr-link\"", StringComparison.Ordinal) >= 0;
                 // The newest record of the conversation says whether it ended on an API error.
@@ -157,6 +169,35 @@ namespace TheGrid.Core
                 if (first != "") question = asked.Count > 1 ? first + " +" + (asked.Count - 1) : first;
             }
             return true;
+        }
+
+        // True when the line is a desktop session ending its turn with the next-step box; `ask` is the question the box leaves, or "".
+        // The desktop app does not document the box, so anything unexpected in it is no question.
+        static bool TryTurnEnd(string line, out string ask)
+        {
+            ask = "";
+            AssistantLine r;
+            try { r = JsonUtility.FromJson<AssistantLine>(line); }
+            catch (ArgumentException) { return false; }
+            if (r == null || r.type != "assistant" || r.isSidechain || r.message == null || r.message.content == null) return false;
+            Block end = null;
+            foreach (var b in r.message.content)
+                if (b != null && b.type == "tool_use" && b.name != null && b.name.EndsWith("wrap_up", StringComparison.Ordinal)) end = b;
+            if (end == null) return false;
+            // JsonUtility turns a number into the string "5"; only a string is a question.
+            if (end.input != null && Regex.IsMatch(line, "\"ask\"\\s*:\\s*\"")) ask = Needs.Clean(end.input.ask);
+            return true;
+        }
+
+        // True when the line is a message from a person. What another session or the app itself says in their place has another origin, or none.
+        static bool IsPersons(string line)
+        {
+            try
+            {
+                var r = JsonUtility.FromJson<UserLine>(line);
+                return r != null && r.type == "user" && !r.isSidechain && r.origin != null && r.origin.kind == "human";
+            }
+            catch (ArgumentException) { return false; }
         }
 
         // Every session transcript: <configDir>/projects/*/*.jsonl. Subagent transcripts sit deeper and are not listed.

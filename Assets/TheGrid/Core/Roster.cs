@@ -12,7 +12,7 @@ namespace TheGrid.Core
         public string sessionId = "", name = "", account = "", app = "", repoRoot = "", repoName = "", branch = "", ticket = "", prUrl = "", state = "", rawStatus = "", workspace = "";
         // What a running agent is doing: reading, editing, testing, reviewing or working. Empty in every other state.
         public string activity = "";
-        // What a blocked session is waiting on and why: the open question from its transcript, or a background session's job file. Empty in every other state.
+        // What a blocked session is waiting on and why: the open question from its transcript, be it one it waits on or one its turn ended on, or a background session's job file. Empty in every other state.
         public string needs = "", needsDetail = "";
         public int prNumber;
         public long stateSince;
@@ -121,7 +121,7 @@ namespace TheGrid.Core
             public bool Seen;
             public string TranscriptPath;
             public long TranscriptStamp;
-            public string Activity = "", Question = "";
+            public string Activity = "", Question = "", EndQuestion = "";
             public bool ApiError;
         }
 
@@ -236,12 +236,16 @@ namespace TheGrid.Core
                     if (meta.PrNumber > 0) { row.prNumber = meta.PrNumber; row.prUrl = meta.PrUrl; }
                     m.Activity = meta.Activity;
                     m.Question = meta.Question;
+                    m.EndQuestion = meta.EndQuestion;
                     m.ApiError = meta.ApiError;
                 }
             }
             var state = LiveSessions.Map(s);
             // The live list says idle for a turn that ended on an API error too. A background session's own state says which.
             if (state == AgentState.Finished && m.ApiError && s.Kind != "background") state = AgentState.Errored;
+            // It says idle for one that ended its turn on a question, too.
+            bool endedAsking = state == AgentState.Finished && m.EndQuestion != "" && s.Kind != "background";
+            if (endedAsking) state = AgentState.BlockedOnQuestion;
             bool firstSight = !m.Seen;
             bool changed = firstSight || state != m.State;
             m.Seen = true;
@@ -276,7 +280,7 @@ namespace TheGrid.Core
             row.subagents = Subagents.ReadActive(m.TranscriptPath, nowMs);
 
             row.needs = row.needsDetail = "";
-            if (state == AgentState.BlockedOnQuestion) row.needs = m.Question;
+            if (state == AgentState.BlockedOnQuestion) row.needs = endedAsking ? m.EndQuestion : m.Question;
             else if (state == AgentState.BackgroundBlocked)
             {
                 // The session's own folder first: another folder may list the same job.
