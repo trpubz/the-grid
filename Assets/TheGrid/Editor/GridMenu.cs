@@ -66,6 +66,10 @@ namespace TheGrid.EditorTools
                 options = BuildOptions.None,
             });
             if (report.summary.result != BuildResult.Succeeded) throw new InvalidOperationException("build failed: " + report.summary.result);
+            // What macOS shows the owner when it asks whether the app may tell Ghostty which of its tabs to show. Without it, macOS refuses and does not ask.
+            Run("/usr/libexec/PlistBuddy", "-c \"Delete :NSAppleEventsUsageDescription\" \"Builds/TheGrid.app/Contents/Info.plist\"", out _);   // left by the build before, if Unity kept the file
+            if (Run("/usr/libexec/PlistBuddy", "-c \"Add :NSAppleEventsUsageDescription string The Grid shows the terminal tab of the session you clicked. It types nothing.\" \"Builds/TheGrid.app/Contents/Info.plist\"", out var plist) != 0)
+                throw new InvalidOperationException("Info.plist: " + plist.Trim());
             Sign("Builds/TheGrid.app");
         }
 

@@ -104,5 +104,57 @@ namespace TheGrid.Core.Tests
             Func<string, string, string> gone = (exe, args) => throw new InvalidOperationException("no such process");
             Assert.IsFalse(Zellij.Jump(41, "/z", gone, out _));                                      // the process went away: no exception
         }
+
+        // What `ps -ao tty=,command=` prints, cut down.
+        const string Terminals = "ttys001  zellij attach main-two\nttys003  /opt/bin/zellij attach main\nttys004  vi zellij main\n"
+            + "ttys005  zellij --session main action list-panes\n??       zellij attach main\nttys006  -zsh\n\nttys007  zellij a -c main\nttys008  zellij -s main\nttys009  zellij\n";
+
+        [TestCase("main", "ttys003 ttys007 ttys008")]   // attached twice, and where it was started
+        [TestCase("main-two", "ttys001")]               // one name begins with the other
+        [TestCase("mai", "")]
+        [TestCase("none", "")]
+        [TestCase("action", "")]
+        public void TheTerminalsThatShowASessionAreItsZellijClients(string session, string ttys) =>
+            Assert.AreEqual(ttys, string.Join(" ", Zellij.ClientTtys(Terminals, session)));
+
+        const string InGhostty = InAPane + " __CFBundleIdentifier=" + Zellij.Ghostty;
+
+        static List<string> Jumped(string ps, string terminals, Func<string> script, out bool told, out string app)
+        {
+            var ran = new List<string>();
+            string Run(string exe, string args)
+            {
+                ran.Add(exe + " " + args);
+                if (exe == "/usr/bin/osascript") return script();
+                return exe != "/bin/ps" ? args.Contains("list-panes") ? PanesWithIds : "" : args.StartsWith("-ao") ? terminals : ps;
+            }
+            told = Zellij.Jump(41, "/z", Run, out app);
+            return ran;
+        }
+
+        [Test]
+        public void GhosttyIsAskedToFocusTheTerminalThatShowsTheSessionOnceZellijIsOnTheTab()
+        {
+            var ran = Jumped(InGhostty, Terminals, () => "", out bool told, out var app);
+            Assert.IsTrue(told);
+            Assert.AreEqual(Zellij.Ghostty, app);
+            Assert.AreEqual("/z --session main action go-to-tab-by-id 3", ran[ran.Count - 3]);
+            Assert.AreEqual("/bin/ps -ao tty=,command=", ran[ran.Count - 2]);
+            StringAssert.StartsWith("/usr/bin/osascript -e ", ran.Last());
+            StringAssert.Contains("{\\\"/dev/ttys003\\\", \\\"/dev/ttys007\\\", \\\"/dev/ttys008\\\"}", ran.Last());
+        }
+
+        [Test]
+        public void ARefusalNoClientOrAnotherTerminalLeavesTheJumpAsItWas()
+        {
+            Jumped(InGhostty, Terminals, () => throw new InvalidOperationException("not allowed"), out bool told, out var app);
+            Assert.IsTrue(told); Assert.AreEqual(Zellij.Ghostty, app);
+            var ran = Jumped(InGhostty, "ttys001  zellij attach main-two\n", () => "", out told, out app);
+            Assert.IsTrue(told); Assert.AreEqual(Zellij.Ghostty, app);
+            Assert.IsFalse(ran.Any(r => r.Contains("osascript")));
+            ran = Jumped(InAPaneOfATerminal, Terminals, () => "", out told, out app);
+            Assert.IsTrue(told); Assert.AreEqual("com.example.term", app);
+            Assert.IsFalse(ran.Any(r => r.Contains("osascript") || r.Contains("-ao")));   // only Ghostty is asked, and only for it are the terminals looked through
+        }
     }
 }
