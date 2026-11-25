@@ -608,7 +608,7 @@ namespace TheGrid
             if (!names.Contains(current)) names.Add(current);
             string repo = row != null ? row.repoName : Path.GetFileName(workspaceFor.TrimEnd('/'));
             panels.Workspaces(window, GUIUtility.ScreenToGUIPoint(workspaceAt), repo, current, names, detail, title,
-                name => { GiveWorkspace(workspaceFor, name); workspaceFor = ""; }, RenameWorkspace, () => workspaceFor = "", () => OpenCloud(workspaceFor, ""));
+                name => { GiveWorkspace(workspaceFor, name); workspaceFor = ""; }, () => workspaceFor = "", () => OpenCloud(workspaceFor, ""));
         }
 
         // Opens the panel that brings a cloud session to a repo, in place of the list of workspaces it was asked from.
