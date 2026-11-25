@@ -213,6 +213,24 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual("Which made-up fix first?", EndQuestion(relayed), "only the message's own origin says who it came from");
         }
 
+        static string Big(int bytes) => "{\"type\":\"api-request-blob\",\"data\":\"" + new string('x', bytes) + "\"}\n";
+
+        [Test]
+        public void AQuestionBehindAVeryLargeRecordIsStillOpen()
+        {
+            Assert.AreEqual("Which made-up fix first?", EndQuestion(TurnEnd(EndAsks) + Big(400000) + Closing));
+            Assert.AreEqual("", SessionFiles.ReadTranscriptTail(transcript).Branch, "the branch, as far back, is not taken on the way");
+            Assert.AreEqual("Which made-up fix first?", EndQuestion(Big(300000)), "also when one record is the whole of the first window");
+            Assert.AreEqual("", EndQuestion(From("human") + Big(300000)), "a person's message behind it closes it as any other");
+        }
+
+        [Test]
+        public void AQuestionPastTheFarthestLookIsNotFound()
+        {
+            Assert.AreEqual("", EndQuestion(TurnEnd(EndAsks) + Big(700000) + Big(700000) + Edits));
+            Assert.AreEqual("editing", SessionFiles.ReadTranscriptTail(transcript).Activity);
+        }
+
         [Test]
         public void MissingTranscriptGivesEmptyMeta()
         {
