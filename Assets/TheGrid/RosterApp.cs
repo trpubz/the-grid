@@ -65,7 +65,7 @@ namespace TheGrid
         string openKey = "", nextOpenKey = "", openBody = "";
         bool pileLogged;
         readonly Dictionary<string, string> lastState = new Dictionary<string, string>();
-        GUIStyle chip, title, dim, detail, error, button, body;
+        GUIStyle chip, title, dim, detail, error, button, body, line;
         float rowWidth, warnedWidth = -1f;
         string lastErrors = "";
 
@@ -132,7 +132,7 @@ namespace TheGrid
                 program = gameObject.AddComponent<DesktopProgram>();
                 program.Family = Fonts.Pick(settings.font, Font.GetOSInstalledFontNames());
                 program.Pinned = settings.programPinned;
-                program.RowClicked += JumpTo;
+                program.RowClicked += row => JumpTo(row.key, row.pid);
                 program.GridWanted += Cocoa.BringGridForward;
                 program.PinClicked += FlipPin;
             }
@@ -263,8 +263,8 @@ namespace TheGrid
 
         void Update()
         {
-            if (collector == null) return;
             if (jump != null && jump.IsCompleted) Jumped();
+            if (collector == null) return;
             if (!pileLogged && !pile.Latest.reading)
             {
                 pileLogged = true;
@@ -437,6 +437,8 @@ namespace TheGrid
             {
                 world.Select(clicked);
                 world.LookAt(clicked);
+                var one = drawn.agents.Find(a => Panels.Key(a) == clicked);
+                if (one != null) JumpTo(clicked, one.pid);
             }
             // A click on the card's workspace, or on a sector's name: the list of workspaces, for that repo.
             if (panels.WorkspaceClicked && card != null) OpenWorkspaces(card.repoRoot);
@@ -535,6 +537,7 @@ namespace TheGrid
 
         void DrawAgent(AgentRow a, long now)
         {
+            GUILayout.BeginVertical(line);
             GUILayout.BeginHorizontal();
             var old = GUI.contentColor;
             GUI.contentColor = ColorFor(a.state);
@@ -569,6 +572,9 @@ namespace TheGrid
                 GUILayout.Label("↳ " + s.description, dim);
                 GUILayout.EndHorizontal();
             }
+            GUILayout.EndVertical();
+            // Drawn after the row's own buttons, so that a click on one of them is theirs.
+            if (GUI.Button(GUILayoutUtility.GetLastRect(), GUIContent.none, GUIStyle.none)) JumpTo(Panels.Key(a), a.pid);
             GUILayout.Space(6);
         }
 
@@ -703,12 +709,13 @@ namespace TheGrid
             worldFrom = null;   // the same roster, lit otherwise: build the world again
         }
 
-        // A click on a row of the program's card: to the session's tab in zellij, or else to its bot in the world.
-        void JumpTo(ProgramRow row)
+        // A click on a row of the lists, of Needs you or of the program's card: to the session's tab in zellij, or else to
+        // its bot in the world. A snapshot's sessions are not this Mac's: no process is asked about.
+        void JumpTo(string key, int pid)
         {
-            int pid = row.pid;
             string path = zellij;
-            jumpKey = row.key;
+            jumpKey = key;
+            if (fixedSnap != null) pid = 0;
             jump = Task.Run(() =>
             {
                 bool told = Zellij.Jump(pid, path, Zellij.Run, out var app);
@@ -808,6 +815,10 @@ namespace TheGrid
             button = new GUIStyle(GUI.skin.button) { fontSize = 11 };
             body = new GUIStyle(GUI.skin.label) { fontSize = 12, wordWrap = true };
             body.normal.textColor = text;
+            line = new GUIStyle();   // a row of the lists: lighter under the pointer, since it can be clicked
+            line.hover.background = new Texture2D(1, 1) { hideFlags = HideFlags.HideAndDontSave };
+            line.hover.background.SetPixel(0, 0, new Color(1f, 1f, 1f, .06f));
+            line.hover.background.Apply();
         }
     }
 }

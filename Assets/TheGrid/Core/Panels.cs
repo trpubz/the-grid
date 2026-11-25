@@ -132,7 +132,7 @@ namespace TheGrid.Core
             return groups;
         }
 
-        static string Key(AgentRow a) => a.account + "|" + a.sessionId;   // as World.Build keys a bot
+        public static string Key(AgentRow a) => a.account + "|" + a.sessionId;   // as World.Build keys a bot
 
         static string Sector(AgentRow a) => a.repoName == "" ? World.NoProject : a.repoName;
 

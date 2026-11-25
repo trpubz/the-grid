@@ -60,6 +60,17 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
+        public void TheKeyOfEveryRowIsItsBotsInTheWorldAndOpensItsCard()
+        {
+            var bots = World.Build(snap, new Plots()).sectors.SelectMany(s => s.bots).ToList();
+            foreach (var a in snap.agents)
+            {
+                Assert.AreEqual(a.name, bots.Single(b => b.key == Panels.Key(a)).name);
+                StringAssert.StartsWith(a.name, Panels.Card(snap, Panels.Key(a), 1000).who);
+            }
+        }
+
+        [Test]
         public void NeedsYouIsExactlyTheBotsThatNeedTheOwnerInTheRostersOrder()
         {
             var want = snap.agents.Where(a => World.NeedsOwner(a.state)).Select(a => a.account + "|" + a.sessionId).ToList();
