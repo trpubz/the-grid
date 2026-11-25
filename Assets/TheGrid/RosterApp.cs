@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using TheGrid.Core;
 using UnityEngine;
@@ -51,6 +52,7 @@ namespace TheGrid
         Task<string> where;
         DesktopProgram program;                  // the bot on the desktop; null where there is none
         Task<(bool told, string app)> jump;      // a click on one of its card's rows, telling zellij on a thread of its own
+        CancellationTokenSource jumpDrop;        // stops it when there is a newer one
         string jumpKey = "", selectOnOpen = "";  // the row's bot; and the bot to select once the world is drawn
         Deliveries deliveries;      // made when the world is first opened: only what arrives after that is shown
         PileSnapshot deliveredFrom; // the pile snapshot last looked through for deliveries
@@ -716,9 +718,11 @@ namespace TheGrid
             string path = zellij;
             jumpKey = key;
             if (fixedSnap != null) pid = 0;
+            jumpDrop?.Cancel();   // a script that macOS is still asking about must not raise its tab after a newer click
+            var drop = (jumpDrop = new CancellationTokenSource()).Token;
             jump = Task.Run(() =>
             {
-                bool told = Zellij.Jump(pid, path, Zellij.Run, out var app);
+                bool told = Zellij.Jump(pid, path, (exe, args) => Zellij.Run(exe, args, drop), out var app);
                 return (told, app);
             });
         }
@@ -816,9 +820,13 @@ namespace TheGrid
             body = new GUIStyle(GUI.skin.label) { fontSize = 12, wordWrap = true };
             body.normal.textColor = text;
             line = new GUIStyle();   // a row of the lists: lighter under the pointer, since it can be clicked
-            line.hover.background = new Texture2D(1, 1) { hideFlags = HideFlags.HideAndDontSave };
-            line.hover.background.SetPixel(0, 0, new Color(1f, 1f, 1f, .06f));
-            line.hover.background.Apply();
+            if (!pictures)   // a pointer left over the window must not be in the picture
+            {
+                var light = new Texture2D(1, 1) { hideFlags = HideFlags.HideAndDontSave };
+                light.SetPixel(0, 0, new Color(1f, 1f, 1f, .06f));
+                light.Apply();
+                line.hover.background = light;
+            }
         }
     }
 }

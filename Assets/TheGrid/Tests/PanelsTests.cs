@@ -77,7 +77,7 @@ namespace TheGrid.Core.Tests
         public void OnlyTheNamesThatWereChangedAreKept()
         {
             var asked = new List<string>();
-            var edits = Edits("One>One", "Two> Deux ", "Three> Three ");
+            var edits = Edits("One>One", "Two> Deux ", "Three> Three ", " Four> Four");
             Assert.IsNull(Panels.KeepNames(edits, (from, to) => { asked.Add(from + ">" + to); return ""; }, out var why));
             Assert.AreEqual("", why);
             CollectionAssert.AreEqual(new[] { "Two>Deux" }, asked);

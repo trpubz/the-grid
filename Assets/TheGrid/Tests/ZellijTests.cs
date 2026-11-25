@@ -107,11 +107,14 @@ namespace TheGrid.Core.Tests
 
         // What `ps -ao tty=,command=` prints, cut down.
         const string Terminals = "ttys001  zellij attach main-two\nttys003  /opt/bin/zellij attach main\nttys004  vi zellij main\n"
-            + "ttys005  zellij --session main action list-panes\n??       zellij attach main\nttys006  -zsh\n\nttys007  zellij a -c main\nttys008  zellij -s main\nttys009  zellij\n";
+            + "ttys005  zellij --session main action list-panes\n??       zellij attach main\nttys006  -zsh\n\nttys007  zellij a -c main\nttys008  zellij -s main\nttys009  zellij\n"
+            + "ttys010  zellij -l dev --session laid\nttys011  zellij -s laid --layout dev\nttys012  zellij -l dev attach laid\nttys013  -zellij attach laid\nttys014  zellij run laid\n";
 
         [TestCase("main", "ttys003 ttys007 ttys008")]   // attached twice, and where it was started
         [TestCase("main-two", "ttys001")]               // one name begins with the other
         [TestCase("mai", "")]
+        [TestCase("laid", "ttys010 ttys011 ttys012 ttys013")]   // with a layout, and as a terminal's own command
+        [TestCase("dev", "")]
         [TestCase("none", "")]
         [TestCase("action", "")]
         public void TheTerminalsThatShowASessionAreItsZellijClients(string session, string ttys) =>
@@ -140,8 +143,28 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual(Zellij.Ghostty, app);
             Assert.AreEqual("/z --session main action go-to-tab-by-id 3", ran[ran.Count - 3]);
             Assert.AreEqual("/bin/ps -ao tty=,command=", ran[ran.Count - 2]);
-            StringAssert.StartsWith("/usr/bin/osascript -e ", ran.Last());
-            StringAssert.Contains("{\\\"/dev/ttys003\\\", \\\"/dev/ttys007\\\", \\\"/dev/ttys008\\\"}", ran.Last());
+            Assert.AreEqual("/usr/bin/osascript -e \"if application id \\\"com.mitchellh.ghostty\\\" is running then\" -e \"tell application id \\\"com.mitchellh.ghostty\\\"\" -e \"repeat with t in (get terminals)\""
+                + " -e \"if {\\\"/dev/ttys003\\\", \\\"/dev/ttys007\\\", \\\"/dev/ttys008\\\"} contains (tty of t) then\" -e \"focus (contents of t)\" -e \"return\" -e \"end if\" -e \"end repeat\" -e \"end tell\" -e \"end if\"", ran.Last());
+        }
+
+        [Test]
+        public void AJumpTheOwnerDidNotAnswerInAMinuteBringsNothingForward()
+        {
+            Jumped(InGhostty, Terminals, () => throw new TimeoutException(), out bool told, out var app);
+            Assert.IsTrue(told);
+            Assert.AreEqual("", app);
+        }
+
+        [Test]
+        public void AProgramIsStoppedWhenItsJumpIsDropped()
+        {
+            var drop = new System.Threading.CancellationTokenSource();
+            drop.CancelAfter(200);
+            var at = System.Diagnostics.Stopwatch.StartNew();
+            Assert.Throws<InvalidOperationException>(() => Zellij.Run("/bin/sleep", "2", drop.Token));
+            Assert.Less(at.ElapsedMilliseconds, 1500);
+            Assert.Throws<InvalidOperationException>(() => Zellij.Run("/bin/sleep", "0", drop.Token), "nothing is started for one already dropped");
+            Assert.AreEqual("hi\n", Zellij.Run("/bin/echo", "hi"));
         }
 
         [Test]

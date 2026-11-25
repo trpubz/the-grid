@@ -339,7 +339,7 @@ namespace TheGrid
                     y += ListRow;
                     var edit = editing ? open.Find(x => x.name == g.name) : null;   // none: made by hand in the settings file meanwhile
                     if (edit == null) GUI.Label(new Rect(24, row.y + 1, row.width - 28, 22), g.name, strong);
-                    else edit.typed = GUI.TextField(new Rect(22, row.y + 1, row.width - 30, 22), edit.typed, 24);
+                    else edit.typed = GUI.TextField(new Rect(22, row.y + 1, row.width - 30, 22), edit.typed, Mathf.Max(24, edit.name.Length));
                     if (edit != null && edit == refused)
                     {
                         Say(new Rect(24, y, w - 28, WhyLine), text);

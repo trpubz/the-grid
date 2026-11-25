@@ -143,7 +143,7 @@ namespace TheGrid.Core
             foreach (var e in edits)
             {
                 var to = e.typed.Trim();
-                if (to == e.name) continue;
+                if (e.typed == e.name || to == e.name) continue;   // as it was, also where the settings file has it with a space
                 why = rename(e.name, to);
                 if (why != "") return e;
                 e.name = to;

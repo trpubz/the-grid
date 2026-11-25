@@ -90,6 +90,7 @@ namespace TheGrid.EditorTools
             }
             if (identity == "")
             {
+                Run("/usr/bin/codesign", "--force --deep --sign - \"" + app + "\"", out _);   // Unity's own signature no longer fits: Info.plist was changed after it
                 Debug.LogWarning("[build] not signed: no Apple Development certificate was found, and " + IdentityFile + " names none. macOS will ask for folder access again after every rebuild.");
                 return;
             }
