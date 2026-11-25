@@ -121,6 +121,98 @@ namespace TheGrid.Core.Tests
             Assert.AreEqual("", SessionFiles.ReadTranscriptTail(transcript).Question);
         }
 
+        // The end of a desktop session's turn: its next-step box, with the question it leaves, if any.
+        static string TurnEnd(string input) =>
+            "{\"type\":\"assistant\",\"isSidechain\":false,\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"mcp__demo__wrap_up\",\"input\":" + input + "}]}}\n";
+        const string EndAsks = "{\"ask\":\"Which made-up  fix first?\",\"recap\":\"Two found.\"}";
+        const string ToolResult = "{\"type\":\"user\",\"isSidechain\":false,\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"content\":\"ok\"}]}}\n";
+        const string Closing = "{\"type\":\"assistant\",\"isSidechain\":false,\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"All done.\"}]}}\n";
+        static string From(string kind) =>
+            "{\"type\":\"user\",\"isSidechain\":false" + (kind == "" ? "" : ",\"origin\":{\"kind\":\"" + kind + "\"}") + ",\"message\":{\"role\":\"user\",\"content\":\"go on\"}}\n";
+
+        string EndQuestion(string lines)
+        {
+            File.AppendAllText(transcript, lines);
+            return SessionFiles.ReadTranscriptTail(transcript).EndQuestion;
+        }
+
+        [Test]
+        public void ATurnThatEndedOnAQuestionLeavesItOpen()
+        {
+            Assert.AreEqual("", SessionFiles.ReadTranscriptTail(transcript).EndQuestion);
+            Assert.AreEqual("Which made-up fix first?", EndQuestion(TurnEnd(EndAsks) + ToolResult + Closing + TurnDuration));
+            Assert.AreEqual("", SessionFiles.ReadTranscriptTail(transcript).Question, "it is not a question the session is waiting on mid-turn");
+        }
+
+        [Test]
+        public void APersonsMessageClosesTheTurnsQuestion()
+        {
+            Assert.AreEqual("", EndQuestion(TurnEnd(EndAsks) + Closing + From("human")));
+            Assert.AreEqual("", EndQuestion(Edits + ToolResult), "the answer's own turn does not reopen it");
+        }
+
+        // A message sent while the session is at work is kept as an attachment, with where it came from inside.
+        static string Queued(string kind) =>
+            "{\"type\":\"attachment\",\"isSidechain\":false,\"attachment\":{\"type\":\"queued_command\",\"prompt\":\"the second\",\"commandMode\":\"prompt\",\"origin\":{\"kind\":\"" + kind + "\"}}}\n";
+
+        [Test]
+        public void APersonsMessageDuringAnAutomaticTurnClosesTheQuestion()
+        {
+            var turn = TurnEnd(EndAsks) + Closing + From("task-notification") + Edits;
+            Assert.AreEqual("Which made-up fix first?", EndQuestion(turn + Queued("peer") + Queued("task-notification") + Closing));
+            Assert.AreEqual("", EndQuestion(Queued("human") + Edits + Closing));
+            Assert.AreEqual("Which made-up fix first?", EndQuestion(Queued("human") + TurnEnd(EndAsks) + Closing), "it came before the question");
+        }
+
+        [TestCase("task-notification")]
+        [TestCase("peer")]
+        [TestCase("")]
+        public void AnAutomaticTurnLeavesTheQuestionOpen(string kind)
+        {
+            Assert.AreEqual("Which made-up fix first?", EndQuestion(TurnEnd(EndAsks) + Closing + From(kind) + Edits + ToolResult + Closing));
+        }
+
+        [Test]
+        public void ANewerTurnsEndReplacesTheQuestion()
+        {
+            Assert.AreEqual("And now?", EndQuestion(TurnEnd(EndAsks) + From("peer") + TurnEnd("{\"ask\":\"And now?\",\"blocked\":true}")));
+            Assert.AreEqual("", EndQuestion(From("peer") + TurnEnd("{\"recap\":\"Nothing pending.\"}") + Closing), "a turn that ended on no question closes the one before it");
+        }
+
+        [TestCase("{}")]
+        [TestCase("{\"ask\":\"\"}")]
+        [TestCase("{\"ask\":\"  \"}")]
+        [TestCase("{\"ask\":null}")]
+        [TestCase("{\"ask\":5}")]
+        [TestCase("{\"ask\":true}")]
+        [TestCase("{\"ask\":[\"Which?\"]}")]
+        [TestCase("{\"ask\":{\"text\":\"Which?\"}}")]
+        [TestCase("\"ask\"")]
+        public void ATurnsEndWithNoWordsToAskIsNoQuestion(string input)
+        {
+            Assert.AreEqual("", EndQuestion(TurnEnd(EndAsks) + TurnEnd(input)));
+        }
+
+        [Test]
+        public void ASubagentsTurnsEndIsNotTheSessions()
+        {
+            string Side(string line) => line.Replace("\"isSidechain\":false", "\"isSidechain\":true");
+            Assert.AreEqual("", EndQuestion(Side(TurnEnd(EndAsks))));
+            Assert.AreEqual("Which made-up fix first?", EndQuestion(TurnEnd(EndAsks) + Side(From("human")) + Side(TurnEnd("{}"))));
+        }
+
+        [Test]
+        public void TextThatOnlyMentionsATurnsEndOrAPersonIsNeither()
+        {
+            var talk = "{\"type\":\"assistant\",\"isSidechain\":false,\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"wrap_up with \\\"ask\\\":\\\"Which?\\\" by a \\\"human\\\"\"}]}}\n";
+            var edit = "{\"type\":\"assistant\",\"isSidechain\":false,\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Edit\",\"input\":{\"ask\":\"wrap_up\"}}]}}\n";
+            var said = "{\"type\":\"user\",\"isSidechain\":false,\"message\":{\"role\":\"user\",\"content\":\"\\\"human\\\" wrap_up\"}}\n";
+            Assert.AreEqual("", EndQuestion(talk + edit + said));
+            Assert.AreEqual("Which made-up fix first?", EndQuestion(TurnEnd(EndAsks) + talk + edit + said + "not json, \"human\" wrap_up\n"));
+            var relayed = From("peer").Replace("\"type\":\"user\",", "\"type\":\"user\",\"writtenBy\":\"human\",");
+            Assert.AreEqual("Which made-up fix first?", EndQuestion(relayed), "only the message's own origin says who it came from");
+        }
+
         [Test]
         public void MissingTranscriptGivesEmptyMeta()
         {
