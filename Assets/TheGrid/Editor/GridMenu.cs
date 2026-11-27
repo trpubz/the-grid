@@ -66,6 +66,10 @@ namespace TheGrid.EditorTools
                 options = BuildOptions.None,
             });
             if (report.summary.result != BuildResult.Succeeded) throw new InvalidOperationException("build failed: " + report.summary.result);
+            // What macOS shows the owner when it asks whether the app may tell Ghostty which of its tabs to show. Without it, macOS refuses and does not ask.
+            Run("/usr/libexec/PlistBuddy", "-c \"Delete :NSAppleEventsUsageDescription\" \"Builds/TheGrid.app/Contents/Info.plist\"", out _);   // left by the build before, if Unity kept the file
+            if (Run("/usr/libexec/PlistBuddy", "-c \"Add :NSAppleEventsUsageDescription string The Grid shows the terminal tab of the session you clicked. It types nothing.\" \"Builds/TheGrid.app/Contents/Info.plist\"", out var plist) != 0)
+                throw new InvalidOperationException("Info.plist: " + plist.Trim());
             Sign("Builds/TheGrid.app");
         }
 
@@ -86,6 +90,7 @@ namespace TheGrid.EditorTools
             }
             if (identity == "")
             {
+                Run("/usr/bin/codesign", "--force --deep --sign - \"" + app + "\"", out _);   // Unity's own signature no longer fits: Info.plist was changed after it
                 Debug.LogWarning("[build] not signed: no Apple Development certificate was found, and " + IdentityFile + " names none. macOS will ask for folder access again after every rebuild.");
                 return;
             }

@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Threading;
 using UnityEngine;
 
 namespace TheGrid.Core
@@ -84,31 +85,88 @@ namespace TheGrid.Core
         public static bool Jump(int pid, string zellijPath, Func<string, string, string> run, out string app)
         {
             app = "";
+            string session;
             if (pid <= 0 || string.IsNullOrEmpty(zellijPath)) return false;
             try
             {
                 var ps = run("/bin/ps", "eww -o command= -p " + pid);
-                if (!TryPane(ps, out var session, out int pane)) return false;
+                if (!TryPane(ps, out session, out int pane)) return false;
                 int tab = TabIdOf(run(zellijPath, "--session " + session + " action list-panes --tab --json"), pane);
                 if (tab < 0) return false;
                 run(zellijPath, "--session " + session + " action go-to-tab-by-id " + tab);
                 app = TerminalApp(ps);
-                return true;
             }
             catch (Exception e) when (Expected(e)) { return false; }
+            // A terminal shows one zellij session in each of its own tabs. Not told which, it stays on the one last in front.
+            if (app == Ghostty)
+                try
+                {
+                    var ttys = ClientTtys(run("/bin/ps", "-ao tty=,command="), session);
+                    if (ttys.Count > 0) run(Osascript, FocusScript(ttys));
+                }
+                catch (TimeoutException) { app = ""; }       // macOS's question was left standing: by now the owner is elsewhere
+                catch (Exception e) when (Expected(e)) { }   // an older Ghostty, or the owner said no: the app still comes forward
+            return true;
+        }
+
+        public const string Ghostty = "com.mitchellh.ghostty", Osascript = "/usr/bin/osascript";
+
+        // The terminals in which a zellij session is shown: the ttys of the zellij programs that attached to it, or started
+        // it by name, from `ps -ao tty=,command=`. Nothing else of that list is kept.
+        // shortcut: what a client was started with. One started with no name, or with the beginning of one, is missed, and one that was since switched to another session is still taken for the first's; ask zellij once it says which tty a client has
+        public static List<string> ClientTtys(string ps, string session)
+        {
+            var found = new List<string>();
+            foreach (var line in (ps ?? "").Split('\n'))
+            {
+                var w = line.Split(new[] { ' ', '\t', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                if (w.Length < 4 || !Regex.IsMatch(w[0], @"^ttys\d+$") || Path.GetFileName(w[1]).TrimStart('-') != "zellij") continue;   // "-zellij" when it is the terminal's own command
+                int verb = 2, named = -1;   // the first word that is no option and no option's value: attach, or a command about a session, or none
+                for (; verb < w.Length && (w[verb][0] == '-' || w[verb - 1][0] == '-' && verb > 2); verb++)
+                    if (w[verb] == "-s" || w[verb] == "--session") named = verb + 1;
+                bool attached = verb < w.Length && (w[verb] == "attach" || w[verb] == "a") && Array.IndexOf(w, session, verb + 1) >= 0;
+                bool started = verb == w.Length && named >= 0 && named < w.Length && w[named] == session;
+                if (attached || started) found.Add(w[0]);
+            }
+            return found;
+        }
+
+        static string FocusScript(List<string> ttys)
+        {
+            var lines = new[]
+            {
+                "if application id \"" + Ghostty + "\" is running then",   // else asking it would start it
+                "tell application id \"" + Ghostty + "\"",
+                "repeat with t in (get terminals)",
+                "if {" + string.Join(", ", ttys.ConvertAll(t => "\"/dev/" + t + "\"")) + "} contains (tty of t) then",
+                "focus (contents of t)",
+                "return",
+                "end if",
+                "end repeat",
+                "end tell",
+                "end if"
+            };
+            return string.Join(" ", Array.ConvertAll(lines, l => "-e \"" + l.Replace("\"", "\\\"") + "\""));
         }
 
         static bool Expected(Exception e) => e is InvalidOperationException || e is TimeoutException || e is Win32Exception || e is IOException;
 
-        // Runs a program and gives what it printed. Throws when it cannot be started, fails, or takes longer than three seconds.
-        public static string Run(string exe, string arguments)
+        // Runs a program and gives what it printed. Throws when it cannot be started, fails, or takes longer than three
+        // seconds; a script waits for a minute, since the first time macOS asks the owner whether it may.
+        public static string Run(string exe, string arguments) => Run(exe, arguments, CancellationToken.None);
+
+        // Stopped, and as good as failed, when `drop` says so.
+        public static string Run(string exe, string arguments, CancellationToken drop)
         {
+            if (drop.IsCancellationRequested) throw new InvalidOperationException("dropped");
+            int wait = exe == Osascript ? 60000 : 3000;
             var psi = new ProcessStartInfo(exe, arguments) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
             using (var p = Process.Start(psi))
+            using (drop.Register(() => { try { p.Kill(); } catch (Exception e) when (Expected(e)) { } }))
             {
                 var stdout = p.StandardOutput.ReadToEndAsync();
                 var stderr = p.StandardError.ReadToEndAsync();
-                if (!p.WaitForExit(3000))
+                if (!p.WaitForExit(wait))
                 {
                     try { p.Kill(); } catch (InvalidOperationException) { }
                     throw new TimeoutException(Path.GetFileName(exe) + " did not answer");

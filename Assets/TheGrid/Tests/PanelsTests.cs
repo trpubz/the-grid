@@ -60,6 +60,46 @@ namespace TheGrid.Core.Tests
         }
 
         [Test]
+        public void TheKeyOfEveryRowIsItsBotsInTheWorldAndOpensItsCard()
+        {
+            var bots = World.Build(snap, new Plots()).sectors.SelectMany(s => s.bots).ToList();
+            foreach (var a in snap.agents)
+            {
+                Assert.AreEqual(a.name, bots.Single(b => b.key == Panels.Key(a)).name);
+                StringAssert.StartsWith(a.name, Panels.Card(snap, Panels.Key(a), 1000).who);
+            }
+        }
+
+        static List<NameEdit> Edits(params string[] pairs) =>
+            pairs.Select(p => p.Split('>')).Select(p => new NameEdit { name = p[0], typed = p[1] }).ToList();
+
+        [Test]
+        public void OnlyTheNamesThatWereChangedAreKept()
+        {
+            var asked = new List<string>();
+            var edits = Edits("One>One", "Two> Deux ", "Three> Three ", " Four> Four");
+            Assert.IsNull(Panels.KeepNames(edits, (from, to) => { asked.Add(from + ">" + to); return ""; }, out var why));
+            Assert.AreEqual("", why);
+            CollectionAssert.AreEqual(new[] { "Two>Deux" }, asked);
+            Assert.AreEqual("Deux", edits[1].name, "a second go must not ask under the old name");
+        }
+
+        [Test]
+        public void ANameThatIsRefusedStopsAndTheOnesBeforeItStayKept()
+        {
+            var asked = new List<string>();
+            var edits = Edits("One>Uno", "Two>", "Three>Tre");
+            var refused = Panels.KeepNames(edits, (from, to) => { asked.Add(from); return to == "" ? "A workspace needs a name." : ""; }, out var why);
+            Assert.AreSame(edits[1], refused);
+            Assert.AreEqual("A workspace needs a name.", why);
+            CollectionAssert.AreEqual(new[] { "One", "Two" }, asked);
+            CollectionAssert.AreEqual(new[] { "Uno", "Two", "Three" }, edits.Select(e => e.name));
+            edits[1].typed = "Due";
+            Assert.IsNull(Panels.KeepNames(edits, (from, to) => { asked.Add(from); return ""; }, out _));
+            CollectionAssert.AreEqual(new[] { "One", "Two", "Two", "Three" }, asked);
+        }
+
+        [Test]
         public void NeedsYouIsExactlyTheBotsThatNeedTheOwnerInTheRostersOrder()
         {
             var want = snap.agents.Where(a => World.NeedsOwner(a.state)).Select(a => a.account + "|" + a.sessionId).ToList();

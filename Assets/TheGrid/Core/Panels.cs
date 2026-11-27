@@ -35,6 +35,9 @@ namespace TheGrid.Core
         public List<string> roots = new List<string>(), repos = new List<string>();
     }
 
+    // A workspace's name while the owner edits it, and what has been typed in its box so far.
+    public sealed class NameEdit { public string name = "", typed = ""; }
+
     // The words of the two panels drawn over the world. Like the world itself, made from the roster snapshot and nothing else.
     public static class Panels
     {
@@ -132,7 +135,23 @@ namespace TheGrid.Core
             return groups;
         }
 
-        static string Key(AgentRow a) => a.account + "|" + a.sessionId;   // as World.Build keys a bot
+        // Gives every workspace whose name was changed its new one. Stops at the first that `rename` refuses, and gives that one
+        // with `why`; null when there is none. Those kept before it stay kept.
+        public static NameEdit KeepNames(List<NameEdit> edits, Func<string, string, string> rename, out string why)
+        {
+            why = "";
+            foreach (var e in edits)
+            {
+                var to = e.typed.Trim();
+                if (e.typed == e.name || to == e.name) continue;   // as it was, also where the settings file has it with a space
+                why = rename(e.name, to);
+                if (why != "") return e;
+                e.name = to;
+            }
+            return null;
+        }
+
+        public static string Key(AgentRow a) => a.account + "|" + a.sessionId;   // as World.Build keys a bot
 
         static string Sector(AgentRow a) => a.repoName == "" ? World.NoProject : a.repoName;
 

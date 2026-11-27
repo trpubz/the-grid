@@ -84,6 +84,20 @@ namespace TheGrid.Core
         // shortcut: only the last 256 KB is read, so a pull request recorded earlier is missed until it is written again; scan the whole file once if the PR column is often empty.
         public static TranscriptMeta ReadTranscriptTail(string path, int maxBytes = 262144)
         {
+            var meta = ReadTail(path, maxBytes, out bool more);
+            // One record of several hundred KB can stand between a question and the end of its turn. Only what closes or asks
+            // is looked for that far back.
+            // shortcut: 1 MB; of 455 real questions, the two that a session sat idle on past the first window were 399 and 706 KB back
+            if (more && maxBytes < FarBytes) meta.EndQuestion = ReadTail(path, FarBytes, out _).EndQuestion;
+            return meta;
+        }
+
+        const int FarBytes = 1 << 20;
+
+        // `more` when there is more of the file before the window and nothing in it says whether a question is open.
+        static TranscriptMeta ReadTail(string path, int maxBytes, out bool more)
+        {
+            more = false;
             var meta = new TranscriptMeta();
             string text;
             bool startsMidFile;
@@ -103,6 +117,7 @@ namespace TheGrid.Core
             }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException) { return meta; }
 
+            more = startsMidFile;
             int from = startsMidFile ? text.IndexOf('\n') + 1 : 0; // the first line is cut when the window starts mid-file
             int end = text.LastIndexOf('\n');                      // a last line with no newline is still being written
             if ((startsMidFile && from == 0) || end < from) return meta;
@@ -140,6 +155,7 @@ namespace TheGrid.Core
                 if (branchLine && !string.IsNullOrEmpty(r.gitBranch)) { meta.Branch = r.gitBranch; haveBranch = true; }
                 if (prLine && r.type == "pr-link" && r.prNumber > 0) { meta.PrNumber = r.prNumber; meta.PrUrl = r.prUrl ?? ""; havePr = true; }
             }
+            more = startsMidFile && !haveEnd;
             return meta;
         }
 
